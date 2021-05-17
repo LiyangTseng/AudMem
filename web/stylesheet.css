@@ -1,0 +1,16 @@
+* {
+    background-color: burlywood;
+}
+
+.title_section {
+    text-align: center;
+    color: brown;
+    font-size: 24px;
+}
+
+.main_section {
+    
+    text-align: center;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 20px;
+}
