@@ -1,16 +1,47 @@
-* {
-    background-color: burlywood;
+body{
+    background-color:#EFF2C0;
+    margin: 0px;
 }
 
 .title_section {
     text-align: center;
-    color: brown;
-    font-size: 24px;
+    color: #a52422;
+    font-size: 18px;
+}
+
+/* Add a black background color to the top navigation */
+.topnav {
+    background-color: #bea57d;
+    overflow: hidden;
+  }
+  
+  /* Style the links inside the navigation bar */
+.topnav a {
+    float: left;
+    color: #a52422;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: bold;
+}
+
+/* Change the color of links on hover */
+.topnav a:hover {
+    background-color: #a4bab7;
+    color: black;
+}
+
+/* Add a color to the active/current link */
+.topnav a.active {
+    background-color: #080f0f;
+    color: #bea57d;
 }
 
 .main_section {
-    
+    color: #080f0f;
     text-align: center;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
     font-size: 20px;
 }
+
