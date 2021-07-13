@@ -4,7 +4,7 @@ import os
 def open_all_links(idx):
     ''' a windows program to open all youtube links automatically '''
 
-    file_path = 'C:\\Users\\User\\Downloads\\yt_clips.csv'
+    file_path = 'C:\\Users\\User\\Downloads\\yt_info.csv'
     df = pd.read_csv(file_path)
 
     url_list = df['id'].values

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 AUDIO_DIR = 'Audios'
 
 def sample_data(yt_info_df):
-    ''' sample video data evenly from yt_clips respect to views'''
+    ''' sample video data evenly from yt_info respect to views'''
     
     valid_yt_info_df = yt_info_df[yt_info_df['valid']==1]
     valid_yt_info_df.sort_values(by=['viewCount'], inplace=True)
@@ -34,9 +34,9 @@ def sample_data(yt_info_df):
     return sampled_info_df
 
 if __name__ == '__main__':
-    yt_info_df = pd.read_csv('yt_clips.csv')
+    yt_info_df = pd.read_csv('yt_info.csv')
     sampled_yt_info = sample_data(yt_info_df)
-    sampled_yt_info.to_csv('sampled_yt_clips.csv', index=False)
+    sampled_yt_info.to_csv('sampled_yt_info.csv', index=False)
     
     n_bins = 7
     viewCounts = sampled_yt_info['viewCount'].to_numpy()
@@ -53,5 +53,5 @@ if __name__ == '__main__':
     video_num = len(sampled_yt_info)
     for i in range(video_num):
         print('========== {:02}/{} =========='.format(i+1, video_num))
-        os.system("youtube-dl -f 140 -o '{output_dir}/%(id)s.%(ext)s' {url}".format(
+        os.system("youtube-dl -f 140 -o '{output_dir}/%(id)s_%(title)s.%(ext)s' {url}".format(
             output_dir=AUDIO_DIR, url=sampled_yt_info.iloc[i]['id']))

@@ -74,7 +74,7 @@ def get_random_videos(category_id):
 def collect_yt_data(video_num):
     
     print('Collecting {} videos'.format(video_num))
-    save_file = 'yt_clips.csv'
+    save_file = 'yt_info.csv'
     ''' 
         get random music-category youtube videos from api and record their statistics, 
         the results will be saved at [save_file]    

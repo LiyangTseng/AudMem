@@ -39,7 +39,7 @@ def plot_histogram(yt_info_df):
     plt.savefig('valid_viewCounts.png')
 
 if __name__ == '__main__':
-    filename = 'yt_clips.csv'
+    filename = 'yt_info.csv'
     yt_info_df = pd.read_csv(filename)
     yt_info_df = preprocess(yt_info_df)
     yt_info_df.to_csv(filename, index=False)
