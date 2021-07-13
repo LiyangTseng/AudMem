@@ -5,7 +5,8 @@ import warnings
 warnings.filterwarnings('ignore')
 
 clip_length = 10
-audio_dir = 'songs'
+audio_dir = 'Audios/raw'
+
 title_chorus_dict = {}
 for playlist in os.listdir(audio_dir):
     for song in os.listdir(os.path.join(audio_dir, playlist)):

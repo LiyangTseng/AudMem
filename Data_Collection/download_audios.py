@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-AUDIO_DIR = 'Audios'
+AUDIO_DIR = 'Audios/raw'
 
 def sample_data(yt_info_df):
     ''' sample video data evenly from yt_info respect to views'''
@@ -50,6 +50,9 @@ if __name__ == '__main__':
     plt.savefig('sampled_viewCounts.png')
 
 
+    if not os.path.exists(AUDIO_DIR):
+        os.makedirs(AUDIO_DIR)
+        
     video_num = len(sampled_yt_info)
     for i in range(video_num):
         print('========== {:02}/{} =========='.format(i+1, video_num))
