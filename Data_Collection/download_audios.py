@@ -4,6 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import re
 
 AUDIO_DIR = 'Audios/raw'
 
@@ -21,7 +22,11 @@ def sample_data(yt_info_df):
     distri_list = [13, 13, 14, 14, 14, 13, 13]
     for _, row in valid_yt_info_df.iterrows():
         exp = int(np.log10(row['viewCount']))
-        if exp == exp_target:
+        '''
+            filter out title with chinise words
+            ref: https://stackoverflow.com/questions/34587346/python-check-if-a-string-contains-chinese-character
+        '''
+        if exp == exp_target and len(re.findall(r'[\u4e00-\u9fff]+', row['title']))==0:
             sampled_info_df = sampled_info_df.append(row, ignore_index=True)
             distri_cnt += 1
             if distri_cnt == distri_list[exp-start_exp]:
@@ -49,12 +54,15 @@ if __name__ == '__main__':
     plt.xlabel('log10 of views')
     plt.savefig('sampled_viewCounts.png')
 
-
+    
     if not os.path.exists(AUDIO_DIR):
         os.makedirs(AUDIO_DIR)
         
     video_num = len(sampled_yt_info)
     for i in range(video_num):
         print('========== {:02}/{} =========='.format(i+1, video_num))
-        os.system("youtube-dl -f 140 -o '{output_dir}/%(id)s_%(title)s.%(ext)s' {url}".format(
-            output_dir=AUDIO_DIR, url=sampled_yt_info.iloc[i]['id']))
+        audio_filename = '{id}_{title}.{ext}'.format(
+            id=sampled_yt_info.iloc[i]['id'][-11:], title=sampled_yt_info.iloc[i]['title'], ext='wav')
+        if not os.path.exists(os.path.join(AUDIO_DIR, audio_filename)):
+            os.system("youtube-dl --extract-audio  --audio-format wav -o '{output_dir}/%(id)s_%(title)s.%(ext)s' {url}".format(
+                        output_dir=AUDIO_DIR, filename = audio_filename, url=sampled_yt_info.iloc[i]['id']))

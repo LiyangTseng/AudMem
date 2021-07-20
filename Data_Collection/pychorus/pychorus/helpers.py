@@ -177,13 +177,5 @@ def find_and_output_chorus(input_file, output_file, clip_length=15):
     chorus_start = find_chorus(chroma, sr, song_length_sec, clip_length)
     if chorus_start is None:
         return
-
-    # print("Best chorus found at {0:g} min {1:.2f} sec".format(
-    #     chorus_start // 60, chorus_start % 60))
-
-    if output_file is not None:
-        chorus_wave_data = song_wav_data[int(chorus_start*sr) : int((chorus_start+clip_length)*sr)]
-        # sf.write(output_file, chorus_wave_data, sr)
-        #librosa.output.write_wav(output_file, chorus_wave_data, sr)
-
-    return chorus_start
+    else:
+        return chorus_start
