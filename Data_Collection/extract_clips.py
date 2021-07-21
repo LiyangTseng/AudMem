@@ -27,7 +27,7 @@ def extract_clip(audio_file, chorus_location):
 
 if __name__ == '__main__':
     
-    ''' usage: python extract_clips.py -i [starting index] -a [use audacity or not] '''
+    ''' usage: python extract_clips.py -index [starting index] -audacity [use audacity or not] '''
 
     parser = argparse.ArgumentParser(description='Starting location and audacity or not')
     parser.add_argument('-i', '--index', help='starting index (count from 1)', default=1)
@@ -42,13 +42,13 @@ if __name__ == '__main__':
             os.system('audacity "{}"'.format(row['file']))
             # need to close audacity first !!
             print('==============================')
-            print('Editing progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
+            print('Extracting progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
             print('Enter chorus location with format [min]:[sec]: ', end='')
             chorus_loc = input()
             extract_clip(row['file'], chorus_loc)
     else:
         for idx, row in chorus_df[start_idx:].iterrows():
             print('==============================')
-            print('Editing progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
+            print('Extracting progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
             chorus_loc = row['chorus_location']
             extract_clip(row['file'], chorus_loc)

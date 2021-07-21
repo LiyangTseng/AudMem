@@ -1,6 +1,7 @@
 import warnings
 warnings.filterwarnings('ignore')
 import os
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -39,10 +40,20 @@ def sample_data(yt_info_df):
     return sampled_info_df
 
 if __name__ == '__main__':
-    yt_info_df = pd.read_csv('yt_info.csv')
-    sampled_yt_info = sample_data(yt_info_df)
-    sampled_yt_info.to_csv('sampled_yt_info.csv', index=False)
+
+    ''' python download_audios.py -sample [True/False] '''
     
+    parser = argparse.ArgumentParser(description='resample audios or not')
+    parser.add_argument('-s', '--sample', help='sample audios from yt_info.csv', default=False, type=bool)
+    args = parser.parse_args()
+
+    if args.sample:
+        yt_info_df = pd.read_csv('yt_info.csv')
+        sampled_yt_info = sample_data(yt_info_df)
+        sampled_yt_info.to_csv('sampled_yt_info.csv', index=False)
+    else:
+        sampled_yt_info = pd.read_csv('sampled_yt_info.csv')
+
     n_bins = 7
     viewCounts = sampled_yt_info['viewCount'].to_numpy()
     log_viewCounts = np.log10(viewCounts.astype('float'))
@@ -65,4 +76,4 @@ if __name__ == '__main__':
             id=sampled_yt_info.iloc[i]['id'][-11:], title=sampled_yt_info.iloc[i]['title'], ext='wav')
         if not os.path.exists(os.path.join(AUDIO_DIR, audio_filename)):
             os.system("youtube-dl --extract-audio  --audio-format wav -o '{output_dir}/%(id)s_%(title)s.%(ext)s' {url}".format(
-                        output_dir=AUDIO_DIR, filename = audio_filename, url=sampled_yt_info.iloc[i]['id']))
+                        output_dir=AUDIO_DIR, url=sampled_yt_info.iloc[i]['id']))
