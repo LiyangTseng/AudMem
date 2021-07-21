@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 import pandas as pd
 import librosa
 import soundfile as sf
@@ -7,7 +8,7 @@ import soundfile as sf
 CLIP_DIR = 'Audios/clips'
 clip_length = 10
 
-def extract_clips(audio_file, chorus_location):
+def extract_clip(audio_file, chorus_location):
     ''' using chorus location to make clip '''
     print('Extracting clip...')
     song_wav_data, sr = librosa.load(audio_file)
@@ -25,14 +26,29 @@ def extract_clips(audio_file, chorus_location):
     print('Clip saved at {}'.format(output_file))
 
 if __name__ == '__main__':
-    chorus_df = pd.read_csv('chorus_location.csv')
-    start_idx = int(sys.argv[1])-1
     
-    for idx, row in chorus_df[start_idx:].iterrows():
-        os.system('audacity "{}"'.format(row['file']))
-        # need to close audacity first !!
-        print('==============================')
-        print('Editing progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
-        print('Enter chorus location with format [min]:[sec]: ', end='')
-        chorus_loc = input()
-        extract_clips(row['file'], chorus_loc)
+    ''' usage: python extract_clips.py -i [starting index] -a [use audacity or not] '''
+
+    parser = argparse.ArgumentParser(description='Starting location and audacity or not')
+    parser.add_argument('-i', '--index', help='starting index (count from 1)', default=1)
+    parser.add_argument('-a', '--audacity', help='use audacity or not', default=False, type=bool)
+    args = parser.parse_args()
+
+    chorus_df = pd.read_csv('chorus_location.csv')
+    start_idx = int(args.index)-1
+    
+    if args.audacity:
+        for idx, row in chorus_df[start_idx:].iterrows():
+            os.system('audacity "{}"'.format(row['file']))
+            # need to close audacity first !!
+            print('==============================')
+            print('Editing progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
+            print('Enter chorus location with format [min]:[sec]: ', end='')
+            chorus_loc = input()
+            extract_clip(row['file'], chorus_loc)
+    else:
+        for idx, row in chorus_df[start_idx:].iterrows():
+            print('==============================')
+            print('Editing progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
+            chorus_loc = row['chorus_location']
+            extract_clip(row['file'], chorus_loc)
