@@ -15,7 +15,7 @@ sampled_yt_df = pd.read_csv('../sampled_yt_info.csv')
 
 with open('stats.csv', 'w') as csvfile:
     writer = csv.writer(csvfile)
-    writer.writerow(['url', 'title', 'mem_score', 'view'])
+    writer.writerow(['url', 'title', 'view', 'pop_score'])
     cnt = 1
     for idx, row in form_df.iterrows():
         url = list(row)[0].split(' ')[1]

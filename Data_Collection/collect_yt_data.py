@@ -4,6 +4,8 @@ import string
 import pandas as pd
 from tqdm import tqdm
 import sys
+import argparse
+
 
 MAX_RESULTS = 50
 # YOUTUBE_API_KEY ='AIzaSyBkUAaWkEqEmuBH_ROYkiqmTO-JlG2WaH8'
@@ -71,14 +73,16 @@ def get_random_videos(category_id):
     print('{} random videos collected'.format(MAX_RESULTS))
     return vid_info_df
 
-def collect_yt_data(video_num):
+def collect_yt_data(argumets):
     
-    print('Collecting {} videos'.format(video_num))
-    save_file = 'yt_info.csv'
     ''' 
         get random music-category youtube videos from api and record their statistics, 
         the results will be saved at [save_file]    
     '''
+
+    video_num = argumets.number
+    save_file = argumets.output
+    print('Collecting {} videos'.format(video_num))
 
     music_category_id = get_video_categorie_id('Music')
     total_video_info_df = pd.DataFrame(columns=['id', 'title'])
@@ -91,4 +95,9 @@ def collect_yt_data(video_num):
     print('Saving data to {}'.format(save_file))
 
 if __name__ == '__main__':
-    collect_yt_data(int(sys.argv[1]))    
+    parser = argparse.ArgumentParser(description='Starting location and audacity or not')
+    parser.add_argument('-n', '--number', help='number of videos to collect', default=100, type=int)
+    parser.add_argument('-o', '--output', help='result file of collection', default='yt_info_v2.csv')
+    args = parser.parse_args()
+
+    collect_yt_data(args)    
