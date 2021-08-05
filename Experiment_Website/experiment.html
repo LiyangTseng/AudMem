@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+  <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
     <head>
         <!-- Load FontAwesome icons -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css">
@@ -8,13 +9,14 @@
     </head>
     <body>
         <div class="navigation_block">
-            <a class="home_btn" href="../home/home.html">Home</a><a class="abt_btn">About</a><a class="ctc_btn">Contact</a>
+            <a class="home_btn" href="../index.html">Home</a><a class="abt_btn">About</a><a class="ctc_btn">Contact</a>
         </div>
         <div class="player">
             <div class="details">
               <div class="now-playing">PLAYING x OF y</div>
               <div class="track-art"></div>
               <div class="track-name">Track Name</div>
+              <input type="submit" class="btn" onclick="insert()" name="insert" value="insert" />
 
             </div>
             <div class="buttons">

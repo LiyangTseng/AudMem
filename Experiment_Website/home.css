@@ -42,7 +42,7 @@ body {
     top: 40px;
     bottom: 0;
     /* ref: https://www.pexels.com/search/website%20background/ */
-    background-image: url("../background.jpg");
+    background-image: url("background.jpg");
     background-size: cover;
     background-position: center 70%;
     background-color: rgba(0, 0, 0, 0.1);

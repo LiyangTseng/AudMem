@@ -62,7 +62,7 @@ body {
     margin: 25px;
     height: 250px;
     width: 250px;
-    background-image: url("../background.jpg");
+    background-image: url("background.jpg");
     background-size: cover;
     border-radius: 15%;
   }

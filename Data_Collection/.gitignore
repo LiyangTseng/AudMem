@@ -1,4 +1,5 @@
 Audios/raw
+pychorus/*
 .vscode
 ../.vscode
 *.pyc

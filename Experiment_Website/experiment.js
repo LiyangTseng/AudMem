@@ -112,6 +112,13 @@ let track_list = ['clip_dl6vG66m1e8_Ilkay Sencan & Mert Hakan - Let Me.wav',
                   'clip_xJt-wTjGkN8_[M_V] 도시 of 레인보우 페이퍼 (Dosi of Rainbow paper) - 겨울향기 (Memories of winter) (Official Music Video).wav', 
                   'clip_ThtO-8h-qfY_Briango - Bachata de Amor  Lyrics.wav', 
                   'clip_lYxcW8jtFw0_MC G15 - Deu Onda (KondZilla).wav'];
+function insert(){
+  data =  {'action': 'heard'};
+  $.post('db.php', data, function (response) {
+      // Response div goes here.
+      alert("action performed successfully");
+  });
+};
 
 function shuffle(array) {
   var currentIndex = array.length,  randomIndex;
