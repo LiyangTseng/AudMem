@@ -10,7 +10,11 @@ let volume_slider = document.querySelector(".volume_slider");
 let curr_time = document.querySelector(".current-time");
 let total_duration = document.querySelector(".total-duration");
 
-let slot_cnt = 90;
+let hrd_btn = document.querySelector(".hrd_btn");
+let unhrd_btn = document.querySelector(".unhrd_btn");
+let prompt = document.querySelector(".timer_prompt");
+
+let slot_cnt = 0;
 let isPlaying = false;
 let updateTimer;
 
@@ -130,7 +134,7 @@ function shuffle(array) {
 }
 
 let audioOrder = [...Array(94).keys()];
-
+// order of every audio
 let slotOrder = [0, 1, 2, 1, 3, 4, 0, 5, 6, 7, 3, 8, 9, 10, 5, 11, 12, 7, 13, 12, 14, 10, 15, 16, 
   17, 18, 19, 20, 21, 22, 23, 15, 24, 25, 24, 18, 26, 17, 27, 28, 29, 23, 30, 31, 27, 32, 33, 34, 29, 
   35, 36, 32, 37, 38, 21, 39, 40, 9, 39, 41, 42, 40, 43, 44, 20, 34, 45, 26, 46, 47, 43, 48, 49, 47, 
@@ -138,17 +142,58 @@ let slotOrder = [0, 1, 2, 1, 3, 4, 0, 5, 6, 7, 3, 8, 9, 10, 5, 11, 12, 7, 13, 12
   65, 66, 60, 67, 68, 65, 69, 70, 66, 4, 71, 72, 44, 11, 73, 52, 19, 74, 75, 72, 74, 76, 70, 38, 73, 77, 
   67, 64, 56, 78, 13, 76, 75, 37, 79, 80, 77, 80, 78, 30, 81, 57, 53, 82, 83, 84, 85, 86, 84, 87, 22, 82,
    81, 88, 83, 89, 90, 91, 86, 91, 92, 93, 89];
+// order of every audio and break (-1 for 5s break, -2 for 3m break)
+let slotWithBreakOrder = Array(323).fill(-1);
+for (let i = 0; i < slotWithBreakOrder.length; i++) {
+  if (i%2 === 0) {
+      slotWithBreakOrder[i] = slotOrder[i/2];
+  }    
+}
+slotWithBreakOrder[54*2-1] = -2;
+slotWithBreakOrder[108*2-1] = -2;
 
 function loadTrack(track_counter) {
-  track_index = audioOrder[slotOrder[track_counter]];
-  clearInterval(updateTimer);
-  resetValues();
-  curr_track.src =  dir + track_list[track_index];
-  curr_track.load();
+  if (slotWithBreakOrder[track_counter] === -1) {
+    // 5s break
+    clearInterval(updateTimer);
+    resetValues();
+    curr_track.src = "pink_noise_5s.wav";
+    curr_track.load();
+    
+    track_name.textContent = `5 Seconds Break`;
+    now_playing.textContent = "";
+    hrd_btn.style.display = 'none';
+    unhrd_btn.style.display = 'none';
+    
+  }
+  else if (slotWithBreakOrder[track_counter] === -2) {
+    // 3m break
+    clearInterval(updateTimer);
+    resetValues();
+    curr_track.src = "pink_noise_3m.wav";
+    curr_track.load();
+    
+    track_name.textContent = `3 Minutes Break`;
+    now_playing.textContent = "";
+    hrd_btn.style.display = 'none';
+    unhrd_btn.style.display = 'none';
+  }
+  else {
+    hrd_btn.style.display = 'inline';
+    unhrd_btn.style.display = 'inline';
+    track_index = audioOrder[slotWithBreakOrder[track_counter]];
+    clearInterval(updateTimer);
+    resetValues();
+    curr_track.src =  dir + track_list[track_index];
+    curr_track.load();
+    
+    // for debug prupose
+    track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
+    // track_name.textContent = "";
+    now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length;
+    
   
-  track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
-  now_playing.textContent = "PLAYING " + (track_counter + 1) + " OF " + slotOrder.length;
-  
+  }
   updateTimer = setInterval(seekUpdate, 1000);
   curr_track.addEventListener("ended", nextTrack);
 }
@@ -172,17 +217,13 @@ function pauseTrack() {
 }
 
 function nextTrack() {
-  if (slot_cnt < slotOrder.length - 1) {
-    slot_cnt += 1;
+  if (slot_cnt < slotWithBreakOrder.length-1) {
+    slot_cnt += 1;    
   }  
   else {
     slot_cnt = 0;
     alert('end of experiment')
     // TODO: terminate experiment
-  }
-  if (slot_cnt == 54 || slot_cnt == 108){
-    alert(`reach slot_cnt ${slot_cnt}, need to implement resting timer`);
-    // TODO: timer between stages
   }
 
   loadTrack(slot_cnt);
