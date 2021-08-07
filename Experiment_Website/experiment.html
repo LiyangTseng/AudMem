@@ -16,8 +16,11 @@
               <div class="now-playing">PLAYING x OF y</div>
               <div class="track-art"></div>
               <div class="track-name">Track Name</div>
-              <input type="submit" class="btn" onclick="insert()" name="insert" value="insert" />
-
+              <div class="response_btns">
+                <!-- <input type="submit" class="hrd_btn" onclick="heard()" name="Heard" value="Heard" /> -->
+                <div class="unhrd_btn" onclick="unheard()">Not heard</div>
+                <div class="hrd_btn" onclick="heard()">Have heard</div>
+              </div>
             </div>
             <div class="buttons">
               <div class="prev-track" onclick="prevTrack()"><i class="fa fa-step-backward fa-2x"></i></div>

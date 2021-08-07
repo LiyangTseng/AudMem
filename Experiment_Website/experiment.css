@@ -20,6 +20,7 @@ body {
 }
 
 .navigation_block .home_btn, .navigation_block .abt_btn, .navigation_block .ctc_btn {
+    border: solid 1px rgb(87, 33, 33);
     background-color: rgb(87, 33, 33);
     color: rgb(216, 216, 201);
     display: inline-block;
@@ -39,7 +40,7 @@ body {
     background-color: rgb(216, 216, 201);
     color:rgb(87, 33, 33);
     cursor: pointer;
-    transition-duration: 0.3s
+    transition-duration: 0.3s;
 }
 
 .player {
@@ -48,61 +49,90 @@ body {
     align-items: center;
     flex-direction: column;
     justify-content: center;
-  }
-  
-  .details {
+}
+
+.details {
     display: flex;
     align-items: center;
     flex-direction: column;
     justify-content: center;
     margin-top: 25px;
-  }
-  
-  .track-art {
+}
+
+.track-art {
     margin: 25px;
     height: 250px;
     width: 250px;
     background-image: url("background.jpg");
     background-size: cover;
     border-radius: 15%;
-  }
-  
-  .track-name {
+}
+
+.track-name {
     font-size: 3rem;
-  }
-  
-  .now-playing {
+}
+
+.now-playing {
     font-size: 2rem;
-  }
-  
-  .buttons {
+}
+
+.response_btns {
     display: flex;
     flex-direction: row;
     align-items: center;
-  }
-  
-  .playpause-track, .prev-track, .next-track {
+    margin-top: 25px;
+    margin-bottom: 25px;
+}
+
+.hrd_btn, .unhrd_btn {
+    width: 200px;
+    display: inline-block;
+    border: solid 2px rgb(87, 33, 33);
+    border-radius: 5px; 
+    color: rgb(216, 216, 201);
+    background-color: rgb(87, 33, 33);
+    font-size: 35px;
+    text-align: center;
+    margin-right: 10px;
+    margin-left: 10px;
+}
+
+.hrd_btn:hover, .unhrd_btn:hover {
+    border: solid 2px #D1B246;
+    background-color: #DCC471;
+    color:rgb(87, 33, 33);
+    cursor: pointer;
+    transition-duration: 0.3s;
+}
+
+.buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.playpause-track, .prev-track, .next-track {
     padding: 25px;
     opacity: 0.7;
-  
+
     /* Smoothly transition the opacity */
     transition: opacity .2s;
-  }
-  
-  .playpause-track:hover, .prev-track:hover, .next-track:hover {
+}
+
+.playpause-track:hover, .prev-track:hover, .next-track:hover {
     opacity: 1.0;
-  }
-  
-  .slider_container {
+}
+
+.slider_container {
     width: 75%;
     max-width: 400px;
     display: flex;
     justify-content: center;
     align-items: center;
-  }
-  
-  /* Modify the appearance of the slider */
-  .seek_slider, .volume_slider {
+}
+
+/* Modify the appearance of the slider */
+.seek_slider, .volume_slider {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -111,10 +141,10 @@ body {
     opacity: 0.7;
     -webkit-transition: .2s;
     transition: opacity .2s;
-  }
-  
-  /* Modify the appearance of the slider thumb */
-  .seek_slider::-webkit-slider-thumb, .volume_slider::-webkit-slider-thumb {
+}
+
+/* Modify the appearance of the slider thumb */
+.seek_slider::-webkit-slider-thumb, .volume_slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -123,28 +153,28 @@ body {
     background: white;
     cursor: pointer;
     border-radius: 50%;
-  }
-  
-  .seek_slider:hover, .volume_slider:hover {
+}
+
+.seek_slider:hover, .volume_slider:hover {
     opacity: 1.0;
-  }
-  
-  .seek_slider {
+}
+
+.seek_slider {
     width: 60%;
-  }
-  
-  .volume_slider {
+}
+
+.volume_slider {
     width: 30%;
-  }
-  
-  .current-time, .total-duration {
+}
+
+.current-time, .total-duration {
     padding: 10px;
-  }
-  
-  i.fa-volume-down, i.fa-volume-up {
+}
+
+i.fa-volume-down, i.fa-volume-up {
     padding: 10px;
-  }
-  
-  i.fa-play-circle, i.fa-pause-circle, i.fa-step-forward, i.fa-step-backward {
+}
+
+i.fa-play-circle, i.fa-pause-circle, i.fa-step-forward, i.fa-step-backward {
     cursor: pointer;
-  }
+}

@@ -10,15 +10,13 @@ let volume_slider = document.querySelector(".volume_slider");
 let curr_time = document.querySelector(".current-time");
 let total_duration = document.querySelector(".total-duration");
 
-let track_index = 0;
+let slot_cnt = 90;
 let isPlaying = false;
 let updateTimer;
 
 // Create new audio element
 let curr_track = document.createElement('audio');
 
-// var fs = require('fs');
-// let track_list = fs.readdirSync('clips');
 let dir = 'clips/'
 // Define the tracks that have to be played
 let track_list = ['clip_dl6vG66m1e8_Ilkay Sencan & Mert Hakan - Let Me.wav', 
@@ -112,13 +110,6 @@ let track_list = ['clip_dl6vG66m1e8_Ilkay Sencan & Mert Hakan - Let Me.wav',
                   'clip_xJt-wTjGkN8_[M_V] 도시 of 레인보우 페이퍼 (Dosi of Rainbow paper) - 겨울향기 (Memories of winter) (Official Music Video).wav', 
                   'clip_ThtO-8h-qfY_Briango - Bachata de Amor  Lyrics.wav', 
                   'clip_lYxcW8jtFw0_MC G15 - Deu Onda (KondZilla).wav'];
-function insert(){
-  data =  {'action': 'heard'};
-  $.post('db.php', data, function (response) {
-      // Response div goes here.
-      alert("action performed successfully");
-  });
-};
 
 function shuffle(array) {
   var currentIndex = array.length,  randomIndex;
@@ -133,23 +124,31 @@ function shuffle(array) {
     // And swap it with the current element.
     [array[currentIndex], array[randomIndex]] = [
       array[randomIndex], array[currentIndex]];
-  }
-
+    }
+    
   return array;
 }
 
-track_list = shuffle(track_list);
+let audioOrder = [...Array(94).keys()];
 
+let slotOrder = [0, 1, 2, 1, 3, 4, 0, 5, 6, 7, 3, 8, 9, 10, 5, 11, 12, 7, 13, 12, 14, 10, 15, 16, 
+  17, 18, 19, 20, 21, 22, 23, 15, 24, 25, 24, 18, 26, 17, 27, 28, 29, 23, 30, 31, 27, 32, 33, 34, 29, 
+  35, 36, 32, 37, 38, 21, 39, 40, 9, 39, 41, 42, 40, 43, 44, 20, 34, 45, 26, 46, 47, 43, 48, 49, 47, 
+  50, 51, 14, 48, 52, 45, 53, 50, 54, 55, 56, 57, 51, 58, 59, 55, 28, 60, 61, 62, 61, 63, 58, 64, 62, 
+  65, 66, 60, 67, 68, 65, 69, 70, 66, 4, 71, 72, 44, 11, 73, 52, 19, 74, 75, 72, 74, 76, 70, 38, 73, 77, 
+  67, 64, 56, 78, 13, 76, 75, 37, 79, 80, 77, 80, 78, 30, 81, 57, 53, 82, 83, 84, 85, 86, 84, 87, 22, 82,
+   81, 88, 83, 89, 90, 91, 86, 91, 92, 93, 89];
 
-function loadTrack(track_index) {
+function loadTrack(track_counter) {
+  track_index = audioOrder[slotOrder[track_counter]];
   clearInterval(updateTimer);
   resetValues();
   curr_track.src =  dir + track_list[track_index];
   curr_track.load();
-
-  track_name.textContent = track_list[track_index].slice(17, -4);;
-  now_playing.textContent = "PLAYING " + (track_index + 1) + " OF " + track_list.length;
-
+  
+  track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
+  now_playing.textContent = "PLAYING " + (track_counter + 1) + " OF " + slotOrder.length;
+  
   updateTimer = setInterval(seekUpdate, 1000);
   curr_track.addEventListener("ended", nextTrack);
 }
@@ -158,14 +157,6 @@ function resetValues() {
   curr_time.textContent = "00:00";
   total_duration.textContent = "00:00";
   seek_slider.value = 0;
-}
-
-// Load the first track in the tracklist
-loadTrack(track_index);
-
-function playpauseTrack() {
-  if (!isPlaying) playTrack();
-  else pauseTrack();
 }
 
 function playTrack() {
@@ -181,22 +172,33 @@ function pauseTrack() {
 }
 
 function nextTrack() {
-  if (track_index < track_list.length - 1)
-    track_index += 1;
-  else track_index = 0;
-  loadTrack(track_index);
+  if (slot_cnt < slotOrder.length - 1) {
+    slot_cnt += 1;
+  }  
+  else {
+    slot_cnt = 0;
+    alert('end of experiment')
+    // TODO: terminate experiment
+  }
+  if (slot_cnt == 54 || slot_cnt == 108){
+    alert(`reach slot_cnt ${slot_cnt}, need to implement resting timer`);
+    // TODO: timer between stages
+  }
+
+  loadTrack(slot_cnt);
   playTrack();
 }
 
 function prevTrack() {
-  if (track_index > 0)
-    track_index -= 1;
-  else track_index = track_list.length;
-  loadTrack(track_index);
+  if (slot_cnt > 0)
+    slot_cnt -= 1;
+  else slot_cnt = track_list.length;
+  loadTrack(slot_cnt);
   playTrack();
 }
 
 function setVolume() {
+  // TODO: make work instaneously (when mouse still pressing)
   curr_track.volume = volume_slider.value / 100;
 }
 
@@ -222,3 +224,26 @@ function seekUpdate() {
     total_duration.textContent = durationMinutes + ":" + durationSeconds;
   }
 }
+
+function startExperiment() {
+  if (!isPlaying) playTrack();
+  else pauseTrack();
+}
+
+function heard(){
+  // when "Heard" button pressed
+  data =  {'action': 'heard'};
+  console.log('entering heard function');
+  $.post('db.php', data, function (response) {
+      // Response div goes here.
+      alert("action performed successfully");
+  });
+};
+
+// ===============================
+// audioOrder = shuffle(audioOrder);
+
+// Load the first track in the tracklist
+loadTrack(slot_cnt);
+
+startExperiment();
