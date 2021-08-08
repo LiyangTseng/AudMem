@@ -13,6 +13,7 @@ body {
 }
 
 .navigation_block .home_btn, .navigation_block .abt_btn, .navigation_block .ctc_btn {
+    border: solid 1px rgb(87, 33, 33);
     background-color: rgb(87, 33, 33);
     color: rgb(216, 216, 201);
     display: inline-block;

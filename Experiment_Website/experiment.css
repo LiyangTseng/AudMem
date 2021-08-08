@@ -76,6 +76,10 @@ body {
     font-size: 2rem;
 }
 
+.timer_prompt {
+    font-size: 30px;
+}
+
 .response_btns {
     display: flex;
     flex-direction: row;
@@ -84,29 +88,35 @@ body {
     margin-bottom: 25px;
 }
 
-.timer_prompt {
-    font-size: 30px;
+
+input[type="radio"] {
+    display: none;
 }
 
-.hrd_btn, .unhrd_btn {
-    width: 200px;
-    display: inline-block;
-    border: solid 2px rgb(87, 33, 33);
-    border-radius: 5px; 
-    color: rgb(216, 216, 201);
-    background-color: rgb(87, 33, 33);
-    font-size: 35px;
-    text-align: center;
-    margin-right: 10px;
-    margin-left: 10px;
+label {
+  width: 200px;
+  display: inline-block;
+  border: solid 2px rgb(87, 33, 33);
+  border-radius: 5px; 
+  color: rgb(216, 216, 201);
+  background-color: rgb(87, 33, 33);
+  font-size: 35px;
+  text-align: center;
+  margin-right: 10px;
+  margin-left: 10px;
 }
 
-.hrd_btn:hover, .unhrd_btn:hover {
-    border: solid 2px #D1B246;
-    background-color: #DCC471;
-    color:rgb(87, 33, 33);
+label:hover {
+    background-color: rgb(104, 52, 52);
+    color: rgb(255, 255, 255);    
     cursor: pointer;
     transition-duration: 0.3s;
+}
+
+input[type="radio"]:checked + label {
+    border: solid 3px red;
+    font-weight: bold;
+    font-style: italic;
 }
 
 .buttons {

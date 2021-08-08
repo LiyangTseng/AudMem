@@ -10,8 +10,6 @@ let volume_slider = document.querySelector(".volume_slider");
 let curr_time = document.querySelector(".current-time");
 let total_duration = document.querySelector(".total-duration");
 
-let hrd_btn = document.querySelector(".hrd_btn");
-let unhrd_btn = document.querySelector(".unhrd_btn");
 let prompt = document.querySelector(".timer_prompt");
 
 let slot_cnt = 0;
@@ -146,6 +144,7 @@ let slotOrder = [0, 1, 2, 1, 3, 4, 0, 5, 6, 7, 3, 8, 9, 10, 5, 11, 12, 7, 13, 12
 let slotWithBreakOrder = Array(323).fill(-1);
 for (let i = 0; i < slotWithBreakOrder.length; i++) {
   if (i%2 === 0) {
+      // insert break between audios
       slotWithBreakOrder[i] = slotOrder[i/2];
   }    
 }
@@ -162,8 +161,8 @@ function loadTrack(track_counter) {
     
     track_name.textContent = `5 Seconds Break`;
     now_playing.textContent = "";
-    hrd_btn.style.display = 'none';
-    unhrd_btn.style.display = 'none';
+    $('label[for="toggle-hrd"]').hide ();
+    $('label[for="toggle-unhrd"]').hide ();
     
   }
   else if (slotWithBreakOrder[track_counter] === -2) {
@@ -175,18 +174,20 @@ function loadTrack(track_counter) {
     
     track_name.textContent = `3 Minutes Break`;
     now_playing.textContent = "";
-    hrd_btn.style.display = 'none';
-    unhrd_btn.style.display = 'none';
+    $('label[for="toggle-hrd"]').hide ();
+    $('label[for="toggle-unhrd"]').hide ();
   }
   else {
-    hrd_btn.style.display = 'inline';
-    unhrd_btn.style.display = 'inline';
+    // ordinay audio
+    $('label[for="toggle-hrd"]').show();
+    $('label[for="toggle-unhrd"]').show();
+    document.getElementById("toggle-unhrd").checked = true;
     track_index = audioOrder[slotWithBreakOrder[track_counter]];
     clearInterval(updateTimer);
     resetValues();
     curr_track.src =  dir + track_list[track_index];
     curr_track.load();
-    
+
     // for debug prupose
     track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
     // track_name.textContent = "";
@@ -217,6 +218,11 @@ function pauseTrack() {
 }
 
 function nextTrack() {
+  if (slot_cnt%2 === 0){
+    // if play real audio in slot
+    let audio_idx = audioOrder[slotWithBreakOrder[slot_cnt]];
+    // saveToDB(audio_idx);
+  }
   if (slot_cnt < slotWithBreakOrder.length-1) {
     slot_cnt += 1;    
   }  
@@ -239,6 +245,7 @@ function prevTrack() {
 }
 
 function setVolume() {
+
   // TODO: make work instaneously (when mouse still pressing)
   curr_track.volume = volume_slider.value / 100;
 }
@@ -266,19 +273,26 @@ function seekUpdate() {
   }
 }
 
+
 function startExperiment() {
   if (!isPlaying) playTrack();
   else pauseTrack();
 }
 
-function heard(){
+// TODO: make sure only save the latest result to sql database, also setup effictive sql database format
+function saveToDB(audio_idx){
+  haveHeard = document.getElementById("toggle-hrd").checked;
   // when "Heard" button pressed
-  data =  {'action': 'heard'};
-  console.log('entering heard function');
+  data =  {'index': audio_idx, 'haveHeard': haveHeard};
+  console.log('preparing to save data to db');
   $.post('db.php', data, function (response) {
-      // Response div goes here.
-      alert("action performed successfully");
+    // Response div goes here.
+    console.log("memory result pushed to db");
   });
+};
+
+window.onbeforeunload = function(){
+  return 'Experiment data will be lost';
 };
 
 // ===============================

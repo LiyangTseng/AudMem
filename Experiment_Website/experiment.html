@@ -18,9 +18,10 @@
               <div class="track-name">Track Name</div>
               <p class="timer_prompt"></p>
               <div class="response_btns">
-                <!-- <input type="submit" class="hrd_btn" onclick="heard()" name="Heard" value="Heard" /> -->
-                <div class="unhrd_btn" onclick="unheard()">Not heard</div>
-                <div class="hrd_btn" onclick="heard()">Have heard</div>
+                <input id="toggle-unhrd" name="toggle" type="radio" checked="checked">
+                <label for="toggle-unhrd">Unheard</label>
+                <input id="toggle-hrd" name="toggle" type="radio">
+                <label for="toggle-hrd">Heard</label>
               </div>
             </div>
             <div class="buttons">
