@@ -189,7 +189,8 @@ function loadTrack(track_counter) {
     curr_track.load();
 
     // for debug prupose
-    track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
+    // track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
+    track_name.textContent = `No.${track_index+1}`;
     // track_name.textContent = "";
     now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length;
     
@@ -228,8 +229,9 @@ function nextTrack() {
   }  
   else {
     slot_cnt = 0;
-    alert('end of experiment')
-    // TODO: terminate experiment
+    alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
+    window.onbeforeunload = null;
+    window.location.href='index.html'
   }
 
   loadTrack(slot_cnt);
@@ -291,13 +293,30 @@ function saveToDB(audio_idx){
   });
 };
 
+function saveAudioOrder(order_dict) {
+  $.post('save_audio_order.php', order_dict, function (response) {
+    // Response div goes here.
+    console.log("save audio order to db");
+  });
+  
+}
+
+// popup warning about leaving experiment
 window.onbeforeunload = function(){
   return 'Experiment data will be lost';
 };
 
 // ===============================
 // audioOrder = shuffle(audioOrder);
-
+let audioOrderDict = [];
+for (let index = 0; index < audioOrder.length; index++) {
+  let obj = {};
+  let key = `audio_${index+1}`;
+  let value = audioOrder[index];
+  obj[key] = value;
+  audioOrderDict.push(obj);
+}
+saveAudioOrder(audioOrderDict);
 // Load the first track in the tracklist
 loadTrack(slot_cnt);
 

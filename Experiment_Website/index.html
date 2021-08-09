@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
     <head>
         <link rel="stylesheet" href="home.css">
         <title> Experiment on Audio Memorability</title>
@@ -8,13 +9,32 @@
         <div class="navigation_block">
             <a class="home_btn" href="index.html">Home</a><div class="abt_btn">About</div><div class="ctc_btn">Contact</div>
         </div>
-        <div class="main_block">
+        <div class="main_block">    
             <div class="description">Experiment on 
                 Audio Memorability
             </div>
-            <a class="start_btn" href="../experiment.html">
-                START
-            </a>
+            <!-- for local testing-->
+            <a href="experiment.html">start</a>
+            <!-- ref: https://www.w3schools.com/howto/howto_css_login_form.asp        -->
+            <button onclick="document.getElementById('id01').style.display='block'" style="width:auto;" class="start_btn">START</button>
+    
+            <div id="id01" class="modal">
+                
+                <!-- first use "action" to redirect to submit_email.php -->
+                <form class="modal-content animate" action="submit_email.php" method="post">
+                    <div class="imgcontainer">
+                        <span onclick="document.getElementById('id01').style.display='none'" class="close" title="Close Modal">&times;</span>
+                    </div>
+    
+                    <div class="container">
+                        <label for="uname"><b>Log In By Email</b></label>
+                        <input type="text" placeholder="Enter Your Email" name="email" required>
+                        <button type="submit">START</button>
+                        
+                    </div>
+                </form>
+            </div>
+    
         </div>
     </body>
 </html>
