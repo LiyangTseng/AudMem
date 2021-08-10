@@ -7,11 +7,6 @@
     }
     
 
-    $EmailSubmitted=$_POST['order'];
-    echo '接收到的內容為: '.$EmailSubmitted;
-    console_log($EmailSubmitted);
-
-
     // sql database info 
     $servername = "sql202.epizy.com";
     $username = "epiz_29320404";
@@ -28,8 +23,8 @@
     // update order
     foreach ($_POST as $key => $value) {
         # code...
-        $sql = "UPDATE INTO experimentOrderBeta (time, email) VALUES (CURRENT_TIMESTAMP, '$EmailSubmitted')";
-
+        $sql = "UPDATE experimentOrderBeta SET ".$key."=".$value." WHERE email='liyangtseng.me06@nctu.edu.tw'";
+        
 
         if ($conn->query($sql) === TRUE) {
             echo "Record updated successfully";

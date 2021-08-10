@@ -39,10 +39,32 @@
               <input type="range" min="1" max="100" value="99" class="volume_slider" onchange="setVolume()">
               <i class="fa fa-volume-up"></i>
             </div>
+        </div>
+
+                    <!-- ref: https://www.w3schools.com/howto/howto_css_login_form.asp        -->
+            <!-- <button onclick="document.getElementById('id01').style.display='block'" style="width:auto;">START</button> -->
+    
+            <div id="id01" class="modal">
+                
+              <!-- first use "action" to redirect to submit_email.php -->
+              <!-- <form class="modal-content animate" action="submit_email.php" method="post"> -->
+              <div class="modal-content animate">
+                  <!-- <div class="imgcontainer">
+                      <span onclick="document.getElementById('id01').style.display='none'" class="close" title="Close Modal">&times;</span>
+                  </div> -->
+  
+                  <div class="container">
+                      <label for="uname"><b>Log In By Email</b></label>
+                      <input type="text" placeholder="Enter Your Email" name="email" id="userEmail" required>
+                      <button type="submit" onclick="submitEmail()">START</button>
+                      
+                  </div>
+              </div>
           </div>
+
         
-          <!-- Load the main script for the player -->
-          <script src="experiment.js"></script>
+        <!-- Load the main script for the player -->
+        <script src="experiment.js"></script>
     </body>
 </html>
 

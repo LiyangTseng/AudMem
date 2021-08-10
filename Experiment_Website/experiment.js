@@ -11,6 +11,7 @@ let curr_time = document.querySelector(".current-time");
 let total_duration = document.querySelector(".total-duration");
 
 let prompt = document.querySelector(".timer_prompt");
+let email = document.getElementById("userEmail").value;
 
 let slot_cnt = 0;
 let isPlaying = false;
@@ -276,9 +277,9 @@ function seekUpdate() {
 }
 
 
-function startExperiment() {
+function playpauseTrack() {
   if (!isPlaying) playTrack();
-  else pauseTrack();
+  // else pauseTrack();
 }
 
 // TODO: make sure only save the latest result to sql database, also setup effictive sql database format
@@ -293,12 +294,25 @@ function saveToDB(audio_idx){
   });
 };
 
-function saveAudioOrder(order_dict) {
-  $.post('save_audio_order.php', order_dict, function (response) {
+function saveAudioOrder(email, order_dict) {
+  // data = order_dict.push({"email": email})
+  data = order_dict;
+  $.post('save_audio_order.php', data, function (response) {
     // Response div goes here.
     console.log("save audio order to db");
   });
   
+}
+
+function submitEmail() {
+  email = document.getElementById("userEmail").value;
+
+  console.log(email);
+  if (email != ""){
+    document.getElementById('id01').style.display='none';
+  } else {
+    alert('You need to fill your email first!');
+  }
 }
 
 // popup warning about leaving experiment
@@ -316,8 +330,8 @@ for (let index = 0; index < audioOrder.length; index++) {
   obj[key] = value;
   audioOrderDict.push(obj);
 }
-saveAudioOrder(audioOrderDict);
+saveAudioOrder(email, audioOrderDict);
 // Load the first track in the tracklist
 loadTrack(slot_cnt);
 
-startExperiment();
+// startExperiment();
