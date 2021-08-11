@@ -33,7 +33,7 @@ body {
     text-decoration: none;
     padding-right: 1px;
     padding-left: 1px;
-
+    user-select: none;
 }
 
 .navigation_block .home_btn:hover, .navigation_block .abt_btn:hover, .navigation_block .ctc_btn:hover {
@@ -93,8 +93,8 @@ input[type="radio"] {
     display: none;
 }
 
-label[for="toggle-unhrd"], label[for="toggle-hrd"] {
-  width: 200px;
+label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"]{
+  width: 300px;
   display: inline-block;
   border: solid 2px rgb(87, 33, 33);
   border-radius: 5px; 
@@ -104,9 +104,10 @@ label[for="toggle-unhrd"], label[for="toggle-hrd"] {
   text-align: center;
   margin-right: 10px;
   margin-left: 10px;
+  user-select: none;
 }
 
-label[for="toggle-unhrd"]:hover, label[for="toggle-hrd"]:hover  {
+label[for="toggle-unhrd"]:hover, label[for="toggle-hrd"]:hover, label[for="toggle-alhrd"]:hover{
     background-color: rgb(104, 52, 52);
     color: rgb(255, 255, 255);    
     cursor: pointer;
@@ -183,6 +184,7 @@ input[type="radio"]:checked + label {
 
 .current-time, .total-duration {
     padding: 10px;
+    user-select: none;
 }
 
 i.fa-volume-down, i.fa-volume-up {

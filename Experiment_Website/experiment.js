@@ -152,6 +152,9 @@ for (let i = 0; i < slotWithBreakOrder.length; i++) {
 slotWithBreakOrder[54*2-1] = -2;
 slotWithBreakOrder[108*2-1] = -2;
 
+let userResponses = [];
+
+
 function loadTrack(track_counter) {
   if (slotWithBreakOrder[track_counter] === -1) {
     // 5s break
@@ -162,9 +165,9 @@ function loadTrack(track_counter) {
     
     track_name.textContent = `5 Seconds Break`;
     now_playing.textContent = "";
-    $('label[for="toggle-hrd"]').hide ();
-    $('label[for="toggle-unhrd"]').hide ();
-    
+    $('label[for="toggle-hrd"]').hide();
+    $('label[for="toggle-unhrd"]').hide();
+    $('label[for="toggle-alhrd"]').hide();
   }
   else if (slotWithBreakOrder[track_counter] === -2) {
     // 3m break
@@ -175,13 +178,15 @@ function loadTrack(track_counter) {
     
     track_name.textContent = `3 Minutes Break`;
     now_playing.textContent = "";
-    $('label[for="toggle-hrd"]').hide ();
-    $('label[for="toggle-unhrd"]').hide ();
+    $('label[for="toggle-hrd"]').hide();
+    $('label[for="toggle-unhrd"]').hide();
+    $('label[for="toggle-alhrd"]').hide();
   }
   else {
     // ordinay audio
     $('label[for="toggle-hrd"]').show();
     $('label[for="toggle-unhrd"]').show();
+    $('label[for="toggle-alhrd"]').show();
     document.getElementById("toggle-unhrd").checked = true;
     track_index = audioOrder[slotWithBreakOrder[track_counter]];
     clearInterval(updateTimer);
@@ -190,7 +195,6 @@ function loadTrack(track_counter) {
     curr_track.load();
 
     // for debug prupose
-    // track_name.textContent = `No.${track_index+1} ==== ${track_list[track_index].slice(17, -4)}`;
     track_name.textContent = `No.${track_index+1}`;
     // track_name.textContent = "";
     now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length;
@@ -221,15 +225,22 @@ function pauseTrack() {
 
 function nextTrack() {
   if (slot_cnt%2 === 0){
-    // if play real audio in slot
-    let audio_idx = audioOrder[slotWithBreakOrder[slot_cnt]];
-    // saveToDB(audio_idx);
+    // if real audio(music) played in slot
+    if (document.getElementById("toggle-alhrd").checked) {
+      userResponses.push(-1);
+    } else if (document.getElementById("toggle-unhrd").checked) {
+      userResponses.push(0);
+    } else if (document.getElementById("toggle-hrd").checked) {
+      userResponses.push(1);
+    }
+
   }
   if (slot_cnt < slotWithBreakOrder.length-1) {
     slot_cnt += 1;    
   }  
   else {
-    slot_cnt = 0;
+    // experiment over
+    saveToDB();
     alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
     window.onbeforeunload = null;
     window.location.href='index.html'
@@ -248,7 +259,6 @@ function prevTrack() {
 }
 
 function setVolume() {
-
   // TODO: make work instaneously (when mouse still pressing)
   curr_track.volume = volume_slider.value / 100;
 }
@@ -282,38 +292,29 @@ function playpauseTrack() {
   // else pauseTrack();
 }
 
-// TODO: make sure only save the latest result to sql database, also setup effictive sql database format
-function saveToDB(audio_idx){
-  haveHeard = document.getElementById("toggle-hrd").checked;
-  // when "Heard" button pressed
-  data =  {'index': audio_idx, 'haveHeard': haveHeard};
-  console.log('preparing to save data to db');
-  $.post('db.php', data, function (response) {
-    // Response div goes here.
-    console.log("memory result pushed to db");
-  });
-};
-
-function saveAudioOrder(email, order_dict) {
-  // data = order_dict.push({"email": email})
-  data = order_dict;
-  $.post('save_audio_order.php', data, function (response) {
-    // Response div goes here.
-    console.log("save audio order to db");
-  });
-  
-}
 
 function submitEmail() {
   email = document.getElementById("userEmail").value;
-
-  console.log(email);
   if (email != ""){
     document.getElementById('id01').style.display='none';
   } else {
     alert('You need to fill your email first!');
-  }
+  }  
 }
+
+function saveToDB() {
+  // save to db as strings
+  let audioOrderStr = audioOrder.join();
+  let responseStr = userResponses.join();
+  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr};
+  console.log(data);
+  $.post('db.php', data, function (response) {
+    console.log(response);
+    console.log("user data successfully saved to db !!");
+  });
+  
+}
+
 
 // popup warning about leaving experiment
 window.onbeforeunload = function(){
@@ -321,16 +322,8 @@ window.onbeforeunload = function(){
 };
 
 // ===============================
-// audioOrder = shuffle(audioOrder);
-let audioOrderDict = [];
-for (let index = 0; index < audioOrder.length; index++) {
-  let obj = {};
-  let key = `audio_${index+1}`;
-  let value = audioOrder[index];
-  obj[key] = value;
-  audioOrderDict.push(obj);
-}
-saveAudioOrder(email, audioOrderDict);
+audioOrder = shuffle(audioOrder);
+
 // Load the first track in the tracklist
 loadTrack(slot_cnt);
 
