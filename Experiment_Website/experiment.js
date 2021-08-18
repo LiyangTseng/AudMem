@@ -10,7 +10,6 @@ let volume_slider = document.querySelector(".volume_slider");
 let curr_time = document.querySelector(".current-time");
 let total_duration = document.querySelector(".total-duration");
 
-let prompt = document.querySelector(".timer_prompt");
 let email = document.getElementById("userEmail").value;
 
 let slot_cnt = 0;
@@ -21,98 +20,40 @@ let updateTimer;
 let curr_track = document.createElement('audio');
 
 let dir = 'clips/'
-// Define the tracks that have to be played
-let track_list = ['clip_dl6vG66m1e8_Ilkay Sencan & Mert Hakan - Let Me.wav', 
-                  'clip_Et-YdmSo_3A_MC Magal e MC G15 - Menor Periferia (GR6 Filmes) DJ Guil Beats.wav', 
-                  'clip_yPS0PGBsV8I_Radio Killer - Be Free [Official video HD].wav', 
-                  'clip_XJt-4KKCZBA_George X - Nahuati (PHCK Remix) [Sound Avenue].wav', 
-                  'clip_bd5m12UEHWI_Duo Anggrek - Goyang Nasi Padang (Official Music Video NAGASWARA) #goyangnasipdg.wav', 
-                  'clip_C7u6rtswjCU_Odhani – Made In China _ Rajkummar Rao & Mouni Roy _  Neha Kakkar & Darshan Raval _ Sachin – Jigar.wav', 
-                  'clip_D9ffTk7-2aI_Base de Rap _ Boom Bap _ Agresivo _ Underground _ Freestyle Beat _ Hip Hop Instrumental.wav', 
-                  'clip_ZpsV5SGa5R4_Lost Sky - Need You [NCS Release].wav', 'clip_o683V8-TAPQ_Opozit - X-oyu-L (Official VIDEO).wav', 
-                  'clip_j9KKh215HTs_TiiwTiiw - Te amo feat Blanka & Sky (Selfie Algerian Cover).wav', 
-                  'clip_qkE-siH6Ed4_Huz Kai - Ghost (Official Music Video).wav', 
-                  'clip_xGPeNN9S0Fg_One Direction - Little Things.wav', 
-                  'clip_-b7X97M5tDo_Trixtor - Runaway (ft. Holly Drummond).wav', 
-                  'clip_p9LLoijPQfg_TREASURE - ‘MY TREASURE’ M_V.wav', 
-                  'clip_TzhhbYS9EO4_Boubkeur ... Huz Huz  ( Audio Officiel ).wav',
-                  'clip_bBcyBylIr40_Zedd & Aloe Blacc & Grey - Candyman.wav', 
-                  'clip_F_9pZv0wn9Q_[달의 연인 - 보보경심 려 OST Part 6] 에픽하이 (EPIK HIGH) - 내 마음이 들리나요 Can You Hear My Heart (Feat. 이하이 LEE HI).wav', 
-                  'clip_vhWoHF9-qfY_Parry Gripp - Nice Big Monster Truck [Official 4K Video].wav', 
-                  'clip_Z5gvqq3ChII_Дома не сиди.wav', 
-                  'clip_BXTpedYsjyI_MC G15 e MC Bruninho - A Distância ta Maltratando (GR6 Filmes) DJ DG e Batidão Stronda.wav', 
-                  'clip_nISI4qF55F4_T-Bone - Crazy Hispanic.wav', 
-                  'clip_2UL-1MOlSPw_Nativ - MVZ Vol. 2 - 07 Slick Rick (feat. Dawill).wav', 
-                  'clip_0Za5671VM-0_Setec - Water Or Concrete.wav', 
-                  'clip_32MsxqBbe08_Merseil - Hi Marimba (Original).wav', 
-                  "clip_SZaZU_qi6Xc_Carole Samaha - Esma'ny (Official Music Video) _ كاروول سماحة - إسمعني - الكليب الرسمي.wav", 
-                  'clip_Ny6BAUMZxT4_Huz - Early Morning Rain.wav', "clip_C90sY_Ht6Ig_Calvin Markus - Emma's Eyes ('Daredevil - Season 3 Date Announcement' Trailer Music).wav", 
-                  "clip_zYoVEbs-xe8_Thrill Collins 'Black or White'.wav", 
-                  "clip_tnOuMlDUgu8_Justin Sane & Huz - It's Not Over (Official Music Video).wav",
-                  'clip_LKaXY4IdZ40_Whitney Houston, Mariah Carey - When You Believe (Official HD Video).wav', 
-                  'clip_C5VCGM2J5ls_وائل جسار - بحبك مش هقول تاني _ Wael Jassar - Ba7ebek Mesh Ha2oul Tany.wav', 
-                  'clip_8OGw36lQn4w_Mazigh ...  Huz Huz A Yamina.wav', 
-                  'clip_Mme9REVuidw_Zouhair Bahaoui - Hasta Luego ft TiiwTiiw & CHK #DreamTiiw2k17.wav',
-                  'clip_btMBUL8_liA_La foudre.wav', 
-                  'clip_nDjdsytJrf8_Simple Plan - Kiss Me Like Nobody’s Watching (Lyrics).wav', 
-                  'clip_3ObVN3QQiZ8_Nancy Ajram - Oul Tani Keda (Official Music Video) _ نانسي عجرم - قول تاني كده.wav', 
-                  'clip_GUC6UqXjU44_Kamel Igman ... Ayen A Thayr iw , Slam fella wen , Huz Huz.wav', 
-                  'clip_RhBb77hG0iw_Nerga3 Tany - Hamoot Wa Arga3 _ Tamer Hosny - نرجع تاني - هموت و ارجع.wav', 
-                  'clip_xJt--P13x3s_04. Stiinte Oculte - Sa Cada Ploaia.wav', 
-                  'clip_T4stQxboYKM_NASSIMA AIT AMI & YACINE YEFSAH - HUZ A YAMINA.wav', 
-                  'clip_dpjUrLEgYKI_Justin Sane & Huz - Days With You (Official Music Video).wav', 
-                  'clip_xJt-xbN5S3E_Yani ft. Stian - WICKED VISION 2012.wav', 
-                  'clip_yKEAUgA8OvU_M. Pokora, Dadju - Si on disait (Clip officiel).wav', 
-                  'clip_EygNk739nnY_MC Arthur - XJ6 (Love Funk) DJ GH.wav', 
-                  'clip_Cd-ur7jyV30_(FREE) Old School x 90s x Joey Bada$$ Boom Bap Type Beat [2021] - Robin Hood.wav', 
-                  'clip_QtYDvqJgQqo_Coone ft. David Spekter - Faye (Official Lyric Video).wav', 
-                  'clip_xe8-Y1oVQeU_A Revolta Social “BP” ⛔ 🇧🇷 (ARS PRODUÇÕES).wav', 
-                  'clip_D6uH2mKJRUA_Huz - Curious (Original Mix).wav', 
-                  'clip_tnzybViYYHw_MC G15 - Cara Bacana (KondZilla).wav', 
-                  'clip_9arRsdRTTNI_Trance - Two hearts together.wav', 
-                  'clip_WGMa6qh-qFY_SOLO VOY - M R F.wav', 
-                  'clip_7pcZIsJNlAs_Didine Canon 16 ft. Larbi Maestro - Tir Ellil طير الليل.wav', 
-                  'clip_feVUoKhP1mE_Izuku - jamais vu (Clip Officiel).wav', 
-                  'clip_3e2aMWVWecU_Phil Smooth - FAKE LOVE (lyrics_lyrics video).wav', 
-                  'clip_fadPaKn-xe8_Dime - Refill (VIDEOCLIP OFICIAL).wav', 
-                  'clip_9bQY2komrnA_I Give You My Heart - Hillsong Worship & Delirious.wav', 
-                  'clip_f8NapGGtMvo_TiiwTiiw - DAWDAW ft Cheb Nadir, Blanka & Sky (DJ La Meche).wav', 
-                  "clip_-_P_cD0yimw_JO1｜'Born To Be Wild' Official MV.wav", 
-                  'clip_1wpJkzCWHcI_Nancy Ajram - Oul Hansak (Official Audio) _ نانسي عجرم - قول هنساك.wav', 
-                  "clip_3TyKyeS3P-Q_JYJ 'BACK SEAT' M_V.wav", 
-                  'clip_Tfypj4UwvvA_Going Deeper feat. Davis Mallory - Believe  _ #GANGSTERMUSIC.wav', 
-                  'clip_GQ5-gYPabd4_Stargazing.wav', 'clip_t7-OcRIdUu8_Edgardo Donato - Se Va La Vida.wav', 
-                  'clip_xjt-NS8R2LA_Garcia - Anseio (Prod. Pacific).wav', 
-                  'clip_ht7xflC4APQ_LIL X - Think  ( prod.pluto ).wav', 
-                  'clip_D1QQ8UyBFoA_Gene Krupa - Ball of Fire.wav', 
-                  'clip_gCsKlVY8_-Q_Pezet - Mamy ten styl.wav', 
-                  'clip_YOKq1VmEbtc_GQ-I do love you.wav', 
-                  'clip_AoB8koE95C0_Quando Rondo - End Of Story (Official Audio).wav', 
-                  'clip_8MAWFIM-2aI_Enamorado.wav', 
-                  "clip_2UL-FFrX0xQ_'그 여름에' 라이브 버스킹♬ 최솜 with 만렙뮤즈 MLMUSE.wav", 
-                  'clip_n4HTXYR-2AI_Sadhguru - D Neutrons Music _ Turban Trap.wav', 
-                  'clip_BEo0rqOZIng_Huz Kai - On & On (Official Music Video).wav', 
-                  'clip_PYM9NUU9Roc_โอเคป่ะ (Yes or No) feat. นุช วิลาวัลย์ อาร์ สยาม  - Flame เฟลม _ Official MV.wav', 
-                  'clip_gwsaElRJI2M_Kayblack - A Cunhada (prod. Wall Hein e DJ RB).wav', 
-                  'clip_8t9RO40-D74_De Underjordiske - Trold.wav', 
-                  'clip_ms5Hfjd-2AI_Os Pontos Negros - Queda e Ascensão.wav', 
-                  'clip_z7y6MykrE5s_MC G15 - Eu Falei Pra Elas (KondZilla).wav', 
-                  'clip_XEjLoHdbVeE_ABBA - Gimme! Gimme! Gimme! (A Man After Midnight).wav', 
-                  'clip_0QN9KLFWn7I_Kozah - Paradox [NCS Release].wav', 
-                  'clip_DwgdKSKGMLQ_HUZ - Panamera.wav', 
-                  "clip_HwcCBnfhsR4_DAY6 'You make Me' M_V.wav", 
-                  'clip_ngJ71Np-qFY_Orli - Internet Explorer (Prod. Amaro JNT).wav', 
-                  'clip_hjIhCG_nIPA_MC G15 - Cara Bacana (Lyric Video) Jorgin Deejhay.wav', 
-                  'clip_lEHM9HZf0IA_Diamond Eyes - Flutter [NCS Release].wav', 
-                  'clip_jII5qoCrzYE_MJ (써니사이드) - +2kg (feat. 효빈) [Lyric Video].wav', 
-                  "clip_C4IuLw86CJ8_Huz 'Hardest Thing' (Official Vid).wav", 
-                  'clip_QglaLzo_aPk_Julius Dreisig & Zeus X Crona - Invisible [NCS Release].wav', 
-                  'clip_ORurdsjkJMQ_Huz Kai - Crush (Visualizer).wav', 
-                  'clip_9wgaix00KCE_ป่ะล่ะ (PALA) - POKMINDSET [Official MV].wav', 
-                  'clip_Gq5-cpb5f7E_Leoparte - Floodlands (2015).wav', 
-                  'clip_xJt-wTjGkN8_[M_V] 도시 of 레인보우 페이퍼 (Dosi of Rainbow paper) - 겨울향기 (Memories of winter) (Official Music Video).wav', 
-                  'clip_ThtO-8h-qfY_Briango - Bachata de Amor  Lyrics.wav', 
-                  'clip_lYxcW8jtFw0_MC G15 - Deu Onda (KondZilla).wav'];
+// Define the tracks that have to be played, 
+// notice the filename should contain alphabet and number to prevent audio.src not found
+let track_list = ['clip_C4IuLw86CJ8.wav', 'clip_hjIhCG_nIPA.wav', 'clip_8OGw36lQn4w.wav', 'clip_fadPaKn-xe8.wav', 
+'clip_EygNk739nnY.wav', 'clip_AoB8koE95C0.wav', 'clip_GUC6UqXjU44.wav', 'clip_DwgdKSKGMLQ.wav', 'clip_ZpsV5SGa5R4.wav', 
+'clip_SZaZU_qi6Xc.wav', 'clip_yPS0PGBsV8I.wav', 'clip_nISI4qF55F4.wav', 'clip_Cd-ur7jyV30.wav', 'clip_9bQY2komrnA.wav', 
+'clip_0QN9KLFWn7I.wav', 'clip_j9KKh215HTs.wav', 'clip_ngJ71Np-qFY.wav', 'clip_Et-YdmSo_3A.wav', 'clip_lEHM9HZf0IA.wav', 
+'clip_jII5qoCrzYE.wav', 'clip_32MsxqBbe08.wav', 'clip_dpjUrLEgYKI.wav', 'clip_QglaLzo_aPk.wav', 'clip_F_9pZv0wn9Q.wav', 
+'clip_tnOuMlDUgu8.wav', 'clip_XJt-4KKCZBA.wav', 'clip_-b7X97M5tDo.wav', 'clip_C5VCGM2J5ls.wav', 'clip_TzhhbYS9EO4.wav', 
+'clip_xJt-wTjGkN8.wav', 'clip_7pcZIsJNlAs.wav', 'clip_ht7xflC4APQ.wav', 'clip_WGMa6qh-qFY.wav', 'clip_qkE-siH6Ed4.wav', 
+'clip_D6uH2mKJRUA.wav', 'clip_Ny6BAUMZxT4.wav', 'clip_Tfypj4UwvvA.wav', 'clip_XEjLoHdbVeE.wav', 'clip_Z5gvqq3ChII.wav', 
+'clip_2UL-1MOlSPw.wav', 'clip_Gq5-cpb5f7E.wav', 'clip_feVUoKhP1mE.wav', 'clip_gCsKlVY8_-Q.wav', 'clip_BXTpedYsjyI.wav', 
+'clip_HwcCBnfhsR4.wav', 'clip_xe8-Y1oVQeU.wav', 'clip_D1QQ8UyBFoA.wav', 'clip_o683V8-TAPQ.wav', 'clip_lYxcW8jtFw0.wav', 
+'clip_T4stQxboYKM.wav', 'clip_9wgaix00KCE.wav', 'clip_nDjdsytJrf8.wav', 'clip_RhBb77hG0iw.wav', 'clip_vhWoHF9-qfY.wav', 
+'clip_p9LLoijPQfg.wav', 'clip_ms5Hfjd-2AI.wav', 'clip_f8NapGGtMvo.wav', 'clip_Mme9REVuidw.wav', 'clip_xJt--P13x3s.wav', 
+'clip_xJt-xbN5S3E.wav', 'clip_ORurdsjkJMQ.wav', 'clip_btMBUL8_liA.wav', 'clip_-_P_cD0yimw.wav', 'clip_tnzybViYYHw.wav', 
+'clip_BEo0rqOZIng.wav', 'clip_yKEAUgA8OvU.wav', 'clip_QtYDvqJgQqo.wav', 'clip_3TyKyeS3P-Q.wav', 'clip_gwsaElRJI2M.wav', 
+'clip_bBcyBylIr40.wav', 'clip_8MAWFIM-2aI.wav', 'clip_2UL-FFrX0xQ.wav', 'clip_ThtO-8h-qfY.wav', 'clip_LKaXY4IdZ40.wav', 
+'clip_bd5m12UEHWI.wav', 'clip_zYoVEbs-xe8.wav', 'clip_C90sY_Ht6Ig.wav', 'clip_0Za5671VM-0.wav', 'clip_3ObVN3QQiZ8.wav', 
+'clip_z7y6MykrE5s.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
+'clip_t7-OcRIdUu8.wav', 'clip_9arRsdRTTNI.wav', 'clip_GQ5-gYPabd4.wav', 'clip_PYM9NUU9Roc.wav', 'clip_xGPeNN9S0Fg.wav', 
+'clip_xjt-NS8R2LA.wav', 'clip_3e2aMWVWecU.wav', 'clip_dl6vG66m1e8.wav', 'clip_8t9RO40-D74.wav', 'clip_D9ffTk7-2aI.wav'];
+
+// var submitModal = new bootstrap.Modal(document.getElementById("submitModal"));
+// submitModal.show();
+var submitModal = new bootstrap.Modal(document.getElementById("submitModal"), {
+  keyboard: false,
+  backdrop: 'static'
+});
+submitModal.show();
+
+// $(window).on('load', function() {
+//     $('#submitModal').modal('show');
+// });
+
 
 function shuffle(array) {
   var currentIndex = array.length,  randomIndex;
@@ -288,6 +229,9 @@ function seekUpdate() {
 
 
 function playpauseTrack() {
+  if (email == ""){
+    alert("Please refresh page and fill your email!")
+  }
   if (!isPlaying) playTrack();
   // else pauseTrack();
 }
@@ -295,8 +239,10 @@ function playpauseTrack() {
 
 function submitEmail() {
   email = document.getElementById("userEmail").value;
+  console.log(email);
   if (email != ""){
-    document.getElementById('id01').style.display='none';
+    submitModal.toggle();
+    // $('#submitModal').modal('toggle');
   } else {
     alert('You need to fill your email first!');
   }  
@@ -326,5 +272,3 @@ audioOrder = shuffle(audioOrder);
 
 // Load the first track in the tracklist
 loadTrack(slot_cnt);
-
-// startExperiment();
