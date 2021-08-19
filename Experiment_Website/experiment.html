@@ -25,75 +25,96 @@
             </nav>
         </header>
         <main>
-            <div class="player">
-                <div class="details">
-                    <div class="now-playing row">PLAYING x OF y</div>
-                    <div class="track-art row"></div>
-                    <div class="track-name row">Track Name</div>
-                    <!-- ref: https://stackoverflow.com/questions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
-                    <div class="response_btns">
-                        <input id="toggle-alhrd" name="toggle" type="radio">
-                        <label for="toggle-alhrd" title="Heard this song before experiment">Heard Before</label>
-                        <input id="toggle-unhrd" name="toggle" type="radio" checked="checked">
-                        <label for="toggle-unhrd" title="First time hearing this song">First Time</label>
-                        <input id="toggle-hrd" name="toggle" type="radio">
-                        <label for="toggle-hrd" title="Second time the song played in the experiment">Surely Repeat</label>
-                    </div>
-                </div>
-                <div class="buttons">
-                    <div class="prev-track" onclick="prevTrack()"><i class="fa fa-step-backward fa-2x"></i></div>
-                    <div class="playpause-track" onclick="playpauseTrack()"><i class="fa fa-play-circle fa-5x"></i></div>
-                    <div class="next-track" onclick="nextTrack()"><i class="fa fa-step-forward fa-2x"></i></div>
-                </div>
-                <div class="slider_container">
-                    <div class="current-time">00:00</div>
-                    <input type="range" min="1" max="100" value="0" class="seek_slider" disabled>
-                    <div class="total-duration">00:00</div>
-                </div>
-                <div class="slider_container">
-                    <i class="fa fa-volume-down"></i>
-                    <input type="range" min="1" max="100" value="99" class="volume_slider" onchange="setVolume()">
-                    <i class="fa fa-volume-up"></i>
-                </div>
-            </div>
-            
-            <!-- Modal -->
-            <div class="modal fade" id="submitModal" tabindex="-1" role="dialog" aria-labelledby="submitModalLabel" aria-hidden="true"> 
-                <div class="modal-dialog" role="document">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title" id="submitModalLabel">Fill in your email first</h5>
-                    </div>
-                    <div class="modal-body">
-                      <form>
-                        <div class="form-group">
-                          <!-- <label for="message-text" class="col-form-label">Email: </label> -->
-                          <input class="col-12" type="text" placeholder="Enter Your Email" name="email" id="userEmail" required>
-                          <!-- <textarea class="form-control" id="message-text"></textarea> -->
+          <div class="player">
+              <div class="details">
+                  <div class="now-playing row">PLAYING x OF y</div>
+                  <div class="track-art row"></div>
+                  <div class="track-name row">Track Name</div>
+                  <!-- ref: https://stackoverflow.com/questions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
+                  <div class="response_btns">
+                      <input id="toggle-alhrd" name="toggle" type="radio">
+                      <label for="toggle-alhrd" title="Heard this song before experiment">Heard Before</label>
+                      <input id="toggle-unhrd" name="toggle" type="radio" checked="checked">
+                      <label for="toggle-unhrd" title="First time hearing this song">First Time</label>
+                      <input id="toggle-hrd" name="toggle" type="radio">
+                      <label for="toggle-hrd" title="Second time the song played in the experiment">Surely Repeat</label>
+                  </div>
+              </div>
+              <div class="buttons">
+                  <!-- <div class="prev-track" onclick="prevTrack()"><i class="fa fa-step-backward fa-2x"></i></div> -->
+                  <div class="playpause-track" onclick="playpauseTrack()"><i class="fa fa-play-circle fa-5x"></i></div>
+                  <!-- <div class="next-track" onclick="nextTrack()"><i class="fa fa-step-forward fa-2x"></i></div> -->
+              </div>
+              <div class="slider_container">
+                  <div class="current-time">00:00</div>
+                  <input type="range" min="1" max="100" value="0" class="seek_slider" disabled>
+                  <div class="total-duration">00:00</div>
+              </div>
+              <div class="slider_container">
+                  <i class="fa fa-volume-down"></i>
+                  <input type="range" min="1" max="100" value="99" class="volume_slider" onchange="setVolume()">
+                  <i class="fa fa-volume-up"></i>
+              </div>
+          </div>
+          
+          <!-- Modal -->
+          <div class="modal fade" id="submitModal" tabindex="-1" role="dialog" aria-labelledby="submitModalLabel" aria-hidden="true"> 
+              <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="submitModalLabel">Welcome to the Experiment</h5>
+                  </div>
+                  <div class="modal-body">
+                    <p>Rules:
+                      <br>
+                      1. Your participation will only counts if you finish the whole experiment.
+                      <br>
+                      2. You should only paritcipate in this experiment once, we will use email as identification.
+                    </p>
+                    <!-- ref: https://stackoverflow.com/questions/1878264/how-do-i-make-an-html-button-not-reload-the-page -->
+                    <form class="needs-validation" novalidate onsubmit="return false">
+                      <div class="form-row">
+                        <div class="col mb-3">
+                          <input type="text" class="form-control" id="userEmail" placeholder="Enter your email" required>
+                          <div class="invalid-feedback">
+                            Please provide a valid email.
+                          </div>
                         </div>
-                      </form>
-                    </div>
-                    <div class="modal-footer">
-                      <button class="btn btn-danger" type="submit" onclick="submitEmail()">START</button>        
-                    </div>
+                      <div class="form-group">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" value="" id="agreeCheck" required>
+                          <label class="form-check-label" for="agreeCheck">
+                            I have read and agree to follow the rules
+                          </label>
+                          <div class="invalid-feedback">
+                            You must agree before submitting.
+                          </div>
+                        </div>
+                      </div>
+                      <div class="text-center">
+                        <button class="btn btn-danger float-right " type="submit" onclick="submitEmail()">START</button>        
+                      </div>
+                    </form>
+                    
                   </div>
                 </div>
-            </div>            
+              </div>
+          </div>            
 
         </main>
         <footer id=scroll-target>
-            <div class="container">
-                <!--Grid row-->
-                <div class="row py-4">
-                  <!--Grid column-->
-                  <div class="col-md-12 text-center">
-                    <i class="material-icons" style="font-size:36px">email</i>
-                    <p>liyangtseng.ee06@nycu.edu.tw</p>
-                  </div>
-                  <!--Grid column-->
+          <div class="container">
+              <!--Grid row-->
+              <div class="row py-4">
+                <!--Grid column-->
+                <div class="col-md-12 text-center">
+                  <i class="material-icons" style="font-size:36px">email</i>
+                  <p>liyangtseng.ee06@nycu.edu.tw</p>
                 </div>
-                <!--Grid row-->
+                <!--Grid column-->
               </div>
+            <!--Grid row-->
+          </div>
         </footer>
         <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
 

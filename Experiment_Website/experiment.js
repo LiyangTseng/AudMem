@@ -136,8 +136,8 @@ function loadTrack(track_counter) {
     curr_track.load();
 
     // for debug prupose
-    track_name.textContent = `No.${track_index+1}`;
-    // track_name.textContent = "";
+    // track_name.textContent = `No.${track_index+1}`;
+    track_name.textContent = "";
     now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length;
     
   
@@ -229,23 +229,24 @@ function seekUpdate() {
 
 
 function playpauseTrack() {
-  if (email == ""){
-    alert("Please refresh page and fill your email!")
+  if (!isPlaying) {
+    playTrack();
+    playpause_btn.style.display = 'none';
   }
-  if (!isPlaying) playTrack();
   // else pauseTrack();
 }
 
 
 function submitEmail() {
   email = document.getElementById("userEmail").value;
-  console.log(email);
-  if (email != ""){
+  agreed = document.getElementById("agreeCheck").checked
+  if (email != "" && agreed == true){
+    console.log('log in as', email);
     submitModal.toggle();
-    // $('#submitModal').modal('toggle');
-  } else {
-    alert('You need to fill your email first!');
-  }  
+  } 
+  // else {
+  //   alert('You need to fill your email first!');
+  // }  
 }
 
 function saveToDB() {
@@ -272,3 +273,21 @@ audioOrder = shuffle(audioOrder);
 
 // Load the first track in the tracklist
 loadTrack(slot_cnt);
+// Example starter JavaScript for disabling form submissions if there are invalid fields
+(function() {
+  'use strict';
+  window.addEventListener('load', function() {
+    // Fetch all the forms we want to apply custom Bootstrap validation styles to
+    var forms = document.getElementsByClassName('needs-validation');
+    // Loop over them and prevent submission
+    var validation = Array.prototype.filter.call(forms, function(form) {
+      form.addEventListener('submit', function(event) {
+        if (form.checkValidity() === false) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+      }, false);
+    });
+  }, false);
+})();
