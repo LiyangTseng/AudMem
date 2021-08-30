@@ -68,7 +68,7 @@ def check_track_memorized(singleUserData, trackMemorability_dict, vigilanceThres
 
         for vigilance_pair in TARGET_PAIRS:
             track_idx = audioOrder[SLOT_ORDER[vigilance_pair[0]]]
-            track_name = idTrackMapping[track_idx]
+            track_name = id_to_track[track_idx]
             repeat_length = vigilance_pair[1]-vigilance_pair[0]
             memorized = 1 if (userResponse[vigilance_pair[0]]==0 and userResponse[vigilance_pair[1]]==1) else 0
             trackMemorability_dict[track_name].append({repeat_length: memorized})
@@ -87,8 +87,8 @@ def write_labels(track_memorability_dict):
 
 if __name__ == '__main__':
 
-    idTrackMapping = get_track_index('track_index.txt')
-    trackMemorability_dict = {track: [] for idx, track in idTrackMapping.items()}
+    id_to_track = get_track_index('track_index.txt')
+    trackMemorability_dict = {track: [] for idx, track in id_to_track.items()}
     experimentData = pd.read_csv('experimentData_beta.csv')
     qualifiedExperimentData = preprocess_filtering(experimentData)
     
