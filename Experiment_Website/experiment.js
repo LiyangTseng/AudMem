@@ -12,6 +12,12 @@ let total_duration = document.querySelector(".total-duration");
 
 let email = document.getElementById("userEmail").value;
 
+let alhrd_checked = document.getElementById("toggle-alhrd").checked;
+let unhrd_checked = document.getElementById("toggle-unhrd").checked;
+let hrd_checked = document.getElementById("toggle-hrd").checked;
+let submitBtn = document.getElementById("submitBtn");
+submitBtn.style.display = "none";
+
 let slot_cnt = 0;
 let isPlaying = false;
 let updateTimer;
@@ -20,27 +26,24 @@ let updateTimer;
 let curr_track = document.createElement('audio');
 
 let dir = 'clips/'
-// Define the tracks that have to be played, 
+// Define the tracks that will be played, 
 // notice the filename should contain alphabet and number to prevent audio.src not found
-let track_list = ['clip_C4IuLw86CJ8.wav', 'clip_hjIhCG_nIPA.wav', 'clip_8OGw36lQn4w.wav', 'clip_fadPaKn-xe8.wav', 
-'clip_EygNk739nnY.wav', 'clip_AoB8koE95C0.wav', 'clip_GUC6UqXjU44.wav', 'clip_DwgdKSKGMLQ.wav', 'clip_ZpsV5SGa5R4.wav', 
-'clip_SZaZU_qi6Xc.wav', 'clip_yPS0PGBsV8I.wav', 'clip_nISI4qF55F4.wav', 'clip_Cd-ur7jyV30.wav', 'clip_9bQY2komrnA.wav', 
-'clip_0QN9KLFWn7I.wav', 'clip_j9KKh215HTs.wav', 'clip_ngJ71Np-qFY.wav', 'clip_Et-YdmSo_3A.wav', 'clip_lEHM9HZf0IA.wav', 
-'clip_jII5qoCrzYE.wav', 'clip_32MsxqBbe08.wav', 'clip_dpjUrLEgYKI.wav', 'clip_QglaLzo_aPk.wav', 'clip_F_9pZv0wn9Q.wav', 
-'clip_tnOuMlDUgu8.wav', 'clip_XJt-4KKCZBA.wav', 'clip_-b7X97M5tDo.wav', 'clip_C5VCGM2J5ls.wav', 'clip_TzhhbYS9EO4.wav', 
-'clip_xJt-wTjGkN8.wav', 'clip_7pcZIsJNlAs.wav', 'clip_ht7xflC4APQ.wav', 'clip_WGMa6qh-qFY.wav', 'clip_qkE-siH6Ed4.wav', 
-'clip_D6uH2mKJRUA.wav', 'clip_Ny6BAUMZxT4.wav', 'clip_Tfypj4UwvvA.wav', 'clip_XEjLoHdbVeE.wav', 'clip_Z5gvqq3ChII.wav', 
-'clip_2UL-1MOlSPw.wav', 'clip_Gq5-cpb5f7E.wav', 'clip_feVUoKhP1mE.wav', 'clip_gCsKlVY8_-Q.wav', 'clip_BXTpedYsjyI.wav', 
-'clip_HwcCBnfhsR4.wav', 'clip_xe8-Y1oVQeU.wav', 'clip_D1QQ8UyBFoA.wav', 'clip_o683V8-TAPQ.wav', 'clip_lYxcW8jtFw0.wav', 
-'clip_T4stQxboYKM.wav', 'clip_9wgaix00KCE.wav', 'clip_nDjdsytJrf8.wav', 'clip_RhBb77hG0iw.wav', 'clip_vhWoHF9-qfY.wav', 
-'clip_p9LLoijPQfg.wav', 'clip_ms5Hfjd-2AI.wav', 'clip_f8NapGGtMvo.wav', 'clip_Mme9REVuidw.wav', 'clip_xJt--P13x3s.wav', 
-'clip_xJt-xbN5S3E.wav', 'clip_ORurdsjkJMQ.wav', 'clip_btMBUL8_liA.wav', 'clip_-_P_cD0yimw.wav', 'clip_tnzybViYYHw.wav', 
-'clip_BEo0rqOZIng.wav', 'clip_yKEAUgA8OvU.wav', 'clip_QtYDvqJgQqo.wav', 'clip_3TyKyeS3P-Q.wav', 'clip_gwsaElRJI2M.wav', 
-'clip_bBcyBylIr40.wav', 'clip_8MAWFIM-2aI.wav', 'clip_2UL-FFrX0xQ.wav', 'clip_ThtO-8h-qfY.wav', 'clip_LKaXY4IdZ40.wav', 
-'clip_bd5m12UEHWI.wav', 'clip_zYoVEbs-xe8.wav', 'clip_C90sY_Ht6Ig.wav', 'clip_0Za5671VM-0.wav', 'clip_3ObVN3QQiZ8.wav', 
-'clip_z7y6MykrE5s.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
-'clip_t7-OcRIdUu8.wav', 'clip_9arRsdRTTNI.wav', 'clip_GQ5-gYPabd4.wav', 'clip_PYM9NUU9Roc.wav', 'clip_xGPeNN9S0Fg.wav', 
-'clip_xjt-NS8R2LA.wav', 'clip_3e2aMWVWecU.wav', 'clip_dl6vG66m1e8.wav', 'clip_8t9RO40-D74.wav', 'clip_D9ffTk7-2aI.wav'];
+let track_list = ['clip_w1G3rqVil1s.wav', 'clip_HiPkwl5p1GY.wav', 'clip_ZIiQ1jMqhVM.wav', 'clip_fOYuWVIXgiM.wav', 'clip_hjIhCG_nIPA.wav', 
+'clip_VLecCiNKjF0.wav', 'clip_hV-FwW1LgxU.wav', 'clip_9DP0yMwvyWE.wav', 'clip_fadPaKn-xe8.wav', 'clip_UJ5-4GiWNnc.wav', 'clip_EygNk739nnY.wav', 
+'clip_AoB8koE95C0.wav', 'clip_GUC6UqXjU44.wav', 'clip_V-ar6MLjy5o.wav', 'clip_DwgdKSKGMLQ.wav', 'clip_SZaZU_qi6Xc.wav', 'clip_nISI4qF55F4.wav', 
+'clip_0QN9KLFWn7I.wav', 'clip_j9KKh215HTs.wav', 'clip_ngJ71Np-qFY.wav', 'clip_Et-YdmSo_3A.wav', 'clip_lEHM9HZf0IA.wav', 'clip_jII5qoCrzYE.wav', 
+'clip_32MsxqBbe08.wav', 'clip_GQ5-Y-n_Djw.wav', 'clip_gg5sZZPuK_o.wav', 'clip_dpjUrLEgYKI.wav', 'clip_ulj-L3K_Gzs.wav', 'clip_tnOuMlDUgu8.wav', 
+'clip_XJt-4KKCZBA.wav', 'clip_C5VCGM2J5ls.wav', 'clip_LGX21vCbzdM.wav', 'clip_TzhhbYS9EO4.wav', 'clip_bI8-2blisUM.wav', 'clip_xJt-wTjGkN8.wav', 
+'clip_0M24ENnb4gE.wav', 'clip_7pcZIsJNlAs.wav', 'clip_spcz4MLQKD0.wav', 'clip_ht7xflC4APQ.wav', 'clip_UGTYqTKUl8w.wav', 'clip_dCish9XM5bE.wav', 
+'clip_bwQ49N0jVvE.wav', 'clip_2JL_KcEzkqg.wav', 'clip_Yyvo9O8fN-A.wav', 'clip_WGMa6qh-qFY.wav', 'clip_D6uH2mKJRUA.wav', 'clip_Tfypj4UwvvA.wav', 
+'clip_Z5gvqq3ChII.wav', 'clip_2F8Kr91wQ0U.wav', 'clip_2UL-1MOlSPw.wav', 'clip_Gq5-cpb5f7E.wav', 'clip_feVUoKhP1mE.wav', 'clip_2ul-hWVNIC0.wav', 
+'clip_audaUMOnGxA.wav', 'clip_BXTpedYsjyI.wav', 'clip_HwcCBnfhsR4.wav', 'clip_sjlkxcwhpwA.wav', 'clip_xe8-Y1oVQeU.wav', 'clip_o683V8-TAPQ.wav', 
+'clip_lYxcW8jtFw0.wav', 'clip_T4stQxboYKM.wav', 'clip_HN65BuYwGMA.wav', 'clip_RhBb77hG0iw.wav', 'clip_vhWoHF9-qfY.wav', 'clip_v0UvOsCi8mc.wav', 
+'clip_XJT-fM4nBJU.wav', 'clip_Mme9REVuidw.wav', 'clip_xJt--P13x3s.wav', 'clip_ORurdsjkJMQ.wav', 'clip_btMBUL8_liA.wav', 'clip_-_P_cD0yimw.wav', 
+'clip_BEo0rqOZIng.wav', 'clip_haCay85cpvo.wav', 'clip_gwsaElRJI2M.wav', 'clip_0aC-jOKuBFE.wav', 'clip_8MAWFIM-2aI.wav', 'clip_dtOv6WvJ44w.wav', 
+'clip_ThtO-8h-qfY.wav', 'clip_bd5m12UEHWI.wav', 'clip_C90sY_Ht6Ig.wav', 'clip_19Q9l85Feqw.wav', 'clip_3ObVN3QQiZ8.wav', 'clip_z7y6MykrE5s.wav', 
+'clip_lfy8tbM0q18.wav', 'clip_SubIr_Fyp4M.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
+'clip_PYM9NUU9Roc.wav', 'clip_xjt-NS8R2LA.wav', 'clip_dl6vG66m1e8.wav', 'clip_yBzk2xXE9yg.wav', 'clip_D9ffTk7-2aI.wav'];
 
 // var submitModal = new bootstrap.Modal(document.getElementById("submitModal"));
 // submitModal.show();
@@ -49,7 +52,6 @@ var submitModal = new bootstrap.Modal(document.getElementById("submitModal"), {
   backdrop: 'static'
 });
 submitModal.show();
-
 // $(window).on('load', function() {
 //     $('#submitModal').modal('show');
 // });
@@ -128,7 +130,9 @@ function loadTrack(track_counter) {
     $('label[for="toggle-hrd"]').show();
     $('label[for="toggle-unhrd"]').show();
     $('label[for="toggle-alhrd"]').show();
-    document.getElementById("toggle-unhrd").checked = true;
+    document.getElementById("toggle-alhrd").checked = false;
+    document.getElementById("toggle-unhrd").checked = false;
+    document.getElementById("toggle-hrd").checked = false;
     track_index = audioOrder[slotWithBreakOrder[track_counter]];
     clearInterval(updateTimer);
     resetValues();
@@ -155,7 +159,6 @@ function resetValues() {
 function playTrack() {
   curr_track.play();
   isPlaying = true;
-  playpause_btn.innerHTML = '<i class="fa fa-pause-circle fa-5x"></i>';
 }
 
 function pauseTrack() {
@@ -164,14 +167,37 @@ function pauseTrack() {
   playpause_btn.innerHTML = '<i class="fa fa-play-circle fa-5x"></i>';;
 }
 
-function nextTrack() {
-  if (slot_cnt%2 === 0){
-    // if real audio(music) played in slot
+function getUserResponse() {
+  return new Promise((resolve, reject) => {
+    (function waitForResponse(){
+      if (document.getElementById("toggle-alhrd").checked || document.getElementById("toggle-unhrd").checked || document.getElementById("toggle-hrd").checked) {
+        $('label[for="toggle-alhrd"]').removeClass("glowed");
+        $('label[for="toggle-unhrd"]').removeClass("glowed");
+        $('label[for="toggle-hrd"]').removeClass("glowed");
+        return resolve();
+      }
+      else {
+        setTimeout(waitForResponse, 30);
+        $('label[for="toggle-alhrd"]').addClass("glowed");
+        $('label[for="toggle-unhrd"]').addClass("glowed");
+        $('label[for="toggle-hrd"]').addClass("glowed");  
+      }
+    })();
+  })  
+}
+async function nextTrack() {
+  if (slot_cnt%2 === 0){ // if real audio(music) played in slot
+    
+    await getUserResponse();
+  
     if (document.getElementById("toggle-alhrd").checked) {
+      // already heard: -1
       userResponses.push(-1);
     } else if (document.getElementById("toggle-unhrd").checked) {
+      // unheard: 0
       userResponses.push(0);
     } else if (document.getElementById("toggle-hrd").checked) {
+      // unheard: 1
       userResponses.push(1);
     }
 
@@ -230,6 +256,8 @@ function seekUpdate() {
 
 function playpauseTrack() {
   if (!isPlaying) {
+    // Load the first track in the tracklist
+    loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
   }
@@ -244,9 +272,6 @@ function submitEmail() {
     console.log('log in as', email);
     submitModal.toggle();
   } 
-  // else {
-  //   alert('You need to fill your email first!');
-  // }  
 }
 
 function saveToDB() {
@@ -270,24 +295,7 @@ window.onbeforeunload = function(){
 
 // ===============================
 audioOrder = shuffle(audioOrder);
-
-// Load the first track in the tracklist
-loadTrack(slot_cnt);
-// Example starter JavaScript for disabling form submissions if there are invalid fields
-(function() {
-  'use strict';
-  window.addEventListener('load', function() {
-    // Fetch all the forms we want to apply custom Bootstrap validation styles to
-    var forms = document.getElementsByClassName('needs-validation');
-    // Loop over them and prevent submission
-    var validation = Array.prototype.filter.call(forms, function(form) {
-      form.addEventListener('submit', function(event) {
-        if (form.checkValidity() === false) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-        form.classList.add('was-validated');
-      }, false);
-    });
-  }, false);
-})();
+$('label[for="toggle-hrd"]').hide();
+$('label[for="toggle-unhrd"]').hide();
+$('label[for="toggle-alhrd"]').hide();
+track_name.textContent = "";

@@ -29,15 +29,18 @@
               <div class="details">
                   <div class="now-playing row">PLAYING x OF y</div>
                   <div class="track-art row"></div>
-                  <div class="track-name row">Track Name</div>
+                  <div class="track-name row"></div>
                   <!-- ref: https://stackoverflow.com/questions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
                   <div class="response_btns">
                       <input id="toggle-alhrd" name="toggle" type="radio">
                       <label for="toggle-alhrd" title="Heard this song before experiment">Heard Before</label>
-                      <input id="toggle-unhrd" name="toggle" type="radio" checked="checked">
+                      <input id="toggle-unhrd" name="toggle" type="radio">
                       <label for="toggle-unhrd" title="First time hearing this song">First Time</label>
                       <input id="toggle-hrd" name="toggle" type="radio">
                       <label for="toggle-hrd" title="Second time the song played in the experiment">Surely Repeat</label>
+                  </div>
+                  <div class="text-center">
+                    <button class="btn-lg btn-danger" id="submitBtn" type="submit">Submit</button>        
                   </div>
               </div>
               <div class="buttons">
