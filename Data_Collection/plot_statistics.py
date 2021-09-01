@@ -10,37 +10,30 @@ def preprocess(df):
         df['viewCount'] = df['viewCount'].apply(lambda view: int(view.replace(',', '')))
     return df
 
-def plot_histogram(yt_info_df):
+def get_histogram(views, type_name='Orignal', n_bins=10, plot=True):
 
-    n_bins = 10
-
-    viewCounts = yt_info_df['viewCount'].to_numpy()
-    # viewCounts = np.array([viewCount.replace(',', '') for viewCount in viewCounts]).astype('int')
-    log_viewCounts = np.log10(viewCounts)
-    log_viewCounts[log_viewCounts == -np.inf] = 0
-
-    plt.figure()
-    plt.title('Video Views Distribution')
-    plt.hist(log_viewCounts, bins=n_bins, range=[0, 10])
-    plt.ylabel('number of videos')
-    plt.xlabel('log10 of views')
-    plt.savefig('viewCounts.png')
-
-    valid_viewCounts = yt_info_df[yt_info_df['valid']==1]['viewCount'].to_numpy()
-    # valid_viewCounts = np.array([valid_viewCount.replace(',', '') for valid_viewCount in valid_viewCounts]).astype('int')
-    valid_log_viewCounts = np.log10(valid_viewCounts)
-    valid_log_viewCounts[valid_log_viewCounts == -np.inf] = 0
-
-    plt.figure()
-    plt.title('Valid Video Views Distribution ')
-    plt.hist(valid_log_viewCounts, bins=n_bins, range=[0, 10])
-    plt.ylabel('number of videos')
-    plt.xlabel('log10 of views')
-    plt.savefig('valid_viewCounts.png')
+    log_views = np.log10(views.astype('float'))
+    log_views[log_views == -np.inf] = 0
+    if plot:
+        plt.figure()
+        plt.title('{} Video Views Distribution'.format(type_name))
+        plt.hist(log_views, bins=n_bins, range=[0, 10])
+        plt.ylabel('number of videos')
+        plt.xlabel('log10 of views')
+        plt.savefig('{}_viewCounts.png'.format(type_name.lower()))
+        print('Distribution saved at {}_viewCounts.png'.format(type_name.lower()))
+    
+    ''' in case other module need the distribution information '''
+    return log_views
 
 if __name__ == '__main__':
     filename = 'yt_info.csv'
     yt_info_df = pd.read_csv(filename)
     yt_info_df = preprocess(yt_info_df)
     yt_info_df.to_csv(filename, index=False)
-    plot_histogram(yt_info_df)
+
+    orginal_viewCount = yt_info_df['viewCount'].to_numpy()
+    get_histogram(orginal_viewCount)
+    valid_viewCounts = yt_info_df[yt_info_df['valid']==1]['viewCount'].to_numpy()
+    get_histogram(valid_viewCounts, type_name='Valid')
+

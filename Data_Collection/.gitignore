@@ -1,5 +1,9 @@
 Audios/raw
+Audios/raw2
+Audios/raw3
+Audios/clips
+Audios/clips2
+Audios/clips3
 pychorus/*
 .vscode
-../.vscode
 *.pyc

@@ -5,11 +5,12 @@ import pandas as pd
 import librosa
 import soundfile as sf
 
-CLIP_DIR = 'Audios/clips'
-clip_length = 10
+# CLIP_DIR = 'Audios/clips'
+clip_length = 15
 
-def extract_clip(audio_file, chorus_location):
+def extract_clip(audio_file, chorus_location, CLIP_DIR):
     ''' using chorus location to make clip '''
+
     print('Extracting clip...')
     song_wav_data, sr = librosa.load(audio_file)
     
@@ -32,9 +33,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Starting location and audacity or not')
     parser.add_argument('-i', '--index', help='starting index (count from 1)', default=1)
     parser.add_argument('-a', '--audacity', help='use audacity or not', default=False, type=bool)
+    parser.add_argument('-s', '--source', help='source of location file', default='chorus_location_3.csv')
+    parser.add_argument('-o', '--output', help='directory of output clip', default='Audios/clips3')
     args = parser.parse_args()
 
-    chorus_df = pd.read_csv('chorus_location.csv')
+    chorus_df = pd.read_csv(args.source)
+    file_exist = [os.path.exists(f) for f in chorus_df['file']]
+    chorus_df = chorus_df[file_exist]
+    chorus_df.to_csv(args.source, index=False)
     start_idx = int(args.index)-1
     
     if args.audacity:
@@ -45,10 +51,10 @@ if __name__ == '__main__':
             print('Extracting progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
             print('Enter chorus location with format [min]:[sec]: ', end='')
             chorus_loc = input()
-            extract_clip(row['file'], chorus_loc)
+            extract_clip(row['file'], chorus_loc, CLIP_DIR=args.output)
     else:
         for idx, row in chorus_df[start_idx:].iterrows():
             print('==============================')
             print('Extracting progress: {:02}/{}, {}'.format(idx+1, len(chorus_df), row['file']))
             chorus_loc = row['chorus_location']
-            extract_clip(row['file'], chorus_loc)
+            extract_clip(row['file'], chorus_loc, CLIP_DIR=args.output)

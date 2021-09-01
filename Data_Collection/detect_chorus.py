@@ -4,10 +4,11 @@ import csv
 import warnings
 warnings.filterwarnings('ignore')
 from tqdm import tqdm
+import argparse
 
-AUDIO_DIR = 'Audios/raw'
 
-def detect_chorus(chorus_length=10):
+def detect_chorus(arguments, chorus_length=10):
+    AUDIO_DIR = arguments.source
     title_chorus_dict = {}
     for audio in tqdm(os.listdir(AUDIO_DIR)):
         audio_path = os.path.join(AUDIO_DIR, audio)
@@ -20,11 +21,17 @@ def detect_chorus(chorus_length=10):
                 continue
             title_chorus_dict[audio_path] = '{:02}:{:02}'.format(int(chorus_start_sec // 60), int(chorus_start_sec % 60))
         
-    with open('chorus_location.csv', 'w') as f:  
+    with open(arguments.output, 'w') as f:  
         writer = csv.writer(f)
         writer.writerow(['file', 'chorus_location'])
         for key, value in title_chorus_dict.items():
             writer.writerow([key, value])  
 
 if __name__ == '__main__':
-    detect_chorus()
+
+    parser = argparse.ArgumentParser(description='resample audios or not')
+    parser.add_argument('-s', '--source', help='directory that stores audios', default='Audios/raw3')
+    parser.add_argument('-o', '--output', help='output file of chorus location', default='chorus_location_3.csv')
+    args = parser.parse_args()
+
+    detect_chorus(args)
