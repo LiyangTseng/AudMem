@@ -3,6 +3,16 @@ main {
     background-color:rgb(219, 215, 206);  
 }
 
+html, body, main {
+    height: 100%;
+}
+
+@media screen and (max-height: 500px) {
+    html, body, main {
+        min-height: 100%;
+    }
+}
+
 .navbar {
     background-color: rgb(26, 24, 23);
 }
@@ -10,9 +20,12 @@ main {
 .nav-link {
     font-size: 1.2em;
 }
+  
+.progress-bar {
+    background-color: rgb(87, 33, 33);
+}
 
 .player {
-    height: 95vh;
     display: flex;
     align-items: center;
     flex-direction: column;
@@ -24,36 +37,38 @@ main {
     align-items: center;
     flex-direction: column;
     justify-content: center;
-    margin-top: 25px;
+    margin-top: 1%;
+}
+
+@media screen and (min-height: 700px) {
+    .details {
+        margin-top: 7%;
+    }
 }
 
 .track-art {
     margin: 25px;
-    height: 200px;
-    width: 200px;
+    height: 25vh;
+    width: 25vh;
     background-image: url("background.jpg");
     background-size: cover;
     border-radius: 15%;
 }
 
 .track-name {
-    font-size: 3rem;
+    font-size: 2.5rem;
 }
 
 .now-playing {
     font-size: 2rem;
 }
 
-.timer_prompt {
-    font-size: 30px;
-}
-
 .response_btns {
     display: flex;
     flex-direction: row;
     align-items: center;
-    margin-top: 25px;
-    margin-bottom: 25px;
+    margin-top: 1%;
+    margin-bottom: 1%;
 }
 
 
@@ -68,11 +83,17 @@ label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"]{
   border-radius: 5px; 
   color: rgb(216, 216, 201);
   background-color: rgb(87, 33, 33);
-  font-size: 35px;
+  font-size: 30px;
   text-align: center;
   margin-right: 10px;
   margin-left: 10px;
   user-select: none;
+}
+
+@media screen and (max-height: 510px) {
+    label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"]{ 
+        font-size: 25px;
+    }
 }
 
 .glowed {

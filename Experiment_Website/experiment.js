@@ -210,7 +210,7 @@ async function nextTrack() {
     saveToDB();
     alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
     window.onbeforeunload = null;
-    window.location.href='index.html'
+    window.location.href='index.html';
   }
 
   loadTrack(slot_cnt);
@@ -260,9 +260,49 @@ function playpauseTrack() {
     loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
+    let hour = 1, min = 15, sec = 0;
+    let totalTimeSec = 75*60;
+    let timeLeftSec = 75*60;
+    
+    let timerStart = setInterval(function(){
+      timeLeftSec --;
+      if (timeLeftSec > 0){
+        $('.progress-bar').css('width', timeLeftSec/totalTimeSec*100+'%');
+        hour = Math.floor(timeLeftSec/60/60);
+        min = Math.floor((timeLeftSec/60)%60);
+        sec = timeLeftSec%60;
+        $('.countDown').text("Time Left " + String(hour).padStart(1, '0') + ":" + String(min).padStart(2, '0') + ":"+ String(sec).padStart(2, '0'));
+
+      } else {
+        clearInterval(timerStart);
+        alert("Time's up! You failed to complete the experiment on time!");
+        window.onbeforeunload = null;
+        window.location.href='index.html';
+      }
+      
+    }, 1000);
   }
   // else pauseTrack();
 }
+
+function progress(timeleft, timetotal, $element) {
+  let progressBarWidth = timeleft * $element.width() / timetotal;
+  
+  // $element.find('div').animate({ width: progressBarWidth }, 500).html(String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0') + ":"+ String(sec).padStart(2, '0'));
+  $('.bar').animate({ width: progressBarWidth }, 500);
+  $('.countDown').text(String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0') + ":"+ String(sec).padStart(2, '0'));
+  if(timeleft > 0) {
+      setTimeout(function() {
+          // progress(timeleft - 1, timetotal, $element);
+          timeleft = timeleft- 1
+          progress();
+      }, 1000);
+  } else {
+    alert("Time's up! You failed to complete the experiment on time!");
+    window.onbeforeunload = null;
+    window.location.href='index.html';
+  }
+};
 
 
 function submitEmail() {
@@ -271,7 +311,7 @@ function submitEmail() {
   if (email != "" && agreed == true){
     console.log('log in as', email);
     submitModal.toggle();
-  } 
+    } 
 }
 
 function saveToDB() {
@@ -287,7 +327,6 @@ function saveToDB() {
   
 }
 
-
 // popup warning about leaving experiment
 window.onbeforeunload = function(){
   return 'Experiment data will be lost';
@@ -299,3 +338,5 @@ $('label[for="toggle-hrd"]').hide();
 $('label[for="toggle-unhrd"]').hide();
 $('label[for="toggle-alhrd"]').hide();
 track_name.textContent = "";
+
+

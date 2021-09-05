@@ -10,7 +10,7 @@
     </head>
     <body>
         <header>
-            <nav class="navbar navbar-expand-lg navbar-dark">
+            <nav class="navbar navbar-expand-lg py-0 navbar-dark">
                 <div class="container-fluid">
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
@@ -25,6 +25,14 @@
             </nav>
         </header>
         <main>
+          <!-- ref: https://stackoverflow.com/questions/30104289/bootstrap-progress-bar-timer/50179723 -->
+          <div class="progress">
+            <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width: 100%;">
+              <span class="sr-only"></span>
+            </div>
+          </div>
+          <p class="text-center display-6 mt-3 countDown">Maximum Time Allowed: 1:15:00, Press Play to Start</p>
+          
           <div class="player">
               <div class="details">
                   <div class="now-playing row">PLAYING x OF y</div>
@@ -45,7 +53,7 @@
               </div>
               <div class="buttons">
                   <!-- <div class="prev-track" onclick="prevTrack()"><i class="fa fa-step-backward fa-2x"></i></div> -->
-                  <div class="playpause-track" onclick="playpauseTrack()"><i class="fa fa-play-circle fa-5x"></i></div>
+                  <div class="playpause-track" onclick="playpauseTrack()"><i class="fa fa-play-circle fa-4x"></i></div>
                   <!-- <div class="next-track" onclick="nextTrack()"><i class="fa fa-step-forward fa-2x"></i></div> -->
               </div>
               <div class="slider_container">
