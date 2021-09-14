@@ -1,9 +1,10 @@
 import os
+import argparse
 import numpy as np
 import pandas as pd
 import librosa
-import argparse
 from tqdm import tqdm
+import matlab.engine
 from PMEmo.features import extract_all_wav_feature, extract_frame_feature, process_dynamic_feature
 import arff
 import pickle
@@ -42,12 +43,32 @@ def extract_chord_features():
     print('tonnetz features of {} saved at {}'.format(AUDIO_DIR, tonnetz_dir))
 
 def extract_rhythm_features():
+    
     ''' extract rhythm pattern (FA) from MA Toolbox '''
-    # import matlab.engine
-    # eng = matlab.engine.start_matlab()
-    # tf = eng.isprime(37)
-    # print(tf)
+    
+    fp_dir = 'features/rhythms/fluctuation_pattern'
+    if not os.path.exists(fp_dir):
+        os.makedirs(fp_dir)
 
+    eng = matlab.engine.start_matlab()
+    for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Rhythm Features', leave=True):
+        audio_path = os.path.join(AUDIO_DIR, audio_file)
+        fp_path = os.path.join(fp_dir, 'fp_'+ audio_file[:16] + '.npy')
+        if os.path.exists(fp_path):
+            continue
+
+        wav = eng.audioread(audio_path)
+
+        p = {'sequence': {'length': 512.0, 'hopsize': 256.0, 'windowfunction': 'boxcar'}, 
+                'fs': 11025.0, 'fft_hopsize': 128.0, 'visu': 0}
+        sone = eng.ma_sone(wav, p)
+        fp = eng.ma_fp(sone,p)
+        fp = np.array(fp._data) # convert mlarray.double to numpy array 
+        
+        np.save(fp_path, fp)
+
+    print('fluctuation pattern features of {} saved at {}'.format(AUDIO_DIR, fp_dir))
+        
 def extract_timbre_features():
 
     ''' extract MFCC and features related to spectrum shape from LibROSA'''
@@ -233,8 +254,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    extract_chord_features()
-    extract_timbre_features()
-    extract_emotion_features(args)
+    # extract_chord_features()
+    extract_rhythm_features()
+    # extract_timbre_features()
+    # extract_emotion_features(args)
 
     

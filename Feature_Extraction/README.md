@@ -41,7 +41,8 @@
 ```
     | tracktrack | repeat_interval:memorized |
 ```
-- [extract_features.py](extract_features.py): extract features from audio files. Features(shape) including chomagram(12, 646), tonnetz(6, 646), fluctation pattern, mfcc(12, 646), spectrum centroid(1, 646), spectrum bandwidth(1, 646), spectrum contrast(7, 646), spectrum flatness(1, 646), spectrum rolloff(1, 646), static arousal(1,) & valence(1,) predicted from PMEmo SVR linear kernel, and dynamic arousal(29,) & valence(29,) that are predicted from PMEmo SVR RBF kernel.
+### TODO: calculate memorability score: (‘memorability score’ to each target image, defined as the percentage of correct detections by participants. ref: P. Isola, J. Xiao, D. Parikh, A. Torralba, and A. Oliva. What makes a photograph memorable? IEEE PAMI, 2014. 1, 2, 3, 4, 5, 6, 7)
+- [extract_features.py](extract_features.py): extract features from audio files. Features(shape) including chomagram(12, 646), tonnetz(6, 646), fluctation pattern(1200,), mfcc(12, 646), spectrum centroid(1, 646), spectrum bandwidth(1, 646), spectrum contrast(7, 646), spectrum flatness(1, 646), spectrum rolloff(1, 646), static arousal(1,) & valence(1,) predicted from PMEmo SVR linear kernel, and dynamic arousal(29,) & valence(29,) that are predicted from PMEmo SVR RBF kernel.
 - [track_index.txt](track_index.txt):  a look-up table that stores the relation between audio filename and index which is used in "AudioOrder" in [experimentData_beta.csv](experimentData_beta.csv).
 
 ## Other Notes
