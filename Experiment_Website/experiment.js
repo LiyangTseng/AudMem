@@ -209,10 +209,13 @@ async function nextTrack() {
     // experiment over
     saveToDB();
     alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
-    window.onbeforeunload = null;
-    window.location.href='index.html';
+    (() => {
+      setInterval(() => {
+        window.onbeforeunload = null;
+        window.location.href='index.html';            
+      }, 1000);
+    })();
   }
-
   loadTrack(slot_cnt);
   playTrack();
 }
