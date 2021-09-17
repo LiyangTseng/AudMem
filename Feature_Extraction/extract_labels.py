@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import csv
+# TODO: value depend on pilot study
 VIGILANCE_THRESHOLD = 0.1
 TRACK_NUM = 94
 # idx of audio

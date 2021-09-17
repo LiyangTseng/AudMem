@@ -9,6 +9,7 @@
     $email = $_POST['email'];
     $audioOrderStr = $_POST['audioOrderStr'];
     $responseStr = $_POST['responseStr'];
+    $responsePositionStr = $_POST['responsePositionStr'];
 
     // Create connection
     $conn = new mysqli($servername, $username, $password, $dbname);
@@ -18,8 +19,8 @@
     }
 
 
-        
-    $sql = "INSERT INTO experimentData_beta (updateTime, userEmail, audioOrder, userResponse) VALUES (CURRENT_TIMESTAMP, '$email', '$audioOrderStr', '$responseStr')";
+    // TODO: update to experimentD
+    $sql = "INSERT INTO experimentData_beta (updateTime, userEmail, audioOrder, userResponse, responsePosition) VALUES (CURRENT_TIMESTAMP, '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr')";
 
     if ($conn->query($sql) === TRUE) {
         echo "Record updated successfully";

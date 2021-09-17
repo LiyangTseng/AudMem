@@ -15,8 +15,6 @@ let email = document.getElementById("userEmail").value;
 let alhrd_checked = document.getElementById("toggle-alhrd").checked;
 let unhrd_checked = document.getElementById("toggle-unhrd").checked;
 let hrd_checked = document.getElementById("toggle-hrd").checked;
-let submitBtn = document.getElementById("submitBtn");
-submitBtn.style.display = "none";
 
 let slot_cnt = 0;
 let isPlaying = false;
@@ -45,16 +43,11 @@ let track_list = ['clip_w1G3rqVil1s.wav', 'clip_HiPkwl5p1GY.wav', 'clip_ZIiQ1jMq
 'clip_lfy8tbM0q18.wav', 'clip_SubIr_Fyp4M.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
 'clip_PYM9NUU9Roc.wav', 'clip_xjt-NS8R2LA.wav', 'clip_dl6vG66m1e8.wav', 'clip_yBzk2xXE9yg.wav', 'clip_D9ffTk7-2aI.wav'];
 
-// var submitModal = new bootstrap.Modal(document.getElementById("submitModal"));
-// submitModal.show();
 var submitModal = new bootstrap.Modal(document.getElementById("submitModal"), {
   keyboard: false,
   backdrop: 'static'
 });
 submitModal.show();
-// $(window).on('load', function() {
-//     $('#submitModal').modal('show');
-// });
 
 
 function shuffle(array) {
@@ -96,7 +89,8 @@ slotWithBreakOrder[54*2-1] = -2;
 slotWithBreakOrder[108*2-1] = -2;
 
 let userResponses = [];
-
+let userResponsePositions = [];
+let userResponseInSec = 0;
 
 function loadTrack(track_counter) {
   if (slotWithBreakOrder[track_counter] === -1) {
@@ -185,10 +179,13 @@ function getUserResponse() {
     })();
   })  
 }
+
 async function nextTrack() {
   if (slot_cnt%2 === 0){ // if real audio(music) played in slot
     
     await getUserResponse();
+    userResponsePositions.push(userResponseInSec);
+    userResponseInSec = 0;
   
     if (document.getElementById("toggle-alhrd").checked) {
       // already heard: -1
@@ -321,7 +318,8 @@ function saveToDB() {
   // save to db as strings
   let audioOrderStr = audioOrder.join();
   let responseStr = userResponses.join();
-  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr};
+  let responsePositionStr = userResponsePositions.join();
+  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr};
   console.log(data);
   $.post('db.php', data, function (response) {
     console.log(response);
@@ -334,6 +332,11 @@ function saveToDB() {
 window.onbeforeunload = function(){
   return 'Experiment data will be lost';
 };
+
+//record music position when radio button checked
+$('input[name="toggle"]').on("click", function() {
+  userResponseInSec = curr_track.currentTime;
+})
 
 // ===============================
 audioOrder = shuffle(audioOrder);
