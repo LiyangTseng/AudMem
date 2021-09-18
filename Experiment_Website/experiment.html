@@ -38,18 +38,19 @@
                   <div class="now-playing row">162 segments to play</div>
                   <div class="track-art row"></div>
                   <div class="track-name row"></div>
-                  <!-- ref: https://stackoverflow.com/questions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
+                  <!-- ref: https://stackoverflow.com/ques【tions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
                   <div class="response_btns">
-                      <input id="toggle-alhrd" name="toggle" type="radio">
-                      <label for="toggle-alhrd" title="Heard this song before experiment">Heard Before</label>
+                      <input id="toggle-alhrd" name="toggle" type="radio" >
+                      <label for="toggle-alhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗前聽過 / Heard before experiment">Heard Before</label>
                       <input id="toggle-unhrd" name="toggle" type="radio">
-                      <label for="toggle-unhrd" title="First time hearing this song">First Time</label>
+                      <label for="toggle-unhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="第一次聽到 / First time hearing">First Time</label>
                       <input id="toggle-hrd" name="toggle" type="radio">
-                      <label for="toggle-hrd" title="Second time the song played in the experiment">Surely Repeat</label>
+                      <label for="toggle-hrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗中重複 / Second time played in the experiment">Surely Repeat</label>
                   </div>
               </div>
               <div class="buttons">
                   <div class="playpause-track" onclick="playpauseTrack()"><i class="fa fa-play-circle fa-4x"></i></div>
+                  <!-- <div class="next-track" onclick="nextTrack()"><i class="fa fa-step-forward fa-2x"></i></div> -->
               </div>
               <div class="slider_container">
                   <div class="current-time">00:00</div>

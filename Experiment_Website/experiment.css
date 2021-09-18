@@ -114,6 +114,10 @@ label[for="toggle-unhrd"]:hover, label[for="toggle-hrd"]:hover, label[for="toggl
     transition-duration: 0.3s;
 }
 
+.tooltip{
+    font-size: 25px;
+ }
+
 input[type="radio"]:checked + label {
     border: solid 3px red;
     font-weight: bold;

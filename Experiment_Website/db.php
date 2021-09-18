@@ -19,7 +19,7 @@
     }
 
 
-    // TODO: update to experimentD
+    // TODO: update to experimentData after pilot study
     $sql = "INSERT INTO experimentData_beta (updateTime, userEmail, audioOrder, userResponse, responsePosition) VALUES (CURRENT_TIMESTAMP, '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr')";
 
     if ($conn->query($sql) === TRUE) {
