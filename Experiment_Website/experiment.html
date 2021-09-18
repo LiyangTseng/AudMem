@@ -7,6 +7,7 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css">
         <link rel="stylesheet" href="experiment.css">
         <title> Experiment on Audio Memorability</title>
+        <meta charset="utf-8"> 
     </head>
     <body>
         <header>
@@ -41,11 +42,11 @@
                   <!-- ref: https://stackoverflow.com/ques【tions/44483070/how-to-program-a-yes-no-answer-as-buttons-in-an-html-form-without-using-radio-b -->
                   <div class="response_btns">
                       <input id="toggle-alhrd" name="toggle" type="radio" >
-                      <label for="toggle-alhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗前聽過 / Heard before experiment">Heard Before</label>
+                      <label for="toggle-alhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗前聽過 / Heard before experiment">1. Heard Before</label>
                       <input id="toggle-unhrd" name="toggle" type="radio">
-                      <label for="toggle-unhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="第一次聽到 / First time hearing">First Time</label>
+                      <label for="toggle-unhrd" data-bs-toggle="tooltip" data-bs-placement="top" title="第一次聽到 / First time hearing">2. First Time</label>
                       <input id="toggle-hrd" name="toggle" type="radio">
-                      <label for="toggle-hrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗中重複 / Second time played in the experiment">Surely Repeat</label>
+                      <label for="toggle-hrd" data-bs-toggle="tooltip" data-bs-placement="top" title="實驗中重複 / Second time played in the experiment">3. Surely Repeat</label>
                   </div>
               </div>
               <div class="buttons">
@@ -69,32 +70,59 @@
               <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                   <div class="modal-header">
-                    <h5 class="modal-title" id="submitModalLabel">Welcome to the Experiment</h5>
+                    <h5 class="modal-title" id="submitModalLabel">Welcome to the Music Memorability Experiment</h5>
                   </div>
                   <div class="modal-body">
+                    <p>規則:
+                      <br>
+                      1. 受試者必須不間斷、全程地參與實驗，如此才能獲取酬勞，
+                      <br>
+                      2. 每位受試者只能參加一次實驗，請用報名實驗時填寫的電子郵件信箱作為登錄識別，實驗結束後我們會再依據此信箱與您連論酬勞付款方式
+                    </p>
+                    <p>
+                      重要提醒: 請在每一個音樂片段播完之前在以下三個選項中擇一作為回答:
+                      <br>
+                      1. 參加實驗前就已經聽過此音樂
+                      <br>
+                      2. 第一次聽到此音樂
+                      <br>
+                      3. 此音樂已在實驗中重複聽播放
+                      <br><br>  
+                      如果實驗前已聽過，且同時實驗中又重複播放此片段，請選擇選項三
+                    </p>
                     <p>Rules:
                       <br>
                       1. Your participation will only counts if you finish the whole experiment in time.
                       <br>
-                      2. You should only paritcipate in this experiment once, we will use email as identification.
+                      2. You should only paritcipate in this experiment once, we will use the email address you submitted as identification and contact you about payment afterward.
+                    </p>
+                    <p>As a reminder, you need to choose the following three statement as your answer before every music segment ends during the experiment:
+                      <br>
+                      1. You have have heard this music segment before the experiment
+                      <br>
+                      2. This is your first time hearing this music segement
+                      <br>
+                      3. The music segment has repeated during the experiment (played second time in the experiment)
+                      <br><br>
+                      If you have heard of the music segment and the segment also repeated in the experiment at the same time, please choose option #3
                     </p>
                     <!-- ref: https://stackoverflow.com/questions/1878264/how-do-i-make-an-html-button-not-reload-the-page -->
                     <form class="needs-validation" novalidate onsubmit="return false">
                       <div class="form-row">
                         <div class="col mb-3">
-                          <input type="text" class="form-control" id="userEmail" placeholder="Enter your email" required>
+                          <input type="text" class="form-control" id="userEmail" placeholder="輸入您的電子郵件信箱 / Enter your email" required>
                           <div class="invalid-feedback">
-                            Please provide a valid email.
+                            請輸入正確的電子郵件信箱 / Please provide a valid email.
                           </div>
                         </div>
                       <div class="form-group">
                         <div class="form-check">
                           <input class="form-check-input" type="checkbox" value="" id="agreeCheck" required>
                           <label class="form-check-label" for="agreeCheck">
-                            I have read and agree to follow the rules
+                            我了解並且同意遵守實驗規則 / I have read and agree to follow the rules
                           </label>
                           <div class="invalid-feedback">
-                            You must agree before submitting.
+                            您必須同意實驗規則才能繼續 / You must agree before submitting.
                           </div>
                         </div>
                       </div>
