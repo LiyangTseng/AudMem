@@ -19,7 +19,7 @@ let hrd_checked = document.getElementById("toggle-hrd").checked;
 let slot_cnt = 0;
 let isPlaying = false;
 let updateTimer;
-
+let experimentFinished = false;
 // Create new audio element
 let curr_track = document.createElement('audio');
 
@@ -95,6 +95,7 @@ let userResponseInSec = 0;
 function loadTrack(track_counter) {
   if (slotWithBreakOrder[track_counter] === -1) {
     // 5s break
+    updateDB()
     clearInterval(updateTimer);
     resetValues();
     curr_track.src = "pink_noise_5s.wav";
@@ -109,6 +110,7 @@ function loadTrack(track_counter) {
   }
   else if (slotWithBreakOrder[track_counter] === -2) {
     // 3m break
+    updateDB();
     clearInterval(updateTimer);
     resetValues();
     curr_track.src = "pink_noise_3m.wav";
@@ -205,7 +207,8 @@ async function nextTrack() {
   }  
   else {
     // experiment over
-    saveToDB();
+    experimentFinished = true;
+    updateDB();
     alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
     (() => {
       setInterval(() => {
@@ -309,24 +312,38 @@ function progress(timeleft, timetotal, $element) {
 function submitEmail() {
   email = document.getElementById("userEmail").value;
   agreed = document.getElementById("agreeCheck").checked
-  if (email != "" && agreed == true){
+  if (email != "" && agreed == true) {
     console.log('log in as', email);
     submitModal.toggle();
-    } 
+    createRowInDB();
+  } 
 }
 
-function saveToDB() {
+function createRowInDB() {
+  let audioOrderStr = audioOrder.join();
+  let responseStr = userResponses.join();
+  let responsePositionStr = userResponsePositions.join();
+  // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
+  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
+  console.log(data);
+  $.post('insert_row_to_db.php', data, function (response) {
+    console.log(response);
+    console.log("create new user data for " + email + " in db !!");
+  });
+}
+
+function updateDB() {
   // save to db as strings
   let audioOrderStr = audioOrder.join();
   let responseStr = userResponses.join();
   let responsePositionStr = userResponsePositions.join();
-  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr};
+  // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
+  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
   console.log(data);
-  $.post('db.php', data, function (response) {
+  $.post('update_db.php', data, function (response) {
     console.log(response);
-    console.log("user data successfully saved to db !!");
+    console.log("successfully updated user data to db !!");
   });
-  
 }
 
 // popup warning about leaving experiment
@@ -345,6 +362,7 @@ $('label[for="toggle-hrd"]').hide();
 $('label[for="toggle-unhrd"]').hide();
 $('label[for="toggle-alhrd"]').hide();
 track_name.textContent = "";
+
 
 var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
 var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {

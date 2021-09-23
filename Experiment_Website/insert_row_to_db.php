@@ -10,6 +10,7 @@
     $audioOrderStr = $_POST['audioOrderStr'];
     $responseStr = $_POST['responseStr'];
     $responsePositionStr = $_POST['responsePositionStr'];
+    $experimentFinished = $_POST['experimentFinished'];
 
     // Create connection
     $conn = new mysqli($servername, $username, $password, $dbname);
@@ -20,12 +21,12 @@
 
 
     // TODO: update to experimentData after pilot study
-    $sql = "INSERT INTO experimentData_beta (updateTime, userEmail, audioOrder, userResponse, responsePosition) VALUES (CURRENT_TIMESTAMP, '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr')";
+    $sql = "INSERT INTO experimentData_beta (startTime, updateTime, userEmail, audioOrder, userResponse, responsePosition, experimentFinished) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr', '$experimentFinished')";
 
     if ($conn->query($sql) === TRUE) {
-        echo "Record updated successfully";
+        echo "Record inserted successfully in insert_row_to_db.php";
     } else {
-        echo "Error updating record: " . $conn->error;
+        echo "Error inserting record: " . $conn->error;
     }
         
     $conn->close();
