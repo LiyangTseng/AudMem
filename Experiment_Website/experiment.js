@@ -98,6 +98,7 @@ function loadTrack(track_counter) {
     clearInterval(updateTimer);
     resetValues();
     curr_track.src = "pink_noise_5s.wav";
+
     curr_track.load();
     
     track_name.textContent = `5 Seconds Break`;
@@ -260,9 +261,9 @@ function playpauseTrack() {
     loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
-    let hour = 1, min = 15, sec = 0;
-    let totalTimeSec = 75*60;
-    let timeLeftSec = 75*60;
+    let hour = 1, min = 20, sec = 0;
+    let totalTimeSec = 80*60;
+    let timeLeftSec = 80*60;
     
     let timerStart = setInterval(function(){
       timeLeftSec --;
