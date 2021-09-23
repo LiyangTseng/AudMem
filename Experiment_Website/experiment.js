@@ -20,6 +20,8 @@ let slot_cnt = 0;
 let isPlaying = false;
 let updateTimer;
 let experimentFinished = false;
+let startTime = '';
+
 // Create new audio element
 let curr_track = document.createElement('audio');
 
@@ -197,7 +199,7 @@ async function nextTrack() {
       // unheard: 0
       userResponses.push(0);
     } else if (document.getElementById("toggle-hrd").checked) {
-      // unheard: 1
+      // repeat: 1
       userResponses.push(1);
     }
 
@@ -315,6 +317,8 @@ function submitEmail() {
   if (email != "" && agreed == true) {
     console.log('log in as', email);
     submitModal.toggle();
+    startTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
+    // TODO: if email already used => alert
     createRowInDB();
   } 
 }
@@ -324,7 +328,7 @@ function createRowInDB() {
   let responseStr = userResponses.join();
   let responsePositionStr = userResponsePositions.join();
   // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
-  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
+  data = {"startTime": startTime, "email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
   console.log(data);
   $.post('insert_row_to_db.php', data, function (response) {
     console.log(response);
@@ -337,8 +341,9 @@ function updateDB() {
   let audioOrderStr = audioOrder.join();
   let responseStr = userResponses.join();
   let responsePositionStr = userResponsePositions.join();
+  let nowTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
   // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
-  data = {"email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
+  data = {"startTime": startTime, "nowTime": nowTime, "email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
   console.log(data);
   $.post('update_db.php', data, function (response) {
     console.log(response);

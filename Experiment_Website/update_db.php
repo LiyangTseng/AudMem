@@ -6,6 +6,8 @@
     $password = "CrNYzDv8IuI7";
     $dbname = "epiz_29320404_MusicMem";
 
+    $startTime = $_POST['startTime'];
+    $nowTime = $_POST['nowTime'];
     $email = $_POST['email'];
     $audioOrderStr = $_POST['audioOrderStr'];
     $responseStr = $_POST['responseStr'];
@@ -21,7 +23,7 @@
 
 
     // TODO: update to experimentData after pilot study
-    $sql = "UPDATE experimentData_beta SET updateTime=CURRENT_TIMESTAMP, userResponse='$responseStr', responsePosition='$responsePositionStr', experimentFinished='$experimentFinished' WHERE userEmail='$email'";
+    $sql = "UPDATE experimentData_beta SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
     
     if ($conn->query($sql) === TRUE) {
         echo "Record updated successfully in update_db.php";
