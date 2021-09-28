@@ -21,6 +21,9 @@ let isPlaying = false;
 let updateTimer;
 let experimentFinished = false;
 let startTime = '';
+let waitForLoad = false;
+let waitTime = -1;
+let timeoutSkip;
 
 // Create new audio element
 let curr_track = document.createElement('audio');
@@ -44,15 +47,20 @@ let track_list = ['clip_w1G3rqVil1s.wav', 'clip_HiPkwl5p1GY.wav', 'clip_ZIiQ1jMq
 'clip_ThtO-8h-qfY.wav', 'clip_bd5m12UEHWI.wav', 'clip_C90sY_Ht6Ig.wav', 'clip_19Q9l85Feqw.wav', 'clip_3ObVN3QQiZ8.wav', 'clip_z7y6MykrE5s.wav', 
 'clip_lfy8tbM0q18.wav', 'clip_SubIr_Fyp4M.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
 'clip_PYM9NUU9Roc.wav', 'clip_xjt-NS8R2LA.wav', 'clip_dl6vG66m1e8.wav', 'clip_yBzk2xXE9yg.wav', 'clip_D9ffTk7-2aI.wav'];
-
+// submit modal of user info
 var submitModal = new bootstrap.Modal(document.getElementById("submitModal"), {
   keyboard: false,
   backdrop: 'static'
 });
 submitModal.show();
-
+// bootstrap tooltip for decision hints
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl)
+})
 
 function shuffle(array) {
+  // shuffle array order
   var currentIndex = array.length,  randomIndex;
 
   // While there remain elements to shuffle...
@@ -97,34 +105,36 @@ let userResponseInSec = 0;
 function loadTrack(track_counter) {
   if (slotWithBreakOrder[track_counter] === -1) {
     // 5s break
-    updateDB()
+    updateDB() // update userResponse of previous audio
     clearInterval(updateTimer);
     resetValues();
     curr_track.src = "pink_noise_5s.wav";
 
-    curr_track.load();
+    // curr_track.load();
     
     track_name.textContent = `5 Seconds Break`;
     now_playing.textContent = "";
     $('label[for="toggle-hrd"]').hide();
     $('label[for="toggle-unhrd"]').hide();
     $('label[for="toggle-alhrd"]').hide();
-  }
-  else if (slotWithBreakOrder[track_counter] === -2) {
+    $('.skip_btn').hide();
+    waitTime = 10000; // 10 second of waiting for loading
+  } else if (slotWithBreakOrder[track_counter] === -2) {
     // 3m break
-    updateDB();
+    updateDB(); // update userResponse of previous audio
     clearInterval(updateTimer);
     resetValues();
     curr_track.src = "pink_noise_3m.wav";
-    curr_track.load();
+    // curr_track.load();
     
     track_name.textContent = `3 Minutes Break`;
     now_playing.textContent = "";
     $('label[for="toggle-hrd"]').hide();
     $('label[for="toggle-unhrd"]').hide();
     $('label[for="toggle-alhrd"]').hide();
-  }
-  else {
+    $('.skip_btn').hide();
+    waitTime = 190000; // 3:10 of waiting for loading
+  } else {
     // ordinay audio
     $('label[for="toggle-hrd"]').show();
     $('label[for="toggle-unhrd"]').show();
@@ -132,19 +142,27 @@ function loadTrack(track_counter) {
     document.getElementById("toggle-alhrd").checked = false;
     document.getElementById("toggle-unhrd").checked = false;
     document.getElementById("toggle-hrd").checked = false;
+    waitTime = 30000;
     track_index = audioOrder[slotWithBreakOrder[track_counter]];
     clearInterval(updateTimer);
     resetValues();
     curr_track.src =  dir + track_list[track_index];
-    curr_track.load();
+    // curr_track.load();
 
-    // for debug prupose
-    // track_name.textContent = `No.${track_index+1}`;
+    // track_name.textContent = `No.${track_index+1}`; // for debug prupose
     track_name.textContent = "";
-    now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length;
-    
-  
+    now_playing.textContent = "PLAYING " + (track_counter/2 + 1) + " OF " + slotOrder.length; 
   }
+  curr_track.load();
+  
+  waitForLoad = true;
+  timeoutSkip = setTimeout(() => {
+    // wait for 30s, if audio still not loaded, pop up "skip" button
+    if (waitForLoad == true) {
+      $('.skip_btn').show();
+    }
+  }, waitTime);
+
   updateTimer = setInterval(seekUpdate, 1000);
   curr_track.addEventListener("ended", nextTrack);
 }
@@ -167,6 +185,7 @@ function pauseTrack() {
 }
 
 function getUserResponse() {
+  // wait until getting user responses
   return new Promise((resolve, reject) => {
     (function waitForResponse(){
       if (document.getElementById("toggle-alhrd").checked || document.getElementById("toggle-unhrd").checked || document.getElementById("toggle-hrd").checked) {
@@ -185,9 +204,43 @@ function getUserResponse() {
   })  
 }
 
+function skip() {
+  // if something went wrong when loading, user can press "skip" after 30 seconds of loading attempt
+  if (slot_cnt%2 === 0){ 
+    // if real audio(music) played in slot, record user responses
+    userResponsePositions.push(-1); // -1 indicate skipping in userResponsePositions
+    userResponseInSec = 0;
+    userResponses.push(-2); // -2 indicate skipping in userResponses
+  }
+  // check experiment over or not
+  if (slot_cnt < slotWithBreakOrder.length-1) {
+    // experiment not over
+    slot_cnt += 1;    
+    loadTrack(slot_cnt);
+    playTrack();  
+  } else {
+    // experiment over
+    experimentFinished = true;
+    updateDB();
+    alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
+    (() => {
+      // wait for 1 sec then redirect to homepage
+      setInterval(() => {
+        window.onbeforeunload = null;
+        window.location.href='index.html';            
+      }, 1000);
+    })();
+  }
+
+}
+
 async function nextTrack() {
-  if (slot_cnt%2 === 0){ // if real audio(music) played in slot
-    
+  // disable skipping because music properly played
+  clearTimeout(timeoutSkip);
+  waitForLoad = false;
+
+  if (slot_cnt%2 === 0){ 
+    // if real audio(music) played in slot
     await getUserResponse();
     userResponsePositions.push(userResponseInSec);
     userResponseInSec = 0;
@@ -204,31 +257,25 @@ async function nextTrack() {
     }
 
   }
+  // check experiment over or not
   if (slot_cnt < slotWithBreakOrder.length-1) {
+    // experiment not over
     slot_cnt += 1;    
-  }  
-  else {
+    loadTrack(slot_cnt);
+    playTrack();  
+  } else {
     // experiment over
     experimentFinished = true;
     updateDB();
     alert('Thank you for your time, this is the end of experiment \nRedirecting to homepage...');
     (() => {
+      // wait for 1 sec then redirect to homepage
       setInterval(() => {
         window.onbeforeunload = null;
         window.location.href='index.html';            
       }, 1000);
     })();
   }
-  loadTrack(slot_cnt);
-  playTrack();
-}
-
-function prevTrack() {
-  if (slot_cnt > 0)
-    slot_cnt -= 1;
-  else slot_cnt = track_list.length;
-  loadTrack(slot_cnt);
-  playTrack();
 }
 
 function setVolume() {
@@ -259,7 +306,6 @@ function seekUpdate() {
   }
 }
 
-
 function playpauseTrack() {
   if (!isPlaying) {
     // Load the first track in the tracklist
@@ -288,18 +334,16 @@ function playpauseTrack() {
       
     }, 1000);
   }
-  // else pauseTrack();
 }
 
 function progress(timeleft, timetotal, $element) {
+  // countdown progress bar (timer) for the experiment 
   let progressBarWidth = timeleft * $element.width() / timetotal;
   
-  // $element.find('div').animate({ width: progressBarWidth }, 500).html(String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0') + ":"+ String(sec).padStart(2, '0'));
   $('.bar').animate({ width: progressBarWidth }, 500);
   $('.countDown').text(String(hour).padStart(2, '0') + ":" + String(min).padStart(2, '0') + ":"+ String(sec).padStart(2, '0'));
   if(timeleft > 0) {
       setTimeout(function() {
-          // progress(timeleft - 1, timetotal, $element);
           timeleft = timeleft- 1
           progress();
       }, 1000);
@@ -312,18 +356,19 @@ function progress(timeleft, timetotal, $element) {
 
 
 function submitEmail() {
+  // close modal if user filled necessary info
   email = document.getElementById("userEmail").value;
   agreed = document.getElementById("agreeCheck").checked
   if (email != "" && agreed == true) {
     console.log('log in as', email);
     submitModal.toggle();
     startTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
-    // TODO: if email already used => alert
     createRowInDB();
   } 
 }
 
 function createRowInDB() {
+  // create new entry in database for user
   let audioOrderStr = audioOrder.join();
   let responseStr = userResponses.join();
   let responsePositionStr = userResponsePositions.join();
@@ -337,8 +382,8 @@ function createRowInDB() {
 }
 
 function updateDB() {
-  // save to db as strings
-  let audioOrderStr = audioOrder.join();
+  // update user data in database
+  let audioOrderStr = audioOrder.join(); // save list to db as strings
   let responseStr = userResponses.join();
   let responsePositionStr = userResponsePositions.join();
   let nowTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
@@ -356,20 +401,14 @@ window.onbeforeunload = function(){
   return 'Experiment data will be lost';
 };
 
-//record music position when radio button checked
+// record the music position in second when user makes decision
 $('input[name="toggle"]').on("click", function() {
   userResponseInSec = curr_track.currentTime;
 })
 
-// ===============================
+// ================ setup before experiment begins ===============
 audioOrder = shuffle(audioOrder);
 $('label[for="toggle-hrd"]').hide();
 $('label[for="toggle-unhrd"]').hide();
 $('label[for="toggle-alhrd"]').hide();
-track_name.textContent = "";
-
-
-var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-  return new bootstrap.Tooltip(tooltipTriggerEl)
-})
+$('.skip_btn').hide();

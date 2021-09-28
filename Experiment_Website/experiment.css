@@ -76,10 +76,10 @@ input[type="radio"] {
     display: none;
 }
 
-label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"]{
+label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"], .skip_btn{
   width: 300px;
   display: inline-block;
-  border: solid 2px rgb(87, 33, 33);
+  /* border: solid 2px rgb(87, 33, 33); */
   border-radius: 5px; 
   color: rgb(216, 216, 201);
   background-color: rgb(87, 33, 33);
@@ -88,6 +88,11 @@ label[for="toggle-unhrd"], label[for="toggle-hrd"], label[for="toggle-alhrd"]{
   margin-right: 10px;
   margin-left: 10px;
   user-select: none;
+}
+
+.skip_btn {
+    border: solid 3px rgb(219, 215, 206);;
+    background-color: rgb(88, 79, 22);    
 }
 
 @media screen and (max-height: 510px) {
@@ -118,7 +123,12 @@ label[for="toggle-unhrd"]:hover, label[for="toggle-hrd"]:hover, label[for="toggl
     font-size: 25px;
  }
 
-input[type="radio"]:checked + label {
+ input[type="radio"] + label {
+    border: solid 3px rgb(219, 215, 206);
+}
+
+
+ input[type="radio"]:checked + label {
     border: solid 3px red;
     font-weight: bold;
     font-style: italic;

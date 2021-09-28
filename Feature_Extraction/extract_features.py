@@ -254,9 +254,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    # extract_chord_features()
+    extract_chord_features()
     extract_rhythm_features()
-    # extract_timbre_features()
-    # extract_emotion_features(args)
+    extract_timbre_features()
+    extract_emotion_features(args)
 
     
