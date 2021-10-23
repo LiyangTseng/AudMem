@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import pandas as pd
 import librosa
@@ -7,7 +6,7 @@ import soundfile as sf
 
 clip_length = 5
 
-def extract_clip(file_df_row, clip_dir, args):
+def extract_clip(file_df_row, clip_dir, args, df):
 
     ''' using chorus location to make clip '''
 
@@ -23,8 +22,15 @@ def extract_clip(file_df_row, clip_dir, args):
         if args.audacity:
             print('Enter intro start location with format [min]:[sec]: ', end='')
             intro_start_location = input()
+            mask = df.file == audio_file
+            df.loc[mask, "intro_start"] = intro_start_location
         else:
-            intro_start_location = file_df_row["intro_start"]
+            try:
+                intro_start_location = file_df_row["intro_start"]
+                if intro_start_location == "-1:99":
+                    raise Exception("unvalid clip")
+            except Exception as e:
+                print("Error extracting clip", e)
 
         minite = int(intro_start_location.split(':')[0])
         second = float(intro_start_location.split(':')[1])
@@ -33,8 +39,17 @@ def extract_clip(file_df_row, clip_dir, args):
         if args.audacity:
             print('Enter intro end location with format [min]:[sec]: ', end='')
             intro_end_location = input()
+            mask = df.file == audio_file
+            df.loc[mask, "intro_end"] = intro_end_location
+            df.to_csv(args.source, index=False)
         else:
-            intro_end_location = file_df_row["intro_start"]
+            try:
+                intro_end_location = file_df_row["intro_end"]
+                if intro_end_location == "-1:99":
+                    raise Exception("unvalid clip")
+            except Exception as e:
+                print("Error extracting clip", e)
+
 
         minite = int(intro_end_location.split(':')[0])
         second = float(intro_end_location.split(':')[1])
@@ -47,7 +62,12 @@ def extract_clip(file_df_row, clip_dir, args):
             print('Enter intro start location with format [min]:[sec]: ', end='')
             intro_start_location = input()
         else:
-            intro_start_location = file_df_row["intro_start"]
+            try:
+                intro_start_location = file_df_row["intro_start"]
+                if intro_start_location == "-1:99":
+                    raise Exception("unvalid clip")
+            except Exception as e:
+                print("Error extracting clip", e)
         minite = int(intro_start_location.split(':')[0])
         second = float(intro_start_location.split(':')[1])
         intro_start = minite*60 + second
@@ -65,10 +85,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Starting location and audacity or not')
     parser.add_argument('-i', '--index', help='starting index (count from 1)', default=1)
-    parser.add_argument('-a', '--audacity', help='use audacity or not', default=False, type=bool)
+    parser.add_argument('-a', '--audacity', help='use audacity or not', default=True, type=bool)
     parser.add_argument('-f', '--fixed_length', help='fixed_length or not', default=False, type=bool)
-    parser.add_argument('-s', '--source', help='source of location file', default='more_intro_locations.csv')
-    parser.add_argument('-o', '--output', help='directory of output clip', default='Audios/new_raw_variable_intro')
+    parser.add_argument('-s', '--source', help='source of location file', default='qualified_intro_locations.csv')
+    parser.add_argument('-o', '--output', help='directory of output clip', default='Audios/raw_variable_intro')
     args = parser.parse_args()
 
     intro_df = pd.read_csv(args.source)
@@ -76,9 +96,6 @@ if __name__ == '__main__':
     intro_df = intro_df[file_exist]
     intro_df.to_csv(args.source, index=False)
     start_idx = int(args.index)-1
-
-    print(args.audacity)
-    input()
 
     if not os.path.exists(args.output):
         os.makedirs(args.output)
@@ -88,5 +105,4 @@ if __name__ == '__main__':
             print("open {} with audacity".format(row['file']))
             os.system('audacity "{}"'.format(row['file']))
             # need to close audacity first !!
-        extract_clip(file_df_row=row, clip_dir=args.output, args=args)
-        
+        extract_clip(file_df_row=row, clip_dir=args.output, args=args, df=intro_df)
