@@ -16,6 +16,7 @@ let alhrd_checked = document.getElementById("toggle-alhrd").checked;
 let unhrd_checked = document.getElementById("toggle-unhrd").checked;
 let hrd_checked = document.getElementById("toggle-hrd").checked;
 
+let track_index = -1;
 let slot_cnt = 0;
 let isPlaying = false;
 let updateTimer;
@@ -31,22 +32,7 @@ let curr_track = document.createElement('audio');
 let dir = 'clips/'
 // Define the tracks that will be played, 
 // notice the filename should contain alphabet and number to prevent audio.src not found
-let track_list = ['clip_w1G3rqVil1s.wav', 'clip_HiPkwl5p1GY.wav', 'clip_ZIiQ1jMqhVM.wav', 'clip_fOYuWVIXgiM.wav', 'clip_hjIhCG_nIPA.wav', 
-'clip_VLecCiNKjF0.wav', 'clip_hV-FwW1LgxU.wav', 'clip_9DP0yMwvyWE.wav', 'clip_fadPaKn-xe8.wav', 'clip_UJ5-4GiWNnc.wav', 'clip_EygNk739nnY.wav', 
-'clip_AoB8koE95C0.wav', 'clip_GUC6UqXjU44.wav', 'clip_V-ar6MLjy5o.wav', 'clip_DwgdKSKGMLQ.wav', 'clip_SZaZU_qi6Xc.wav', 'clip_nISI4qF55F4.wav', 
-'clip_0QN9KLFWn7I.wav', 'clip_j9KKh215HTs.wav', 'clip_ngJ71Np-qFY.wav', 'clip_Et-YdmSo_3A.wav', 'clip_lEHM9HZf0IA.wav', 'clip_jII5qoCrzYE.wav', 
-'clip_32MsxqBbe08.wav', 'clip_GQ5-Y-n_Djw.wav', 'clip_gg5sZZPuK_o.wav', 'clip_dpjUrLEgYKI.wav', 'clip_ulj-L3K_Gzs.wav', 'clip_tnOuMlDUgu8.wav', 
-'clip_XJt-4KKCZBA.wav', 'clip_C5VCGM2J5ls.wav', 'clip_LGX21vCbzdM.wav', 'clip_TzhhbYS9EO4.wav', 'clip_bI8-2blisUM.wav', 'clip_xJt-wTjGkN8.wav', 
-'clip_0M24ENnb4gE.wav', 'clip_7pcZIsJNlAs.wav', 'clip_spcz4MLQKD0.wav', 'clip_ht7xflC4APQ.wav', 'clip_UGTYqTKUl8w.wav', 'clip_dCish9XM5bE.wav', 
-'clip_bwQ49N0jVvE.wav', 'clip_2JL_KcEzkqg.wav', 'clip_Yyvo9O8fN-A.wav', 'clip_WGMa6qh-qFY.wav', 'clip_D6uH2mKJRUA.wav', 'clip_Tfypj4UwvvA.wav', 
-'clip_Z5gvqq3ChII.wav', 'clip_2F8Kr91wQ0U.wav', 'clip_2UL-1MOlSPw.wav', 'clip_Gq5-cpb5f7E.wav', 'clip_feVUoKhP1mE.wav', 'clip_2ul-hWVNIC0.wav', 
-'clip_audaUMOnGxA.wav', 'clip_BXTpedYsjyI.wav', 'clip_HwcCBnfhsR4.wav', 'clip_sjlkxcwhpwA.wav', 'clip_xe8-Y1oVQeU.wav', 'clip_o683V8-TAPQ.wav', 
-'clip_lYxcW8jtFw0.wav', 'clip_T4stQxboYKM.wav', 'clip_HN65BuYwGMA.wav', 'clip_RhBb77hG0iw.wav', 'clip_vhWoHF9-qfY.wav', 'clip_v0UvOsCi8mc.wav', 
-'clip_XJT-fM4nBJU.wav', 'clip_Mme9REVuidw.wav', 'clip_xJt--P13x3s.wav', 'clip_ORurdsjkJMQ.wav', 'clip_btMBUL8_liA.wav', 'clip_-_P_cD0yimw.wav', 
-'clip_BEo0rqOZIng.wav', 'clip_haCay85cpvo.wav', 'clip_gwsaElRJI2M.wav', 'clip_0aC-jOKuBFE.wav', 'clip_8MAWFIM-2aI.wav', 'clip_dtOv6WvJ44w.wav', 
-'clip_ThtO-8h-qfY.wav', 'clip_bd5m12UEHWI.wav', 'clip_C90sY_Ht6Ig.wav', 'clip_19Q9l85Feqw.wav', 'clip_3ObVN3QQiZ8.wav', 'clip_z7y6MykrE5s.wav', 
-'clip_lfy8tbM0q18.wav', 'clip_SubIr_Fyp4M.wav', 'clip_YOKq1VmEbtc.wav', 'clip_1wpJkzCWHcI.wav', 'clip_n4HTXYR-2AI.wav', 'clip_C7u6rtswjCU.wav', 
-'clip_PYM9NUU9Roc.wav', 'clip_xjt-NS8R2LA.wav', 'clip_dl6vG66m1e8.wav', 'clip_yBzk2xXE9yg.wav', 'clip_D9ffTk7-2aI.wav'];
+let track_list = ['normalize_5s_intro_thc1MtNagC8.wav', 'normalize_5s_intro_Wo2qUD1g7xM.wav', 'normalize_5s_intro_3ObVN3QQiZ8.wav', 'normalize_5s_intro_S-zQJFRX5Fg.wav', 'normalize_5s_intro_SyZOAgXiPMw.wav', 'normalize_5s_intro_GQT8ejgV2_A.wav', 'normalize_5s_intro_PQAIxeSIQU4.wav', 'normalize_5s_intro_E-8pyVBvCPQ.wav', 'normalize_5s_intro_Qr8eZSVaw10.wav', 'normalize_5s_intro_p7j-tz1Cn4o.wav', 'normalize_5s_intro_nISI4qF55F4.wav', 'normalize_5s_intro_RoeRU5zxkak.wav', 'normalize_5s_intro_EygNk739nnY.wav', 'normalize_5s_intro_w1G3rqVil1s.wav', 'normalize_5s_intro_KKc_RMln5UY.wav', 'normalize_5s_intro_Ng2JdroNfC0.wav', 'normalize_5s_intro_xc0sWhVhmkw.wav', 'normalize_5s_intro_VVRszjvg3_U.wav', 'normalize_5s_intro_C7u6rtswjCU.wav', 'normalize_5s_intro_HiPkwl5p1GY.wav', 'normalize_5s_intro_mYa_9d2Daas.wav', 'normalize_5s_intro_6MSYrN4YfKY.wav', 'normalize_5s_intro_O2q_9lBDM7I.wav', 'normalize_5s_intro_7E_a_VKjcl8.wav', 'normalize_5s_intro_a8cJLohQ_Jg.wav', 'normalize_5s_intro_7zz-nEVKZdc.wav', 'normalize_5s_intro_JeGhUESd_1o.wav', 'normalize_5s_intro_IN1f9k8qVDk.wav', 'normalize_5s_intro_RhBb77hG0iw.wav', 'normalize_5s_intro_qAiwzv8N7rM.wav', 'normalize_5s_intro_AoB8koE95C0.wav', 'normalize_5s_intro_j3DigipQ_hQ.wav', 'normalize_5s_intro_1X0SdKtnwo8.wav', 'normalize_5s_intro_RCJx5VW-fQI.wav', 'normalize_5s_intro_S_-qkv0NZ1g.wav', 'normalize_5s_intro_C90sY_Ht6Ig.wav', 'normalize_5s_intro_Z5gvqq3ChII.wav', 'normalize_5s_intro_zumMQrI_tMg.wav', 'normalize_5s_intro_gwsaElRJI2M.wav', 'normalize_5s_intro_ftjEcrrf7r0.wav', 'normalize_5s_intro_ZBBS4imv1qo.wav', 'normalize_5s_intro_DyQ_9p6y89c.wav', 'normalize_5s_intro_vgZv7Uu4YrA.wav', 'normalize_5s_intro_wcLXjQLwSBE.wav', 'normalize_5s_intro_7LuQQP-DAoc.wav', 'normalize_5s_intro_BEo0rqOZIng.wav', 'normalize_5s_intro_n4HTXYR-2AI.wav', 'normalize_5s_intro_72T4j04MS8o.wav', 'normalize_5s_intro_6TT_UgrRHq8.wav', 'normalize_5s_intro_uo8qDCDZhK0.wav', 'normalize_5s_intro_Et-YdmSo_3A.wav', 'normalize_5s_intro_oxKbrl4kyg8.wav', 'normalize_5s_intro_XgwqnGG-pbI.wav', 'normalize_5s_intro_1wpJkzCWHcI.wav', 'normalize_5s_intro_bwQ49N0jVvE.wav', 'normalize_5s_intro_OMR2W-7AyYU.wav', 'normalize_5s_intro_sjlkxcwhpwA.wav', 'normalize_5s_intro_4F1wvsJXXVY.wav', 'normalize_5s_intro_YEq-cvq_cK4.wav', 'normalize_5s_intro_42O51bcJyq0.wav', 'normalize_5s_intro_5FYAICvv-d0.wav', 'normalize_5s_intro_yBzk2xXE9yg.wav', 'normalize_5s_intro_zEWSSod0zTY.wav', 'normalize_5s_intro_dvf--10EYXw.wav', 'normalize_5s_intro_xQOXxmznGPg.wav', 'normalize_5s_intro_hMWoOunsMFM.wav', 'normalize_5s_intro_TnsOVDCq_b0.wav', 'normalize_5s_intro_Yh78Ll6-ODQ.wav', 'normalize_5s_intro_IYnu4-69fTA.wav', 'normalize_5s_intro_SubIr_Fyp4M.wav', 'normalize_5s_intro_WrRAZVJGImw.wav', 'normalize_5s_intro_gFnNr5vr5bQ.wav', 'normalize_5s_intro_j9KKh215HTs.wav', 'normalize_5s_intro_XBTT9tSVsh0.wav', 'normalize_5s_intro_u8BxVzRG9bE.wav', 'normalize_5s_intro_SQBuVfTX1ME.wav', 'normalize_5s_intro_-MqZKMbOYEA.wav', 'normalize_5s_intro_IpniN1Wq68Y.wav', 'normalize_5s_intro_1lunUbvf35M.wav', 'normalize_5s_intro_zk04E79riMQ.wav', 'normalize_5s_intro_uUfPwlxFFJM.wav', 'normalize_5s_intro_Ws-QlpSltr8.wav', 'normalize_5s_intro_xT1eOeXlTXg.wav', 'normalize_5s_intro_1Ngn3fZIK2E.wav', 'normalize_5s_intro_2JL_KcEzkqg.wav', 'normalize_5s_intro_4jvQFLlRQlo.wav', 'normalize_5s_intro_AjGkbFqi67c.wav', 'normalize_5s_intro_ahpmuikko3U.wav', 'normalize_5s_intro_sY5wXfgspQI.wav', 'normalize_5s_intro_HMvXE4Zs6ZA.wav', 'normalize_5s_intro_gv7BRXvZJbI.wav', 'normalize_5s_intro_4wgo8K28RNM.wav', 'normalize_5s_intro_2ySLmwsfP4Q.wav', 'normalize_5s_intro_MY4YJxn-9Og.wav', 'normalize_5s_intro_3gjfHYZ873o.wav', 'normalize_5s_intro_csHiDQXIggE.wav', 'normalize_5s_intro_C5VCGM2J5ls.wav', 'normalize_5s_intro_ey4Fc9DP5Rw.wav', 'normalize_5s_intro_bI7xde9-3BI.wav', 'normalize_5s_intro_EfZ-dVDySzc.wav', 'normalize_5s_intro_Zh3uBgwow8A.wav', 'normalize_5s_intro_JQTlG7NxJek.wav', 'normalize_5s_intro_1CrxzClzLvs.wav', 'normalize_5s_intro_0aC-jOKuBFE.wav', 'normalize_5s_intro_xePw8n4xu8o.wav', 'normalize_5s_intro_lEHM9HZf0IA.wav', 'normalize_5s_intro_xhmtXrtLkgo.wav', 'normalize_5s_intro_hHItMz0gfaU.wav', 'normalize_5s_intro_99f0oH45TVc.wav', 'normalize_5s_intro_co6WMzDOh1o.wav', 'normalize_5s_intro_xqzOxMdhmzU.wav', 'normalize_5s_intro_h-nnAeByB1A.wav', 'normalize_5s_intro_TFv9Kcym9dg.wav', 'normalize_5s_intro_tEW2eRQ-4DY.wav', 'normalize_5s_intro_VAc0xuVa7jI.wav', 'normalize_5s_intro_PALMMqZLAQk.wav', 'normalize_5s_intro_STpRa2JPFA0.wav', 'normalize_5s_intro_SgJMnEdtTXA.wav', 'normalize_5s_intro_NL2ZHPji3Z0.wav', 'normalize_5s_intro_EVSuxb6Ywcg.wav', 'normalize_5s_intro_wAJMhJpSCIc.wav', 'normalize_5s_intro_GphIn74Weu0.wav', 'normalize_5s_intro_gue_crpFdSE.wav', 'normalize_5s_intro_oQ0O2cd1T04.wav', 'normalize_5s_intro_vMcFA2x23FE.wav', 'normalize_5s_intro_FhvXg70ycrM.wav', 'normalize_5s_intro_lE_747E_Sdg.wav', 'normalize_5s_intro_i0MrGb1hT2U.wav', 'normalize_5s_intro_bI8-2blisUM.wav', 'normalize_5s_intro_aQ06TfyA1Ks.wav', 'normalize_5s_intro_ZvrysfBDzSs.wav', 'normalize_5s_intro_v2seHL0pwbg.wav', 'normalize_5s_intro_BrrWNfjgHGs.wav', 'normalize_5s_intro_j1c70vRHdhQ.wav', 'normalize_5s_intro_3DCHLwOqtJs.wav', 'normalize_5s_intro_g20t_K9dlhU.wav', 'normalize_5s_intro_EH1OEWJ9C5w.wav', 'normalize_5s_intro_SCBxmcwmX7U.wav', 'normalize_5s_intro_tXvpe2GbUec.wav', 'normalize_5s_intro_7ZgPGMfUVek.wav', 'normalize_5s_intro_aIJuCcGFJkc.wav', 'normalize_5s_intro_RLMl1umHgp0.wav', 'normalize_5s_intro_KT-m6qTJyN0.wav', 'normalize_5s_intro_WJs-_T8I74Y.wav', 'normalize_5s_intro_aIyqRdrHodE.wav', 'normalize_5s_intro_XJT-fM4nBJU.wav', 'normalize_5s_intro_7QQzDQceGgU.wav', 'normalize_5s_intro_fE2h3lGlOsk.wav', 'normalize_5s_intro_Oq1n8fUxQZc.wav', 'normalize_5s_intro_pssWSj42t8M.wav', 'normalize_5s_intro_GsPq9mzFNGY.wav', 'normalize_5s_intro_Jg9NbDizoPM.wav', 'normalize_5s_intro_Ib7m3Qh-4O4.wav', 'normalize_5s_intro_hn3wJ1_1Zsg.wav', 'normalize_5s_intro_hjZqVw3qI9E.wav', 'normalize_5s_intro_cUKD9tEeBp0.wav', 'normalize_5s_intro_q_4no3KCrY4.wav', 'normalize_5s_intro_VlWs8ey2nyg.wav', 'normalize_5s_intro_Srp0opA8V8o.wav', 'normalize_5s_intro_PYM9NUU9Roc.wav', 'normalize_5s_intro_v0UvOsCi8mc.wav', 'normalize_5s_intro_zaCbuB3w0kg.wav', 'normalize_5s_intro_PCp2iXA1uLE.wav', 'normalize_5s_intro_S2RnxiNJg0M.wav', 'normalize_5s_intro_Jtv4satRsP0.wav', 'normalize_5s_intro_ytq5pGcM77w.wav', 'normalize_5s_intro_9nWpMZFrbvI.wav', 'normalize_5s_intro_1kN-34GFMYM.wav', 'normalize_5s_intro_Yyvo9O8fN-A.wav', 'normalize_5s_intro_ulj-L3K_Gzs.wav', 'normalize_5s_intro_V-ar6MLjy5o.wav', 'normalize_5s_intro_dtOv6WvJ44w.wav', 'normalize_5s_intro_XkC8Uzl9pCY.wav', 'normalize_5s_intro_jII5qoCrzYE.wav', 'normalize_5s_intro_7pcZIsJNlAs.wav', 'normalize_5s_intro_0QN9KLFWn7I.wav', 'normalize_5s_intro_d6BzCEkGd3I.wav', 'normalize_5s_intro_lYxcW8jtFw0.wav', 'normalize_5s_intro_R1T_SrdQGH8.wav', 'normalize_5s_intro_YOKq1VmEbtc.wav', 'normalize_5s_intro_19Q9l85Feqw.wav', 'normalize_5s_intro_CXm7hPs_als.wav', 'normalize_5s_intro_nFOLhtsyvMA.wav', 'normalize_5s_intro_-8cFfkyk7vA.wav', 'normalize_5s_intro_ZIiQ1jMqhVM.wav', 'normalize_5s_intro_hejXc_FSYb8.wav', 'normalize_5s_intro_eXvBjCO19QY.wav', 'normalize_5s_intro_haCay85cpvo.wav', 'normalize_5s_intro_RpJz01guPMY.wav', 'normalize_5s_intro_sPlXrbVLdO8.wav', 'normalize_5s_intro_Mme9REVuidw.wav', 'normalize_5s_intro_UGTYqTKUl8w.wav', 'normalize_5s_intro_9DP0yMwvyWE.wav', 'normalize_5s_intro_WrDJMxSKlCA.wav', 'normalize_5s_intro_2F8Kr91wQ0U.wav', 'normalize_5s_intro_gyegm85BPPA.wav', 'normalize_5s_intro_Xhh3_-JRnDc.wav', 'normalize_5s_intro_WRSeV_27z6k.wav', 'normalize_5s_intro_HwcCBnfhsR4.wav', 'normalize_5s_intro_bd5m12UEHWI.wav', 'normalize_5s_intro_1juIFmPyG-Y.wav', 'normalize_5s_intro_DGsoqhIUgDQ.wav', 'normalize_5s_intro_2UL-1MOlSPw.wav', 'normalize_5s_intro_2AWE9tqnDPw.wav', 'normalize_5s_intro_68b_HImZAig.wav', 'normalize_5s_intro_GIulOhzXufc.wav', 'normalize_5s_intro_Stet_4bnclk.wav', 'normalize_5s_intro_RHGfkuJv0j0.wav', 'normalize_5s_intro_0uLI6BnVh6w.wav', 'normalize_5s_intro_uo6VU4euIbY.wav', 'normalize_5s_intro_6pARjpdqxYQ.wav', 'normalize_5s_intro_hjIhCG_nIPA.wav', 'normalize_5s_intro_hV-FwW1LgxU.wav', 'normalize_5s_intro_mWfWyhzC22U.wav', 'normalize_5s_intro_IISA6t-9zzc.wav', 'normalize_5s_intro_gDevCxVY_wA.wav', 'normalize_5s_intro_IrtcCSE2bVY.wav', 'normalize_5s_intro_feVUoKhP1mE.wav', 'normalize_5s_intro_Tfypj4UwvvA.wav', 'normalize_5s_intro_TeH7sCVCMJk.wav', 'normalize_5s_intro_0EVVKs6DQLo.wav', 'normalize_5s_intro_d7to9URtLZ4.wav', 'normalize_5s_intro_TzhhbYS9EO4.wav', 'normalize_5s_intro_nn5nypm7GG8.wav', 'normalize_5s_intro_hed6HkYNA7g.wav', 'normalize_5s_intro_rWznOAwxM1g.wav', 'normalize_5s_intro_zyQkFh-E4Ak.wav', 'normalize_5s_intro_agKkcRXN2iE.wav', 'normalize_5s_intro_SZaZU_qi6Xc.wav', 'normalize_5s_intro_ZpDQJnI4OhU.wav', 'normalize_5s_intro_D4nWzd63jV4.wav', 'normalize_5s_intro_9odM1BRqop4.wav', 'normalize_5s_intro_F64yFFnZfkI.wav', 'normalize_5s_intro_Js2JQH_kt0I.wav', 'normalize_5s_intro_Skt_NKI4d6U.wav'];
 // submit modal of user info
 var submitModal = new bootstrap.Modal(document.getElementById("submitModal"), {
   keyboard: false,
@@ -78,25 +64,35 @@ function shuffle(array) {
   return array;
 }
 
-let audioOrder = [...Array(94).keys()];
+let audioOrder = [...Array(235).keys()];
 // order of every audio
-let slotOrder = [0, 1, 2, 1, 3, 4, 0, 5, 6, 7, 3, 8, 9, 10, 5, 11, 12, 7, 13, 12, 14, 10, 15, 16, 
-  17, 18, 19, 20, 21, 22, 23, 15, 24, 25, 24, 18, 26, 17, 27, 28, 29, 23, 30, 31, 27, 32, 33, 34, 29, 
-  35, 36, 32, 37, 38, 21, 39, 40, 9, 39, 41, 42, 40, 43, 44, 20, 34, 45, 26, 46, 47, 43, 48, 49, 47, 
-  50, 51, 14, 48, 52, 45, 53, 50, 54, 55, 56, 57, 51, 58, 59, 55, 28, 60, 61, 62, 61, 63, 58, 64, 62, 
-  65, 66, 60, 67, 68, 65, 69, 70, 66, 4, 71, 72, 44, 11, 73, 52, 19, 74, 75, 72, 74, 76, 70, 38, 73, 77, 
-  67, 64, 56, 78, 13, 76, 75, 37, 79, 80, 77, 80, 78, 30, 81, 57, 53, 82, 83, 84, 85, 86, 84, 87, 22, 82,
-   81, 88, 83, 89, 90, 91, 86, 91, 92, 93, 89];
+let slotOrder = [0, 1, 2, 3, 4, 0, 5, 6, 2, 7, 8, 9, 1, 10, 11, 12, 13, 4, 14, 15, 16, 5, 17, 18, 19, 20, 
+  15, 21, 7, 22, 23, 24, 25, 26, 27, 28, 29, 12, 30, 31, 32, 20, 33, 16, 34, 31, 14, 35, 36, 37, 27, 38, 39, 
+  25, 40, 41, 42, 43, 44, 21, 45, 46, 32, 47, 48, 49, 30, 50, 51, 52, 53, 54, 35, 55, 56, 57, 58, 59, 60, 54, 
+  61, 62, 63, 64, 65, 36, 66, 67, 68, 69, 70, 38, 71, 43, 72, 73, 74, 75, 40, 76, 71, 77, 53, 78, 72, 79, 51, 
+  80, 81, 65, 82, 58, 47, 83, 84, 63, 85, 86, 87, 88, 84, 89, 90, 56, 91, 92, 93, 64, 94, 95, 68, 96, 97, 98, 
+  74, 99, 6, 23, 100, 11, 101, 8, 102, 103, 104, 59, 101, 13, 22, 46, 100, 29, 105, 33, 48, 99, 106, 107, 45, 
+  108, 109, 110, 105, 111, 61, 112, 102, 113, 114, 115, 110, 116, 117, 118, 119, 120, 121, 122, 86, 123, 124, 
+  125, 108, 126, 127, 104, 128, 129, 125, 130, 121, 131, 132, 89, 107, 112, 93, 118, 133, 134, 75, 135, 136, 
+  137, 138, 77, 139, 140, 82, 129, 141, 67, 142, 137, 135, 143, 144, 95, 145, 146, 147, 148, 149, 120, 150, 
+  151, 152, 131, 153, 154, 134, 155, 150, 136, 156, 157, 158, 159, 160, 145, 138, 161, 141, 162, 157, 163, 
+  164, 165, 166, 156, 167, 168, 169, 170, 160, 171, 164, 144, 172, 170, 153, 173, 161, 147, 174, 175, 151, 
+  176, 149, 166, 116, 177, 178, 179, 113, 180, 17, 90, 178, 111, 181, 18, 127, 177, 76, 26, 128, 50, 182, 
+  44, 142, 66, 179, 122, 41, 148, 183, 78, 83, 143, 184, 98, 185, 180, 162, 60, 184, 87, 186, 152, 187, 85, 
+  188, 52, 165, 189, 182, 190, 188, 191, 154, 181, 192, 80, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 
+  168, 203, 198, 204, 155, 205, 206, 193, 207, 208, 209, 210, 211, 212, 213, 196, 214, 215, 216, 62, 187, 158, 
+  209, 217, 218, 216, 212, 190, 207, 219, 220, 221, 200, 204, 222, 223, 195, 221, 224, 225, 226, 227, 228, 
+  229, 230, 214, 201, 215, 173, 211, 222, 171, 231, 224, 218, 232, 217, 174, 213, 223, 232, 219, 220, 233, 176, 225, 91, 226, 227, 234, 94];
 // order of every audio and break (-1 for 5s break, -2 for 3m break)
-let slotWithBreakOrder = Array(323).fill(-1);
+let slotWithBreakOrder = Array(slotOrder.length*2-1).fill(-1);
 for (let i = 0; i < slotWithBreakOrder.length; i++) {
   if (i%2 === 0) {
       // insert break between audios
       slotWithBreakOrder[i] = slotOrder[i/2];
   }    
 }
-slotWithBreakOrder[54*2-1] = -2;
-slotWithBreakOrder[108*2-1] = -2;
+slotWithBreakOrder[slotOrder.length/3*2-1] = -2; //first rest
+slotWithBreakOrder[slotOrder.length/3*2*2-1] = -2; //second rest
 
 let userResponses = [];
 let userResponsePositions = [];
@@ -104,21 +100,21 @@ let userResponseInSec = 0;
 
 function loadTrack(track_counter) {
   if (slotWithBreakOrder[track_counter] === -1) {
-    // 5s break
+    // 3s break
     updateDB() // update userResponse of previous audio
     clearInterval(updateTimer);
     resetValues();
-    curr_track.src = "pink_noise_5s.wav";
+    curr_track.src = "pink_noise_3s.wav";
 
     // curr_track.load();
     
-    track_name.textContent = `5 Seconds Break`;
+    track_name.textContent = `3 Seconds Break`;
     now_playing.textContent = "";
     $('label[for="toggle-hrd"]').hide();
     $('label[for="toggle-unhrd"]').hide();
     $('label[for="toggle-alhrd"]').hide();
     $('.skip_btn').hide();
-    waitTime = 10000; // 10 second of waiting for loading
+    waitTime = 7000; // 7 second of waiting for loading
   } else if (slotWithBreakOrder[track_counter] === -2) {
     // 3m break
     updateDB(); // update userResponse of previous audio
@@ -139,6 +135,7 @@ function loadTrack(track_counter) {
     $('label[for="toggle-hrd"]').show();
     $('label[for="toggle-unhrd"]').show();
     $('label[for="toggle-alhrd"]').show();
+    $('.skip_btn').hide();
     document.getElementById("toggle-alhrd").checked = false;
     document.getElementById("toggle-unhrd").checked = false;
     document.getElementById("toggle-hrd").checked = false;
@@ -313,8 +310,8 @@ function playpauseTrack() {
     playTrack();
     playpause_btn.style.display = 'none';
     let hour = 1, min = 20, sec = 0;
-    let totalTimeSec = 80*60;
-    let timeLeftSec = 80*60;
+    let totalTimeSec = 90*60;
+    let timeLeftSec = 90*60;
     
     let timerStart = setInterval(function(){
       timeLeftSec --;
