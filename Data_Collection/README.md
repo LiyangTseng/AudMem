@@ -4,5 +4,6 @@
 - [brows_all.py](brows_all.py): a program to open all youtube links one by one automatically, and is meant to be used in the process of filtering unwanted music.
 - [plot_statistics.py](plot_statistics.py): plot histograms of both viewCounts and valid_viewCounts. 
 - [download_audios.py](download_audios.py): first choose evenly distributed data from [yt_info.csv](yt_info.csv) with respect to views and then them as audios.
-- [detect_chorus.py](detect_chorus.py): use [pychorus](https://github.com/vivjay30/pychorus) to roughly detect chorus location, the result would be stored at [chorus_locations.csv](chorus_locations.csv).
-- [extract_clips.py](extract_clips.py): extract chorus clips from raw audio using either the chorus locations stored in [chorus_locations.csv](chorus_locations.csv) or the [audacity](https://www.audacityteam.org/) program to determine the locations on th fly. 
+- [detect_chorus.py](detect_chorus.py): use [pychorus](https://github.com/vivjay30/pychorus) to roughly detect chorus location, the result would be stored at [intro_locations.csv](intro_locations.csv).
+- [extract_clips.py](extract_clips.py): extract chorus clips from raw audio using either the chorus locations stored in [intro_locations.csv](intro_locations.csv) or the [audacity](https://www.audacityteam.org/) program to determine the locations on th fly. 
+- [normalize_clip.py](normalize_clip.py): used to normalize all volumns and strech the audios to desired length.
