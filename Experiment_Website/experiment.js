@@ -310,8 +310,8 @@ function playpauseTrack() {
     playTrack();
     playpause_btn.style.display = 'none';
     let hour = 1, min = 20, sec = 0;
-    let totalTimeSec = 90*60;
-    let timeLeftSec = 90*60;
+    let totalTimeSec = 75*60;
+    let timeLeftSec = 75*60;
     
     let timerStart = setInterval(function(){
       timeLeftSec --;

@@ -26,8 +26,8 @@ def extract_chord_features():
 
     for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Chord Features', leave=True):
         audio_path = os.path.join(AUDIO_DIR, audio_file)
-        chroma_path = os.path.join(chroma_dir, 'chroma_'+ audio_file[:16] + '.npy') 
-        tonnetz_path =  os.path.join(tonnetz_dir, 'tonnetz_'+ audio_file[:16] + '.npy')
+        chroma_path = os.path.join(chroma_dir, 'chroma_'+ audio_file.replace(".wav", ".npy")) 
+        tonnetz_path =  os.path.join(tonnetz_dir, 'tonnetz_'+ audio_file.replace(".wav", ".npy"))
         if os.path.exists(chroma_path) and os.path.exists(tonnetz_path):
             continue
         else:
@@ -44,30 +44,25 @@ def extract_chord_features():
 
 def extract_rhythm_features():
     
-    ''' extract rhythm pattern (FA) from MA Toolbox '''
+    ''' extract tempogram from libROSA '''
     
-    fp_dir = 'features/rhythms/fluctuation_pattern'
-    if not os.path.exists(fp_dir):
-        os.makedirs(fp_dir)
+    tempogram_dir = 'features/rhythms/tempogram'
+    if not os.path.exists(tempogram_dir):
+        os.makedirs(tempogram_dir)
 
-    eng = matlab.engine.start_matlab()
+
     for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Rhythm Features', leave=True):
         audio_path = os.path.join(AUDIO_DIR, audio_file)
-        fp_path = os.path.join(fp_dir, 'fp_'+ audio_file[:16] + '.npy')
-        if os.path.exists(fp_path):
+        tempogram_path = os.path.join(tempogram_dir, 'tempogram_'+ audio_file.replace(".wav", ".npy"))
+        if os.path.exists(tempogram_path):
             continue
 
-        wav = eng.audioread(audio_path)
+        y, sr = librosa.load(audio_path)
+        oenv = librosa.onset.onset_strength(y=y, sr=sr)
+        tempogram = librosa.feature.tempogram(onset_envelope=oenv, sr=sr)
+        np.save(tempogram_path, tempogram)
 
-        p = {'sequence': {'length': 512.0, 'hopsize': 256.0, 'windowfunction': 'boxcar'}, 
-                'fs': 11025.0, 'fft_hopsize': 128.0, 'visu': 0}
-        sone = eng.ma_sone(wav, p)
-        fp = eng.ma_fp(sone,p)
-        fp = np.array(fp._data) # convert mlarray.double to numpy array 
-        
-        np.save(fp_path, fp)
-
-    print('fluctuation pattern features of {} saved at {}'.format(AUDIO_DIR, fp_dir))
+    print('tempogram features of {} saved at {}'.format(AUDIO_DIR, tempogram_dir))
         
 def extract_timbre_features():
 
@@ -100,14 +95,14 @@ def extract_timbre_features():
      
     for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Timbre Features', leave=True):
         audio_path = os.path.join(AUDIO_DIR, audio_file)
-        mfcc_path = os.path.join(mfcc_dir, 'mfcc_' + audio_file[:16] + '.npy')
-        mfcc_delta_path = os.path.join(mfcc_delta_dir, 'mfccDelta_' + audio_file[:16] + '.npy')
-        mfcc_delta2_path = os.path.join(mfcc_delta2_dir, 'mfccDelta2_' + audio_file[:16] + '.npy')
-        spectral_centroid_path = os.path.join(spectral_centroid_dir, 'cent_' + audio_file[:16] + '.npy')
-        spectral_bandwidth_path = os.path.join(spectral_bandwidth_dir, 'specBw_' + audio_file[:16] + '.npy') 
-        spectral_contrast_path = os.path.join(spectral_contrast_dir, 'contrast_' + audio_file[:16] + '.npy')
-        spectral_flatness_path = os.path.join(spectral_flatness_dir, 'flatness_' + audio_file[:16] + '.npy')
-        spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'rolloff_' + audio_file[:16] + '.npy')
+        mfcc_path = os.path.join(mfcc_dir, 'mfcc_' + audio_file.replace(".wav", ".npy"))
+        mfcc_delta_path = os.path.join(mfcc_delta_dir, 'mfccDelta_' + audio_file.replace(".wav", ".npy"))
+        mfcc_delta2_path = os.path.join(mfcc_delta2_dir, 'mfccDelta2_' + audio_file.replace(".wav", ".npy"))
+        spectral_centroid_path = os.path.join(spectral_centroid_dir, 'cent_' + audio_file.replace(".wav", ".npy"))
+        spectral_bandwidth_path = os.path.join(spectral_bandwidth_dir, 'specBw_' + audio_file.replace(".wav", ".npy"))
+        spectral_contrast_path = os.path.join(spectral_contrast_dir, 'contrast_' + audio_file.replace(".wav", ".npy"))
+        spectral_flatness_path = os.path.join(spectral_flatness_dir, 'flatness_' + audio_file.replace(".wav", ".npy"))
+        spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'rolloff_' + audio_file.replace(".wav", ".npy"))
 
         if os.path.exists(mfcc_path) and os.path.exists(mfcc_delta_path) and os.path.exists(mfcc_delta2_path) and \
             os.path.exists(spectral_centroid_path) and os.path.exists(spectral_bandwidth_path) and os.path.exists(spectral_contrast_path) and \
@@ -186,9 +181,9 @@ def extract_emotion_features(args):
     audio_filenames = [data[0][:-4] for data in arrf_data['data']]
 
     # load saved model ref: https://stackoverflow.com/questions/32700797/saving-a-cross-validation-trained-model-in-scikit
-    with open('features/emotions/tmp/svr_linear_static_arousal.pkl' , 'rb') as fid:
+    with open('svr_linear_static_arousal.pkl' , 'rb') as fid:
         static_arousal_model = pickle.load(fid)  
-    with open('features/emotions/tmp/svr_linear_static_valence.pkl' , 'rb') as fid:
+    with open('svr_linear_static_valence.pkl' , 'rb') as fid:
         static_valence_model = pickle.load(fid)
 
     predicted_static_arousal = static_arousal_model.predict(scaled_dynamic_features)
@@ -200,9 +195,9 @@ def extract_emotion_features(args):
     scaler = StandardScaler().fit(dynamic_features)
     scaled_dynamic_features = scaler.transform(dynamic_features)
     
-    with open('features/emotions/tmp/svr_rbf_dynamic_arousal.pkl' , 'rb') as fid:
+    with open('svr_rbf_dynamic_arousal.pkl' , 'rb') as fid:
         dynamic_arousal_model = pickle.load(fid)
-    with open('features/emotions/tmp/svr_rbf_dynamic_valence.pkl' , 'rb') as fid:
+    with open('svr_rbf_dynamic_valence.pkl' , 'rb') as fid:
         dynamic_valence_model = pickle.load(fid)
 
     predicted_dynamic_arousal = dynamic_arousal_model.predict(scaled_dynamic_features)

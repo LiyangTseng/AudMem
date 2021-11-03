@@ -119,13 +119,28 @@ def check_track_memorized(singleUserData, id_to_track, vigilanceThreshold=VIGILA
 
 def write_labels(track_memorability_dict):
     ''' write lables to output directory, the format would be "track", "repeat_interval:memorized" '''
-    label_file = os.path.join('labels', 'track_memorability_beta.csv')
-    with open(label_file, 'w') as csv_file:  
+    detailed_label_file = os.path.join('labels', 'track_memorability_details_beta.csv')
+    label_score_file = os.path.join('labels', 'track_memorability_scores_beta.csv')
+    with open(detailed_label_file, 'w') as csv_file:  
         writer = csv.writer(csv_file)
         writer.writerow(['track', 'repeat_interval:memorized'])
-        for track, memorability in track_memorability_dict.items():
-            writer.writerow([track, memorability])
-    print('labels saved at {}'.format(label_file))
+        for track, interval_memorized_list in track_memorability_dict.items():
+            writer.writerow([track, interval_memorized_list])
+    print('detailed labels saved at {}'.format(detailed_label_file))
+
+    with open(label_score_file, 'w') as csv_file:  
+        writer = csv.writer(csv_file)
+        writer.writerow(['track', 'score'])
+        for track, interval_memorized_list in track_memorability_dict.items():
+            memorized_count = 0
+            for interval_memorized_pair in interval_memorized_list:
+                interval = list(interval_memorized_pair)[0]
+                memorized = interval_memorized_pair.get(interval)
+                memorized_count += memorized
+            track_score = 0 if interval_memorized_list == [] else memorized_count/len(interval_memorized_list)
+            writer.writerow([track, track_score])
+    print('label scores saved at {}'.format(label_score_file))
+
 
 def record_macro_stats(trackMemorability_dict):
     ''' save and plot the statistics of memorability against interval '''
