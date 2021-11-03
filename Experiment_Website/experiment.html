@@ -27,6 +27,16 @@
             </nav>
         </header>
         <main>
+          <div class="alert alert-success collapse" role="alert", id="passExperimentAlert">
+            <Strong> Congradulation! </Strong> You passed the experiment, please copy and save this <a href="#" class="alert-link" onclick="copyToClipboard()">Token</a> to contact us.
+            <br><Strong> 恭喜! </Strong> 您已通過實驗，請按下並複製<a href="#" class="alert-link" onclick="copyToClipboard()">Token</a>以在聯絡我們時作為實驗完成的依據
+          </div>
+
+          <div class="alert alert-danger collapse" role="alert", id="failedExperimentAlert">
+            <strong>Too Bad! 您未通過實驗</strong> The experiment is over and you failed the experiment. 
+            <br><strong>很抱歉! </strong> 您未通過實驗
+            <div id="failed_explain"></div>
+          </div>
           <!-- ref: https://stackoverflow.com/questions/30104289/bootstrap-progress-bar-timer/50179723 -->
           <div class="progress">
             <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="width: 100%;">
@@ -78,9 +88,9 @@
                   <div class="modal-body">
                     <p>規則:
                       <br>
-                      1. 受試者必須不間斷、全程地參與實驗，如此才能獲取酬勞，
+                      1. 受試者必須不間斷、專注地全程地參與實驗，在短時間內重複的片段有夠高的正確率才能獲取酬勞，
                       <br>
-                      2. 每位受試者只能參加一次實驗，請用報名實驗時填寫的電子郵件信箱作為登錄識別，實驗結束後我們會再依據此信箱與您連論酬勞付款方式
+                      2. 每位受試者只能參加一次實驗，請用報名實驗時填寫的電子郵件信箱作為登錄識別，實驗結束若有夠高的正確率可以憑結束時的亂碼(token)與報名信箱與我們聯絡酬勞付款方式
                     </p>
                     <p>
                       重要提醒: 在135，270首片段結束後會有3分鐘的休息時間，可以在此休息、上廁所。另外請在每一個音樂片段播完之前在以下三個選項中擇一作為回答:
@@ -95,9 +105,9 @@
                     </p>
                     <p>Rules:
                       <br>
-                      1. Your participation will only counts if you finish the whole experiment in time.
+                      1. Your participation will only counts if you finish the whole experiment in time and pass the vigilance threshold.
                       <br>
-                      2. You should only paritcipate in this experiment once, we will use the email address you submitted as identification and contact you about payment afterward.
+                      2. You should only paritcipate in this experiment once, you should use the token generated after passsing experiment and the email address you submitted as identification to contact us about payment afterward.
                     </p>
                     <p>As a reminder, you can take a 3-minute bathroom break after clip #135 and #270; you also need to choose the following three statement as your answer before every music segment ends during the experiment:
                       <br>

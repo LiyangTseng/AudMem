@@ -1,10 +1,10 @@
 <?php
 
     // sql database info 
-    $servername = "sql202.epizy.com";
-    $username = "epiz_29320404";
-    $password = "CrNYzDv8IuI7";
-    $dbname = "epiz_29320404_MusicMem";
+    $servername = "ns29.g-dns.com";
+    $username = "musicme1_admin";
+    $password = "5MLab3zQI(N*";
+    $dbname = "musicme1_database_01";
 
     $startTime = $_POST['startTime'];
     $nowTime = $_POST['nowTime'];
@@ -12,6 +12,9 @@
     $audioOrderStr = $_POST['audioOrderStr'];
     $responseStr = $_POST['responseStr'];
     $responsePositionStr = $_POST['responsePositionStr'];
+    $vigilanceDetail = $_POST['vigilanceDetail'];
+    $vigilanceScore = $_POST['vigilanceScore'];
+    $token = $_POST['token'];
     $experimentFinished = $_POST['experimentFinished'];
 
     // Create connection
@@ -23,7 +26,8 @@
 
 
     // TODO: update to experimentData after pilot study
-    $sql = "UPDATE experimentData_beta SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
+    $sql = "UPDATE experimentData_beta SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', 
+    vigilanceDetail='$vigilanceDetail', vigilanceScore='$vigilanceScore', token='$token', experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
     
     if ($conn->query($sql) === TRUE) {
         echo "Record updated successfully in update_db.php";

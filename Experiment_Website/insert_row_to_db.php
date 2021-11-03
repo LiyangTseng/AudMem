@@ -1,10 +1,10 @@
 <?php
 
     // sql database info 
-    $servername = "sql202.epizy.com";
-    $username = "epiz_29320404";
-    $password = "CrNYzDv8IuI7";
-    $dbname = "epiz_29320404_MusicMem";
+    $servername = "ns29.g-dns.com";
+    $username = "musicme1_admin";
+    $password = "5MLab3zQI(N*";
+    $dbname = "musicme1_database_01";
 
     $startTime = $_POST['startTime'];
     $email = $_POST['email'];
