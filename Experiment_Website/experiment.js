@@ -266,7 +266,7 @@ function skip() {
     
     updateDB();
     clearInterval(timerStart);
-
+    window.onbeforeunload = null;
   }
 
 }
@@ -315,6 +315,7 @@ async function nextTrack() {
     
     updateDB();
     clearInterval(timerStart);
+    window.onbeforeunload = null;
   }
 }
 
@@ -440,6 +441,7 @@ function updateDB() {
 }
 
 
+https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript
 function copyToClipboard() {
     window.prompt("Copy to clipboard: Ctrl+C, Enter", finished_token);
   }

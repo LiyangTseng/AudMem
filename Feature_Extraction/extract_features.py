@@ -96,13 +96,13 @@ def extract_timbre_features():
     for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Timbre Features', leave=True):
         audio_path = os.path.join(AUDIO_DIR, audio_file)
         mfcc_path = os.path.join(mfcc_dir, 'mfcc_' + audio_file.replace(".wav", ".npy"))
-        mfcc_delta_path = os.path.join(mfcc_delta_dir, 'mfccDelta_' + audio_file.replace(".wav", ".npy"))
-        mfcc_delta2_path = os.path.join(mfcc_delta2_dir, 'mfccDelta2_' + audio_file.replace(".wav", ".npy"))
-        spectral_centroid_path = os.path.join(spectral_centroid_dir, 'cent_' + audio_file.replace(".wav", ".npy"))
-        spectral_bandwidth_path = os.path.join(spectral_bandwidth_dir, 'specBw_' + audio_file.replace(".wav", ".npy"))
-        spectral_contrast_path = os.path.join(spectral_contrast_dir, 'contrast_' + audio_file.replace(".wav", ".npy"))
-        spectral_flatness_path = os.path.join(spectral_flatness_dir, 'flatness_' + audio_file.replace(".wav", ".npy"))
-        spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'rolloff_' + audio_file.replace(".wav", ".npy"))
+        mfcc_delta_path = os.path.join(mfcc_delta_dir, 'mfcc_delta_' + audio_file.replace(".wav", ".npy"))
+        mfcc_delta2_path = os.path.join(mfcc_delta2_dir, 'mfcc_delta2_' + audio_file.replace(".wav", ".npy"))
+        spectral_centroid_path = os.path.join(spectral_centroid_dir, 'spectral_centroid_' + audio_file.replace(".wav", ".npy"))
+        spectral_bandwidth_path = os.path.join(spectral_bandwidth_dir, 'spectral_bandwidth_' + audio_file.replace(".wav", ".npy"))
+        spectral_contrast_path = os.path.join(spectral_contrast_dir, 'spectral_contrast_' + audio_file.replace(".wav", ".npy"))
+        spectral_flatness_path = os.path.join(spectral_flatness_dir, 'spectral_flatness_' + audio_file.replace(".wav", ".npy"))
+        spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'spectral_rolloff_' + audio_file.replace(".wav", ".npy"))
 
         if os.path.exists(mfcc_path) and os.path.exists(mfcc_delta_path) and os.path.exists(mfcc_delta2_path) and \
             os.path.exists(spectral_centroid_path) and os.path.exists(spectral_bandwidth_path) and os.path.exists(spectral_contrast_path) and \
@@ -219,10 +219,10 @@ def extract_emotion_features(args):
 
     single_dynamic_prediction_len = predicted_dynamic_arousal.shape[0]//len(audio_filenames)
     for idx in tqdm(range(len(audio_filenames)), desc='Emotion Features'):
-        static_arousal_path = os.path.join(static_arousal_dir, 'staticArousal_' + audio_filenames[idx] + '.npy')
-        static_valence_path = os.path.join(static_valence_dir, 'staticValence_' + audio_filenames[idx] + '.npy')
-        dynamic_arousal_path = os.path.join(dynamic_arousal_dir, 'dynamicArousal_' + audio_filenames[idx] + '.npy')
-        dynamic_valence_path = os.path.join(dynamic_valence_dir, 'dynamicValence_' + audio_filenames[idx] + '.npy')
+        static_arousal_path = os.path.join(static_arousal_dir, 'static_arousal_' + audio_filenames[idx] + '.npy')
+        static_valence_path = os.path.join(static_valence_dir, 'static_valence_' + audio_filenames[idx] + '.npy')
+        dynamic_arousal_path = os.path.join(dynamic_arousal_dir, 'dynamic_arousal_' + audio_filenames[idx] + '.npy')
+        dynamic_valence_path = os.path.join(dynamic_valence_dir, 'dynamic_valence_' + audio_filenames[idx] + '.npy')
 
         if os.path.exists(static_arousal_path) and os.path.exists(static_valence_path) and os.path.exists(dynamic_arousal_path) and os.path.exists(dynamic_valence_path):
             continue
