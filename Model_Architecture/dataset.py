@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-
+from utils.extract_features import extract_all_features
 class HandCraftedDataset(Dataset):
     def __init__(self, features_dir, labels_dir, mode="train"):
         super().__init__()
@@ -34,7 +34,10 @@ class HandCraftedDataset(Dataset):
         concate_features = np.array([])
         for feature_type in self.features_dict:
             for subfeatures in self.features_dict[feature_type]:
-                f = np.load(os.path.join(self.features_dir, feature_type, subfeatures, "{}_{}".format(subfeatures, self.idx_to_filename[index].replace("wav", "npy"))))
+                feature_file_path = os.path.join(self.features_dir, feature_type, subfeatures, "{}_{}".format(subfeatures, self.idx_to_filename[index].replace("wav", "npy")))
+                if not os.path.exists(feature_file_path):
+                    extract_all_features()
+                f = np.load(feature_file_path)
                 if feature_type == "emotions":
                     # features not sequential
                     concate_features = np.concatenate([concate_features, f.reshape(-1)])
