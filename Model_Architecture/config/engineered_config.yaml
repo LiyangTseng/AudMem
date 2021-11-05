@@ -1,0 +1,5 @@
+# non end-to-end configuration
+experiment:
+    batch_size: 5
+    epochs: 10
+    learning_rate: 0.01
