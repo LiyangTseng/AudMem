@@ -4,30 +4,30 @@ import numpy as np
 import pandas as pd
 import librosa
 from tqdm import tqdm
-from utils.features import extract_all_wav_feature, extract_frame_feature, process_dynamic_feature
+from features import extract_all_wav_feature, extract_frame_feature, process_dynamic_feature
 import arff
 import pickle
 from sklearn.preprocessing import StandardScaler
 '''
-    this file is the same as the one in Feature_Extraction/extract_features.py
+    this file is the modified version of the one in Feature_Extraction/extract_features.py
 '''
 
-AUDIO_DIR = '../Experiment_Website/clips'
 
 
-def extract_chord_features():
+
+def extract_chord_features(audio_dir):
 
     ''' extract choragram and tonnetz from LibROSA'''
 
-    chroma_dir = 'features/chords/chroma'
+    chroma_dir = '{}/chords/chroma'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(chroma_dir):
         os.makedirs(chroma_dir)
-    tonnetz_dir = 'features/chords/tonnetz'
+    tonnetz_dir = '{}/chords/tonnetz'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(tonnetz_dir):
         os.makedirs(tonnetz_dir)
 
-    for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Chord Features', leave=True):
-        audio_path = os.path.join(AUDIO_DIR, audio_file)
+    for audio_file in tqdm(os.listdir(audio_dir), desc='Chord Features', leave=True):
+        audio_path = os.path.join(audio_dir, audio_file)
         chroma_path = os.path.join(chroma_dir, 'chroma_'+ audio_file.replace(".wav", ".npy")) 
         tonnetz_path =  os.path.join(tonnetz_dir, 'tonnetz_'+ audio_file.replace(".wav", ".npy"))
         if os.path.exists(chroma_path) and os.path.exists(tonnetz_path):
@@ -41,20 +41,20 @@ def extract_chord_features():
                 tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
                 np.save(tonnetz_path, tonnetz)
 
-    print('chroma features of {} saved at {}'.format(AUDIO_DIR, chroma_dir))
-    print('tonnetz features of {} saved at {}'.format(AUDIO_DIR, tonnetz_dir))
+    print('chroma features of {} saved at {}'.format(audio_dir, chroma_dir))
+    print('tonnetz features of {} saved at {}'.format(audio_dir, tonnetz_dir))
 
-def extract_rhythm_features():
+def extract_rhythm_features(audio_dir):
     
     ''' extract tempogram from libROSA '''
     
-    tempogram_dir = 'features/rhythms/tempogram'
+    tempogram_dir = '{}/rhythms/tempogram'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(tempogram_dir):
         os.makedirs(tempogram_dir)
 
 
-    for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Rhythm Features', leave=True):
-        audio_path = os.path.join(AUDIO_DIR, audio_file)
+    for audio_file in tqdm(os.listdir(audio_dir), desc='Rhythm Features', leave=True):
+        audio_path = os.path.join(audio_dir, audio_file)
         tempogram_path = os.path.join(tempogram_dir, 'tempogram_'+ audio_file.replace(".wav", ".npy"))
         if os.path.exists(tempogram_path):
             continue
@@ -64,39 +64,39 @@ def extract_rhythm_features():
         tempogram = librosa.feature.tempogram(onset_envelope=oenv, sr=sr)
         np.save(tempogram_path, tempogram)
 
-    print('tempogram features of {} saved at {}'.format(AUDIO_DIR, tempogram_dir))
+    print('tempogram features of {} saved at {}'.format(audio_dir, tempogram_dir))
         
-def extract_timbre_features():
+def extract_timbre_features(audio_dir):
 
     ''' extract MFCC and features related to spectrum shape from LibROSA'''
     
-    mfcc_dir = 'features/timbre/mfcc'
+    mfcc_dir = '{}/timbre/mfcc'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(mfcc_dir):
         os.makedirs(mfcc_dir)
-    mfcc_delta_dir = 'features/timbre/mfcc_delta'
+    mfcc_delta_dir = '{}/timbre/mfcc_delta'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(mfcc_delta_dir):
         os.makedirs(mfcc_delta_dir)
-    mfcc_delta2_dir = 'features/timbre/mfcc_delta2'
+    mfcc_delta2_dir = '{}/timbre/mfcc_delta2'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(mfcc_delta2_dir):
         os.makedirs(mfcc_delta2_dir)
-    spectral_centroid_dir = 'features/timbre/spectral_centroid'
+    spectral_centroid_dir = '{}/timbre/spectral_centroid'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_centroid_dir):
         os.makedirs(spectral_centroid_dir)
-    spectral_bandwidth_dir = 'features/timbre/spectral_bandwidth'
+    spectral_bandwidth_dir = '{}/timbre/spectral_bandwidth'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_bandwidth_dir):
         os.makedirs(spectral_bandwidth_dir)
-    spectral_contrast_dir = 'features/timbre/spectral_contrast'
+    spectral_contrast_dir = '{}/timbre/spectral_contrast'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_contrast_dir):
         os.makedirs(spectral_contrast_dir)
-    spectral_flatness_dir = 'features/timbre/spectral_flatness'
+    spectral_flatness_dir = '{}/timbre/spectral_flatness'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_flatness_dir):
         os.makedirs(spectral_flatness_dir)
-    spectral_rolloff_dir = 'features/timbre/spectral_rolloff'
+    spectral_rolloff_dir = '{}/timbre/spectral_rolloff'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_rolloff_dir):
         os.makedirs(spectral_rolloff_dir)
      
-    for audio_file in tqdm(os.listdir(AUDIO_DIR), desc='Timbre Features', leave=True):
-        audio_path = os.path.join(AUDIO_DIR, audio_file)
+    for audio_file in tqdm(os.listdir(audio_dir), desc='Timbre Features', leave=True):
+        audio_path = os.path.join(audio_dir, audio_file)
         mfcc_path = os.path.join(mfcc_dir, 'mfcc_' + audio_file.replace(".wav", ".npy"))
         mfcc_delta_path = os.path.join(mfcc_delta_dir, 'mfcc_delta_' + audio_file.replace(".wav", ".npy"))
         mfcc_delta2_path = os.path.join(mfcc_delta2_dir, 'mfcc_delta2_' + audio_file.replace(".wav", ".npy"))
@@ -139,24 +139,24 @@ def extract_timbre_features():
                 np.save(spectral_rolloff_path, rolloff)
         
 
-    print('mfcc features of {} saved at {}'.format(AUDIO_DIR, mfcc_dir))
-    print('mfcc_delta features of {} saved at {}'.format(AUDIO_DIR, mfcc_delta_dir))
-    print('mfcc_delta2 features of {} saved at {}'.format(AUDIO_DIR, mfcc_delta2_dir))
-    print('spectral_centroid features of {} saved at {}'.format(AUDIO_DIR, spectral_centroid_dir))
-    print('spectral_bandwidth features of {} saved at {}'.format(AUDIO_DIR, spectral_bandwidth_dir))
-    print('spectral_contrast features of {} saved at {}'.format(AUDIO_DIR, spectral_contrast_dir))
-    print('spectral_flatness features of {} saved at {}'.format(AUDIO_DIR, spectral_flatness_dir))
-    print('spectral_rolloff features of {} saved at {}'.format(AUDIO_DIR, spectral_rolloff_dir))
+    print('mfcc features of {} saved at {}'.format(audio_dir, mfcc_dir))
+    print('mfcc_delta features of {} saved at {}'.format(audio_dir, mfcc_delta_dir))
+    print('mfcc_delta2 features of {} saved at {}'.format(audio_dir, mfcc_delta2_dir))
+    print('spectral_centroid features of {} saved at {}'.format(audio_dir, spectral_centroid_dir))
+    print('spectral_bandwidth features of {} saved at {}'.format(audio_dir, spectral_bandwidth_dir))
+    print('spectral_contrast features of {} saved at {}'.format(audio_dir, spectral_contrast_dir))
+    print('spectral_flatness features of {} saved at {}'.format(audio_dir, spectral_flatness_dir))
+    print('spectral_rolloff features of {} saved at {}'.format(audio_dir, spectral_rolloff_dir))
 
-def extract_emotion_features(open_opensmile = False):
+def extract_emotion_features(audio_dir, open_opensmile = False):
 
     ''' extract predicted valence, arousal from PMEmo '''
     
     def extract_opensmile_features():
         # extract features for PMEmo 
-        wavdir = AUDIO_DIR
+        wavdir = audio_dir
         opensmiledir = 'opensmile'
-        tmp_feature_folder = 'features/emotions/tmp'
+        tmp_feature_folder = '{}/emotions/tmp'.format(audio_dir.replace("raw_audios", "features"))
         if not os.path.exists(tmp_feature_folder):
             os.makedirs(tmp_feature_folder)
         static_distfile = os.path.join(tmp_feature_folder, "static_features.arff") 
@@ -174,7 +174,7 @@ def extract_emotion_features(open_opensmile = False):
 
 
     ''' predict static arousal and valence using PMEmo '''
-    with open('features/emotions/tmp/static_features.arff') as f:
+    with open('{}/emotions/tmp/static_features.arff'.format(audio_dir.replace("raw_audios", "features"))) as f:
         arrf_data = arff.load(f)
     static_features = np.array(arrf_data['data'])[:, 1:-1]
     scaler = StandardScaler().fit(static_features)
@@ -192,7 +192,7 @@ def extract_emotion_features(open_opensmile = False):
     predicted_static_valence = static_valence_model.predict(scaled_dynamic_features)
 
     ''' predict dynamic arousal and valence using PMEmo '''
-    csv_data = pd.read_csv('features/emotions/tmp/dynamic_features.csv')
+    csv_data = pd.read_csv('{}/emotions/tmp/dynamic_features.csv'.format(audio_dir.replace("raw_audios", "features")))
     dynamic_features = csv_data[csv_data.columns[2:262]]
     scaler = StandardScaler().fit(dynamic_features)
     scaled_dynamic_features = scaler.transform(dynamic_features)
@@ -206,16 +206,16 @@ def extract_emotion_features(open_opensmile = False):
     predicted_dynamic_valence = dynamic_valence_model.predict(scaled_dynamic_features)
 
     ''' write static/dynamic arousal/valence to file '''
-    static_arousal_dir = 'features/emotions/static_arousal'
+    static_arousal_dir = '{}/emotions/static_arousal'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(static_arousal_dir):
         os.makedirs(static_arousal_dir)
-    static_valence_dir = 'features/emotions/static_valence'
+    static_valence_dir = '{}/emotions/static_valence'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(static_valence_dir):
         os.makedirs(static_valence_dir)
-    dynamic_arousal_dir = 'features/emotions/dynamic_arousal'
+    dynamic_arousal_dir = '{}/emotions/dynamic_arousal'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(dynamic_arousal_dir):
         os.makedirs(dynamic_arousal_dir)
-    dynamic_valence_dir = 'features/emotions/dynamic_valence'
+    dynamic_valence_dir = '{}/emotions/dynamic_valence'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(dynamic_valence_dir):
         os.makedirs(dynamic_valence_dir)
 
@@ -238,23 +238,28 @@ def extract_emotion_features(open_opensmile = False):
             if not os.path.exists(dynamic_valence_path):
                 np.save(dynamic_valence_path, predicted_dynamic_valence[idx*single_dynamic_prediction_len : (idx+1)*single_dynamic_prediction_len])
 
-    print('static arousal of {} saved at {}'.format(AUDIO_DIR, static_arousal_dir))
-    print('static valence of {} saved at {}'.format(AUDIO_DIR, static_valence_dir))
-    print('dynamic arousal of {} saved at {}'.format(AUDIO_DIR, dynamic_arousal_dir))
-    print('dynamic valence of {} saved at {}'.format(AUDIO_DIR, dynamic_valence_dir))
-
-def extract_all_features(open_opensmile):
-    extract_chord_features()
-    extract_rhythm_features()
-    extract_timbre_features()
-    extract_emotion_features(open_opensmile)
+    print('static arousal of {} saved at {}'.format(audio_dir, static_arousal_dir))
+    print('static valence of {} saved at {}'.format(audio_dir, static_valence_dir))
+    print('dynamic arousal of {} saved at {}'.format(audio_dir, dynamic_arousal_dir))
+    print('dynamic valence of {} saved at {}'.format(audio_dir, dynamic_valence_dir))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--extract_opensmile_features', help='use opensmile to extract features or not', type=bool, default=False)
+    parser.add_argument('-f', '--extract_opensmile_features', help='use opensmile to extract features or not', type=bool, default=True)
     args = parser.parse_args()
 
-    extract_all_features(args.extract_opensmile_features)
+    audio_dir_root = '../data/raw_audios'
+    audio_sub_dir_list = ["original", "-5_semitones", "-4_semitones", "-3_semitones", 
+                            "-2_semitones", "-1_semitones", "1_semitones", "2_semitones", "3_semitones", 
+                            "4_semitones", "5_semitones"]
+    for sub_dir in audio_sub_dir_list:
+        audio_sub_dir = os.path.join(audio_dir_root, sub_dir)
+        print("==== Processing {} ====".format(audio_sub_dir))
+        extract_chord_features(audio_sub_dir)
+        extract_rhythm_features(audio_sub_dir)
+        extract_timbre_features(audio_sub_dir)
+        extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
+        
 
     
