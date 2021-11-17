@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import os
 import argparse
 import numpy as np
@@ -94,7 +96,10 @@ def extract_timbre_features(audio_dir):
     spectral_rolloff_dir = '{}/timbre/spectral_rolloff'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_rolloff_dir):
         os.makedirs(spectral_rolloff_dir)
-     
+    melspectrogram_dir = '{}/timbre/melspectrogram'.format(audio_dir.replace("raw_audios", "features"))
+    if not os.path.exists(melspectrogram_dir):
+        os.makedirs(melspectrogram_dir)
+
     for audio_file in tqdm(os.listdir(audio_dir), desc='Timbre Features', leave=True):
         audio_path = os.path.join(audio_dir, audio_file)
         mfcc_path = os.path.join(mfcc_dir, 'mfcc_' + audio_file.replace(".wav", ".npy"))
@@ -105,10 +110,11 @@ def extract_timbre_features(audio_dir):
         spectral_contrast_path = os.path.join(spectral_contrast_dir, 'spectral_contrast_' + audio_file.replace(".wav", ".npy"))
         spectral_flatness_path = os.path.join(spectral_flatness_dir, 'spectral_flatness_' + audio_file.replace(".wav", ".npy"))
         spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'spectral_rolloff_' + audio_file.replace(".wav", ".npy"))
+        melspectrogram_path = os.path.join(melspectrogram_dir, 'melspectrogram_' + audio_file.replace(".wav", ".npy"))
 
         if os.path.exists(mfcc_path) and os.path.exists(mfcc_delta_path) and os.path.exists(mfcc_delta2_path) and \
             os.path.exists(spectral_centroid_path) and os.path.exists(spectral_bandwidth_path) and os.path.exists(spectral_contrast_path) and \
-            os.path.exists(spectral_flatness_path) and os.path.exists(spectral_rolloff_path):
+            os.path.exists(spectral_flatness_path) and os.path.exists(spectral_rolloff_path) and os.path.exists(melspectrogram_path):
             continue
         else:
             y, sr = librosa.load(audio_path)
@@ -137,7 +143,11 @@ def extract_timbre_features(audio_dir):
             if not os.path.exists(spectral_rolloff_path):       
                 rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
                 np.save(spectral_rolloff_path, rolloff)
-        
+            if not os.path.exists(melspectrogram_path):       
+                melspectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
+                np.save(melspectrogram_path, melspectrogram)
+
+
 
     print('mfcc features of {} saved at {}'.format(audio_dir, mfcc_dir))
     print('mfcc_delta features of {} saved at {}'.format(audio_dir, mfcc_delta_dir))
@@ -147,6 +157,7 @@ def extract_timbre_features(audio_dir):
     print('spectral_contrast features of {} saved at {}'.format(audio_dir, spectral_contrast_dir))
     print('spectral_flatness features of {} saved at {}'.format(audio_dir, spectral_flatness_dir))
     print('spectral_rolloff features of {} saved at {}'.format(audio_dir, spectral_rolloff_dir))
+    print('melspectrogram features of {} saved at {}'.format(audio_dir, melspectrogram_dir))
 
 def extract_emotion_features(audio_dir, open_opensmile = False):
 
@@ -246,7 +257,7 @@ def extract_emotion_features(audio_dir, open_opensmile = False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--extract_opensmile_features', help='use opensmile to extract features or not', type=bool, default=True)
+    parser.add_argument('-f', '--extract_opensmile_features', help='use opensmile to extract features or not', type=bool, default=False)
     args = parser.parse_args()
 
     audio_dir_root = '../data/raw_audios'

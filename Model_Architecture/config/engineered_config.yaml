@@ -1,5 +1,32 @@
 # non end-to-end configuration
+features:
+    chords: ["chroma"]
+    rhythms: ["tempogram"]
+    timbre: ["mfcc"]
+    emotions: ["static_arousal", "static_valence"]
+    
 experiment:
     batch_size: 5
     epochs: 10
     learning_rate: 0.01
+
+model:
+    MLP:
+         # ==== make sure size is consistent with the one from dataloader ====
+        sequential_input_size: 408 
+        non_sequential_input_size: 2
+        # ===================================================================
+        
+        hidden_size: 320
+    LSTM:    
+        # ==== make sure size is consistent with the one from dataloader ====
+        sequential_input_size: 408 
+        non_sequential_input_size: 2
+        # ===================================================================
+        hidden_size: 320
+        layer_num: 4
+        bidirectional: True
+
+path:
+    features_dir: "data/features"
+    labels_dir: "data/labels"

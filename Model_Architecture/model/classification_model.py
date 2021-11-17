@@ -3,13 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class MLP(nn.Module):
-    def __init__(self, sequential_input_size, non_sequential_input_size, hidden_size):
+    def __init__(self, model_config):
         super(MLP, self).__init__()
         print("Using MLP")
-        self.input_size = sequential_input_size + non_sequential_input_size
-        self.Linear_1 = nn.Linear(self.input_size, hidden_size)
+        self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
+        self.Linear_1 = nn.Linear(self.input_size, model_config["hidden_size"])
         self.Relu = nn.ReLU()
-        self.Linear_2 = nn.Linear(hidden_size, 1)
+        self.Linear_2 = nn.Linear(model_config["hidden_size"], 1)
         self.Sigmoid = nn.Sigmoid()
 
         self.Loss_Function = nn.BCELoss()
@@ -28,22 +28,22 @@ class MLP(nn.Module):
         return batch_size, correct_count, loss
 
 class LSTM(nn.Module):
-    def __init__(self, sequential_input_size, non_sequential_input_size, hidden_size, num_layers, device, bidirectional=True):
+    def __init__(self, model_config, device):
         super().__init__()
         print("Using LSTM")
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+        self.hidden_size = model_config["hidden_size"]
+        self.num_layers = model_config["layer_num"]
         self.device = device
-        self.bidirectional = bidirectional
+        self.bidirectional = model_config["bidirectional"]
         self.LSTM = nn.ModuleList()
         
         for i in range(self.num_layers):
-            input_size = sequential_input_size if i == 0 else intermediate_hidden_size*(1+int(self.bidirectional))
-            intermediate_hidden_size = self.hidden_size//(2**i)
+            input_size = model_config["sequential_input_size"] if i == 0 else intermediate_hidden_size*(1+int(self.bidirectional))
+            intermediate_hidden_size = self.hidden_size
             self.LSTM.append(nn.LSTM(input_size=input_size, hidden_size=intermediate_hidden_size, batch_first=True, bidirectional=True))
 
         # input shape: (batch_size, seq, input_size)
-        self.Linear = nn.Linear(self.hidden_size//8*(1+int(self.bidirectional))+non_sequential_input_size, 1)
+        self.Linear = nn.Linear(self.hidden_size*(1+int(self.bidirectional))+model_config["non_sequential_input_size"], 1)
 
         self.Sigmoid = nn.Sigmoid()
         self.Loss_Function = nn.BCELoss()
@@ -52,8 +52,8 @@ class LSTM(nn.Module):
 
         for idx, layer in enumerate(self.LSTM):
             inputs = sequential_features if idx == 0 else hidden_states
-            h0 = torch.zeros(1+int(self.bidirectional), inputs.size(0), self.hidden_size//(2**idx), dtype=torch.double, device=self.device)
-            c0 = torch.zeros(1+int(self.bidirectional), inputs.size(0), self.hidden_size//(2**idx), dtype=torch.double, device=self.device)
+            h0 = torch.zeros(1+int(self.bidirectional), inputs.size(0), self.hidden_size, dtype=torch.double, device=self.device)
+            c0 = torch.zeros(1+int(self.bidirectional), inputs.size(0), self.hidden_size, dtype=torch.double, device=self.device)
             # in shape: (batch_size, seq_len, input_size)
             hidden_states, _ = layer(inputs, (h0, c0))
             # out shape: (batch_size, seq_length, hidden_size*bidirectional)

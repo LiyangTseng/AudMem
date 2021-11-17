@@ -3,4 +3,6 @@ model/__pycache__/
 utils/__pycache__/
 utils/opensmile
 utils/.ipynb_checkpoints
+utils/smile.log
 data/
+weights/
