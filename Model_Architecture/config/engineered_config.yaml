@@ -6,9 +6,9 @@ features:
     emotions: ["static_arousal", "static_valence"]
     
 experiment:
-    batch_size: 5
+    batch_size: 64
     epochs: 10
-    learning_rate: 0.01
+    learning_rate: 0.00075
 
 model:
     MLP:
@@ -19,6 +19,7 @@ model:
         
         hidden_size: 320
     LSTM:    
+        seq_len: 216
         # ==== make sure size is consistent with the one from dataloader ====
         sequential_input_size: 408 
         non_sequential_input_size: 2

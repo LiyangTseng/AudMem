@@ -1,14 +1,17 @@
 import os
 import numpy as np
+import librosa
+import soundfile as sf
 import torch
-from torch.nn.modules import loss
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import DataLoader
 import yaml
 import argparse
 from tqdm import tqdm
 from model.probing_model import Probing_Model
 from model.classification_model import LSTM
 from dataset import HandCraftedDataset, ReconstructionDataset
+
 
 def check_device():
     use_cuda = torch.cuda.is_available()
@@ -67,18 +70,19 @@ def train_valid_split(config, dataset):
     valid_sampler = SubsetRandomSampler(val_indices)
 
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
-                                            sampler=train_sampler)
+                                            sampler=train_sampler, num_workers=10)
     valid_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
-                                                sampler=valid_sampler)
+                                                sampler=valid_sampler, num_workers=10)
     return train_loader, valid_loader
 
 def train_reconstruction(args, config):
 
     device = check_device()
-    dataset = ReconstructionDataset(config)
+    train_dataset = ReconstructionDataset(config)
+    train_loader, valid_loader = train_valid_split(config=config, dataset=train_dataset)
+    
     model_config = config["model"]
-    model = Probing_Model(model_config=model_config).to(device).double()
-    train_loader, valid_loader = train_valid_split(config=config, dataset=dataset)
+    model = Probing_Model(model_config=model_config, mode="train").to(device).double()
     
     optimizer = torch.optim.Adam(model.parameters(), config["experiment"]["learning_rate"])
     
@@ -93,8 +97,9 @@ def train_reconstruction(args, config):
             hidden_states, melspectrogram = hidden_states.to(device), melspectrogram.to(device)
             
             optimizer.zero_grad()
-            loss = model(hidden_states, melspectrogram)
-
+            
+            _, loss = model(hidden_states, melspectrogram)
+            
             batch_train_loss.append(loss.cpu().detach().numpy())
             loss.backward() # compute gradient
             optimizer.step()
@@ -108,7 +113,7 @@ def train_reconstruction(args, config):
                 hidden_states, melspectrogram = data
                 hidden_states, melspectrogram = hidden_states.to(device), melspectrogram.to(device)
                 
-                loss = model(hidden_states, melspectrogram)
+                _, loss = model(hidden_states, melspectrogram)
                 
                 batch_valid_loss.append(loss.cpu().detach().numpy())
                 
@@ -125,10 +130,42 @@ def train_reconstruction(args, config):
     torch.save(model.state_dict(), model_weight_path)
     print("weights of model '{}' saved at {}".format(args.model, model_weight_path))
 
+def inference_reconstruction(args, config):
+    
+    device = check_device()
+    test_dataset = ReconstructionDataset(config, mode="test")
+    
+    # set size of one batch to entire sequence length
+    test_loader = DataLoader(dataset=test_dataset, batch_size=config["model"]["seq_len"], shuffle=False, num_workers=10)
 
-def convert_mel_to_audio():
-    ''' convert reconstructed mel-spectrogram to audio  '''
-    pass
+
+    model_config = config["model"]
+    model = Probing_Model(model_config=model_config, mode="test").to(device).double()
+    model_weight_dir = "weights/probing"
+    model_weight_path = os.path.join((model_weight_dir), args.model, "{}.pt".format(args.model))
+    model.load_state_dict(torch.load(model_weight_path))
+
+    reconstruct_audio_dir = "data/reconstructed_audios"
+    for idx, data in enumerate(tqdm(test_loader, desc="inference")):
+        hidden_states = data
+        hidden_states = hidden_states.to(device)
+        
+        predicted_mels = model(hidden_states)
+        predicted_mels = predicted_mels.cpu().detach().numpy().T
+        reconstructed_audio = librosa.feature.inverse.mel_to_audio(predicted_mels)
+
+
+        augment_type_idx = idx//(len(test_dataset.idx_to_filename)*test_dataset.hidden_layer_num)
+        audio_idx = (idx%((len(test_dataset.idx_to_filename)*test_dataset.hidden_layer_num)))//test_dataset.hidden_layer_num
+        layer_idx = idx%test_dataset.hidden_layer_num
+
+        
+        reconstruct_audio_subdir = os.path.join(reconstruct_audio_dir, test_dataset.augmented_type_list[augment_type_idx], test_dataset.idx_to_filename[audio_idx].replace(".wav", ""))
+        if not os.path.exists(reconstruct_audio_subdir):
+            os.makedirs(reconstruct_audio_subdir)
+        reconstruct_audio_path = os.path.join(reconstruct_audio_subdir, "{}.wav".format(layer_idx))
+        
+        sf.write(reconstruct_audio_path, reconstructed_audio, samplerate=22050)
 
 if __name__ == "__main__":
     
@@ -136,13 +173,18 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config", help="config file location", default="config/reconstruct_config.yaml")
     parser.add_argument("-g", "--hidden_states", help="get hidden states or not", default=False, type=bool)
     parser.add_argument("-t", "--train", help="train or not", default=True, type=bool)
+    parser.add_argument("-i", "--inference", help="test or not", default=True, type=bool)
     parser.add_argument("-m", "--model", help="highway", default="highway")
 
     args = parser.parse_args()
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+    print("config file loaded")
 
     if args.hidden_states:
         get_hidden_states(config)
     if args.train:
         train_reconstruction(args, config)
+    if args.inference:
+        inference_reconstruction(args, config)
+    

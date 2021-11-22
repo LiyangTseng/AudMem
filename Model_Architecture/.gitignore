@@ -6,3 +6,4 @@ utils/.ipynb_checkpoints
 utils/smile.log
 data/
 weights/
+tensorboard/

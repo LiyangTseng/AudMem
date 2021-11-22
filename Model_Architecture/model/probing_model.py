@@ -33,20 +33,36 @@ class Highway(nn.Module):
 
 class Probing_Model(nn.Module):
     """ use to reconstruct audio """
-    def __init__(self, model_config):
+    def __init__(self, model_config, mode="train"):
         super().__init__()
+        if mode in ["train", "test"]:
+            self.mode = mode
+        else:
+            raise Exception("Invalid model mode")
+
+        self.Batch_Norm = nn.BatchNorm1d(640)
         self.Highway_Network = Highway(size=model_config["input_size"], num_layers=model_config["layer_num"], f=torch.relu)
         self.Relu_1 = nn.ReLU()
         self.Linear = nn.Linear(model_config["input_size"], model_config["output_size"])
         self.Relu_2 = nn.ReLU()
         self.Loss_Function = nn.L1Loss()
 
-    def forward(self, features, labels):
-        out = self.Highway_Network(features)
-        out = self.Relu_1(out)
-        out = self.Linear(out)
-        out = self.Relu_2(out)
-
-        loss = self.Loss_Function(out, labels)
-        
-        return loss
+    # def forward(self, features, labels):
+    def forward(self, *args):
+        if self.mode == "train":
+            (features, labels) = args
+            features = self.Batch_Norm(features)
+            out = self.Highway_Network(features)
+            out = self.Relu_1(out)
+            out = self.Linear(out)
+            predictions = self.Relu_2(out)
+            loss = self.Loss_Function(predictions, labels)
+            return predictions, loss
+        else:
+            (features, ) = args
+            features = self.Batch_Norm(features)
+            out = self.Highway_Network(features)
+            out = self.Relu_1(out)
+            out = self.Linear(out)
+            predictions = self.Relu_2(out)
+            return predictions
