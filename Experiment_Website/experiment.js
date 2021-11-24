@@ -191,12 +191,13 @@ function calculateVigilancePerformance() {
       vigilance_performance.push(-1); // not count, ex already heard before
     }
   }
-  const counts = {};
+  const counts = {'0': 0, '1': 0, '-1': 0};
 
   for (const num of vigilance_performance) {
     counts[num] = counts[num] ? counts[num] + 1 : 1;
   }
-  vigilanceScore = (counts[1] == 0) ? 0 : counts[1]/(counts[0]+counts[1]);
+
+  vigilanceScore = counts[1]/(counts[0]+counts[1]);
   vigilanceDetail = vigilance_performance.join();
 }
 
@@ -353,9 +354,9 @@ function playpauseTrack() {
     loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
-    let hour = 1, min = 20, sec = 0;
-    let totalTimeSec = 75*60;
-    let timeLeftSec = 75*60;
+    let hour = 1, min = 40, sec = 0;
+    let totalTimeSec = 100*60;
+    let timeLeftSec = 100*60;
     
     timerStart = setInterval(function(){
       timeLeftSec --;
