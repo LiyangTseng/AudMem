@@ -3,84 +3,108 @@ warnings.filterwarnings("ignore")
 import os
 import yaml
 import argparse
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import time
+from tqdm import tqdm
 from dataset import HandCraftedDataset
-from model.engineered_model import MLP
+from model.classification_model import MLP, LSTM
 
 def train(args):
     
-    with open(args.config, 'r') as f:
-        hyper_parameters = yaml.load(f)
-    
-    train_engineered_set = HandCraftedDataset(features_dir=args.feature_dir, labels_dir=args.label_dir, mode="train")
-    valid_engineered_set = HandCraftedDataset(features_dir=args.feature_dir, labels_dir=args.label_dir, mode="valid")
-    test_engineered_set = HandCraftedDataset(features_dir=args.feature_dir, labels_dir=args.label_dir, mode="test")
-    
-    train_loader = DataLoader(dataset=train_engineered_set, batch_size=hyper_parameters["experiment"]["batch_size"], shuffle=True, num_workers=2)
-    valid_loader = DataLoader(dataset=valid_engineered_set, batch_size=hyper_parameters["experiment"]["batch_size"], shuffle=False, num_workers=2)
-
     use_cuda = torch.cuda.is_available()
-    # device = torch.device("cuda" if use_cuda else "cpu") 
-    device = "cpu"
+    device = torch.device("cuda" if use_cuda else "cpu") 
     print("Using device: ", device)
 
-    model = MLP().to(device).double()
-    optimizer = torch.optim.Adam(model.parameters(), hyper_parameters["experiment"]["learning_rate"])
-    loss_function = nn.BCELoss()
+    with open(args.config, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    
+    if args.model == "MLP":
+        train_engineered_set = HandCraftedDataset(config=config, pooling=True, mode="train")
+        valid_engineered_set = HandCraftedDataset(config=config, pooling=True, mode="valid")
+        test_engineered_set = HandCraftedDataset(config=config, pooling=True, mode="test")
+        
+        model_config = config["model"]["MLP"]
+        model = MLP(model_config=model_config).to(device).double()
+    
+    elif args.model == "LSTM":
+        train_engineered_set = HandCraftedDataset(config=config, pooling=False, mode="train")
+        valid_engineered_set = HandCraftedDataset(config=config, pooling=False, mode="valid")
+        test_engineered_set = HandCraftedDataset(config=config, pooling=False, mode="test")
+        
+        model_config = config["model"]["LSTM"]
+        model = LSTM(model_config=model_config, device=device).to(device).double()
 
+    exp_config = config["experiment"]
+    train_loader = DataLoader(dataset=train_engineered_set, batch_size=exp_config["batch_size"], shuffle=True, num_workers=15)
+    valid_loader = DataLoader(dataset=valid_engineered_set, batch_size=exp_config["batch_size"], shuffle=False, num_workers=15)
+    # tensorboard session
+    now_tuple = time.localtime(time.time())
+    date_info = '%02d-%02d-%02d_%02d:%02d'%(now_tuple[0]%100,now_tuple[1],now_tuple[2],now_tuple[3],now_tuple[4])
+    writer = SummaryWriter(log_dir=os.path.join("tensorboard", args.model, date_info))
 
-    training_loss = []
-    training_accuracy = []
-    validation_loss = []
-    validation_accuracy = []
+    optimizer = torch.optim.Adam(model.parameters(), exp_config["learning_rate"])
 
-    for epoch in range(hyper_parameters["experiment"]["epochs"]):
+    train_loss_list = []
+    valid_loss_list = []
+    for epoch in range(exp_config["epochs"]):
         # train
-        model.train() # activate train mode
-        for _, data in enumerate(train_loader):
-            features, labels = data
-            features, labels = features.to(device), labels.to(device)
-            optimizer.zero_grad() # clear previous gradient
-            outputs = model(features) # feed data into model
-            predictions = torch.max(outputs, 1)[1] # return the indices for the max through axis 1 
-            acc = (predictions == labels).sum() / features.shape[0]
-            loss = loss_function(outputs, labels.reshape(-1,1))
+        model.train()
+        batch_train_loss = [] # record the loss of every batch
+        
+        for data in tqdm(train_loader, desc="train"):
+            sequential_features, non_sequential_features, labels = data
+            sequential_features, non_sequential_features, labels = sequential_features.to(device), non_sequential_features.to(device), labels.to(device)
+ 
+            optimizer.zero_grad()           
+            loss = model(sequential_features, non_sequential_features, labels) 
+            
+            batch_train_loss.append(loss.cpu().detach().numpy())
             loss.backward() # compute gradient
             optimizer.step()
-            # training_accuracy.append(acc)
-            # training_loss.append(loss)
-
-        training_accuracy.append(acc)
-        training_loss.append(loss)
-        
+            
+        epoch_train_loss = np.mean(batch_train_loss)
+        train_loss_list.append(epoch_train_loss)    
+        writer.add_scalar("Loss/train", epoch_train_loss, epoch)
         # validation
         with torch.no_grad():
             model.eval()
-            for _, data in enumerate(valid_loader):
-                features, labels = data
-                features, labels = features.to(device), labels.to(device)
-                outputs = model(features) # feed data into model
-                predictions = torch.max(outputs, 1)[1] # return the indices for the max through axis 1 
-                acc = (predictions == labels).sum() / features.shape[0]
-                loss = loss_function(outputs, labels.reshape(-1,1))
-                # validation_accuracy.append(acc)
-                # validation_loss.append(loss)
+            data_num = 0
+            batch_valid_loss = [] # record the loss of every batch
+            correct_prediction = 0 # accumulate the total correct prediction in an epoch
+            for data in tqdm(valid_loader, desc="valid"):
+                sequential_features, non_sequential_features, labels = data
+                sequential_features, non_sequential_features, labels = sequential_features.to(device), non_sequential_features.to(device), labels.to(device)
+                loss = model(sequential_features, non_sequential_features, labels) 
+                batch_valid_loss.append(loss.cpu().detach().numpy())
                 
-                validation_accuracy.append(acc)
-                validation_loss.append(loss)
-        print('epoch: {:2},  training loss {:.2f}  training acc: {:.2f}  validation loss {:.2f}  validation acc: {:.2f}'.format(
-            epoch+1, training_loss[epoch], training_accuracy[epoch], validation_loss[epoch], validation_accuracy[epoch]))
+            epoch_valid_loss = np.mean(batch_valid_loss)
+            valid_loss_list.append(epoch_valid_loss)
+            writer.add_scalar("Loss/valid", epoch_valid_loss, epoch)
+
+        print('epoch: {:2},  training loss {:.3f}  validation loss {:.3f}\n'.format(
+                                    epoch+1, train_loss_list[epoch], valid_loss_list[epoch]))
+        
+        writer.flush()
+
+    model_weight_dir = "weights/classification"
+    model_weight_subdir = os.path.join((model_weight_dir), args.model)
+    if not os.path.exists(model_weight_subdir):
+        os.makedirs(model_weight_subdir)
+    model_weight_path = os.path.join(model_weight_subdir, "{}.pt".format(args.model))
+    torch.save(model.state_dict(), model_weight_path)
+    print("weights of model '{}' saved at {}".format(args.model, model_weight_path))
+
 
 
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("-p", "--preprocess", help="preprocessing or not", default=False, type=bool)
-    parser.add_argument("-c", "--config", help="config file location", default="config/engineered.yaml")
-    parser.add_argument("-f", "--feature_dir", help="directory of features", default="../Feature_Extraction/features")
-    parser.add_argument("-l", "--label_dir", help="directory of labels", default="../Feature_Extraction/labels")
+    parser.add_argument("-c", "--config", help="config file location", default="config/engineered_config.yaml")
+    parser.add_argument("-m", "--model", help="MLP, LSTM", default="LSTM")
 
     args = parser.parse_args()
     train(args)
