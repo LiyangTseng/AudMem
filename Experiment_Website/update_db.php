@@ -32,9 +32,11 @@
     if ($conn->query($sql) === TRUE) {
         echo "Record updated successfully in update_db.php";
     } else {
-        echo "Error updating record: " . $conn->error;
+        echo "Database Error";
+        exit;
+        // pass to js to redirect
     }
-        
+    
     $conn->close();
     
 ?>

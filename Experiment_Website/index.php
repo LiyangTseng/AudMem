@@ -1,6 +1,61 @@
+<?php
+
+if (isset($_GET['msg'])){ // when ?msg=error
+
+  $msg = $_GET['msg'];
+  ?>
+
+  <!--
+    display your error
+  -->
+
 <!DOCTYPE html>
 <html>
-    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <head>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+        <title> Error Page</title>
+    </head>
+
+    <!-- <h1><?php echo $msg; ?></h1> -->
+    <body>
+        <main>
+            <div class="main_block position-relative overflow-hidden p-3 p-md-5 text-center ">
+                <div class=" col-12 col-lg-8 p-lg-4 mx-auto my-3">
+                  <h1 class="title display-2 font-weight-normal">Error querying database !!<br> Please contact recruiter</h1>
+                </div>
+            </div>            
+        </main>
+        <footer id=scroll-target>
+            <div class="container">
+                <!--Grid row-->
+                <div class="row py-4">
+                  <!--Grid column-->
+                  <div class="col-md-12 text-center">
+                    <i class="material-icons" style="font-size:56px">email</i>
+
+                    <p style="font-size:36px">liyangtseng.ee06@nycu.edu.tw</p>
+                  </div>
+                  <!--Grid column-->
+                </div>
+                <!--Grid row-->
+              </div>
+        </footer>
+        
+    
+    </body>
+</html>
+
+
+<?php }else{ ?>
+
+<!--
+display home page
+-->
+<!DOCTYPE html>
+<html>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <head>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
@@ -56,3 +111,8 @@
     </body>
 </html>
 
+
+
+<?php }
+
+?>
