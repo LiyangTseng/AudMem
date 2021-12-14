@@ -410,7 +410,7 @@ function submitEmail() {
     console.log('log in as', email);
     submitModal.toggle();
     startTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
-    // createRowInDB();
+    createRowInDB();
     queryEmailInDB();
   } 
 }
