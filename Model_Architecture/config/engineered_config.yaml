@@ -1,24 +1,43 @@
 # non end-to-end configuration
 features:
     chords: ["chroma"]
-    rhythms: ["tempogram"]
+    # rhythms: ["tempogram"]
     timbre: ["mfcc"]
     emotions: ["static_arousal", "static_valence"]
     
 experiment:
     batch_size: 64
-    epochs: 10
-    learning_rate: 0.00075
+    epochs: 100
 
 model:
-    MLP:
+    Regression_MLP:
          # ==== make sure size is consistent with the one from dataloader ====
-        sequential_input_size: 408 
+        sequential_input_size: 24
         non_sequential_input_size: 2
         # ===================================================================
         
-        hidden_size: 320
-    LSTM:    
+        hidden_size: 100
+        learning_rate: 0.0001
+    Regression_LSTM:    
+        seq_len: 216
+        # ==== make sure size is consistent with the one from dataloader ====
+        sequential_input_size: 24
+        non_sequential_input_size: 2
+        # ===================================================================
+        hidden_size: 100
+        layer_num: 4
+        bidirectional: True
+        learning_rate: 0.00005
+    Ranking_MLP:
+         # ==== make sure size is consistent with the one from dataloader ====
+        # sequential_input_size: 408 
+        sequential_input_size: 24 
+        non_sequential_input_size: 2
+        # ===================================================================
+        
+        hidden_size: 50
+        learning_rate: 0.0001
+    Ranking_LSTM:
         seq_len: 216
         # ==== make sure size is consistent with the one from dataloader ====
         sequential_input_size: 408 
@@ -27,7 +46,8 @@ model:
         hidden_size: 320
         layer_num: 4
         bidirectional: True
-
+        # learning_rate: 0.00005
+        learning_rate: 0.0001
 path:
     features_dir: "data/features"
     labels_dir: "data/labels"

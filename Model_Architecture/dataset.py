@@ -4,22 +4,31 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from itertools import combinations
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (classification) '''
-    def __init__(self, config, pooling=False, mode="train"):
+    def __init__(self, config, pooling=False, mode="train", pairwise_ranking=False):
         super().__init__()
+        self.mode = mode
         self.features_dir = config["path"]["features_dir"]
         self.lables_dir = config["path"]["labels_dir"]
-        self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
+        
+        if self.mode == "train":
+            self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
+            # self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
+        else:
+            self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
         self.pooling = pooling
-        if mode == "train":
+        self.pairwise_ranking = pairwise_ranking
+
+        if self.mode == "train":
             self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[:200]
-        elif mode == "valid":
+        elif self.mode == "valid":
             self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[200:220]
-        elif mode == "test":
+        elif self.mode == "test":
             self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[220:]
-        elif mode == "all":
+        elif self.mode == "all":
             self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))            
         else:
             raise Exception ("Invalid dataset mode")
@@ -61,28 +70,49 @@ class HandCraftedDataset(Dataset):
                 self.sequential_features.append(torch.tensor(sequential_features))
                 self.non_sequential_features.append(torch.tensor(non_sequential_features_list))
                 self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx], dtype=torch.double))
+        
+        if self.pairwise_ranking:
+            indices = [i for i in range(len(self.labels))]
+            self.indices_combinations = list(combinations(indices, 2))
 
     def __len__(self):
-        return len(self.idx_to_filename)*len(self.augmented_type_list)       
+        if self.pairwise_ranking:
+            return len(self.indices_combinations)
+        else:
+            return len(self.idx_to_filename)*len(self.augmented_type_list)       
 
     def __getitem__(self, index):
-        return self.sequential_features[index], self.non_sequential_features[index], self.labels[index]
-        
+        if self.pairwise_ranking:
+            if self.mode != "test":
+                (index_1, index_2) = self.indices_combinations[index]
+                return self.sequential_features[index_1], self.non_sequential_features[index_1], self.labels[index_1], \
+                        self.sequential_features[index_2], self.non_sequential_features[index_2], self.labels[index_2]
+            else:
+                (index_1, index_2) = self.indices_combinations[index]
+                return self.sequential_features[index_1], self.non_sequential_features[index_1],  \
+                        self.sequential_features[index_2], self.non_sequential_features[index_2]
+        else:
+            if self.mode != "test":
+                return self.sequential_features[index], self.non_sequential_features[index], self.labels[index]
+            else:
+                return self.sequential_features[index], self.non_sequential_features[index]
+
 class EndToEndDataset(Dataset):
     ''' End-to-end audio features to predict memorability (classification) '''
     pass
 
 class ReconstructionDataset(Dataset):
     ''' LSTM　hidden states to reconstruct mel-spectrograms ref: https://arxiv.org/pdf/1911.01102.pdf '''
-    def __init__(self, config, mode="train"):
+    def __init__(self, config, downsampling_factor=1, mode="train"):
 
         super().__init__()
+        self.downsampling_factor = downsampling_factor
         self.hidden_states_dir = config["path"]["hidden_states_dir"]
         self.features_dir = config["path"]["features_dir"]
         self.hidden_layer_num = 4
         # self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1]
         self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1:]
-        self.sequence_length = 216
+        self.sequence_length = int(216/self.downsampling_factor)
 
         self.mode = mode
         if self.mode == "train":
@@ -103,6 +133,7 @@ class ReconstructionDataset(Dataset):
                     hidden_states_path = os.path.join(self.hidden_states_dir, augment_type,
                                     self.idx_to_filename[audio_idx].replace(".wav", ""), str(layer_idx)+".pt")
                     hidden_states = torch.load(hidden_states_path, map_location=torch.device('cpu'))
+                    hidden_states = hidden_states[::self.downsampling_factor]                
                     self.hidden_states.append(hidden_states)
                 
                 if self.mode == "train":
@@ -111,7 +142,8 @@ class ReconstructionDataset(Dataset):
                                             "melspectrogram_{}.npy".format(self.idx_to_filename[audio_idx].replace(".wav", "")))
 
                     melspectrogram = np.load(melspetrogram_path)
-                    self.melspectrograms.append(melspectrogram)
+                    # melspectrogram = melspectrogram[::self.downsampling_factor]
+                    self.melspectrograms.append(melspectrogram)       
 
     def __len__(self):
         return len(self.idx_to_filename)*len(self.augmented_type_list)*self.hidden_layer_num*self.sequence_length

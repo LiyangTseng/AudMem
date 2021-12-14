@@ -14,8 +14,10 @@ from sklearn.preprocessing import StandardScaler
     this file is the modified version of the one in Feature_Extraction/extract_features.py
 '''
 
-
-
+def normalize_features(np_array):
+    ''' normalize numpy array to [-1, 1] '''
+    # ref: https://stackoverflow.com/questions/1735025/how-to-normalize-a-numpy-array-to-within-a-certain-range 
+    return 2.*(np_array - np.min(np_array))/np.ptp(np_array)-1
 
 def extract_chord_features(audio_dir):
 
@@ -38,9 +40,11 @@ def extract_chord_features(audio_dir):
             y, sr = librosa.load(audio_path)
             if not os.path.exists(chroma_path):
                 chroma_cqt = librosa.feature.chroma_cens(y=y, sr=sr)
+                chroma_cqt = normalize_features(chroma_cqt)
                 np.save(chroma_path, chroma_cqt)
             if not os.path.exists(tonnetz_path):
                 tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
+                tonnetz = normalize_features(tonnetz)
                 np.save(tonnetz_path, tonnetz)
 
     print('chroma features of {} saved at {}'.format(audio_dir, chroma_dir))
@@ -64,6 +68,7 @@ def extract_rhythm_features(audio_dir):
         y, sr = librosa.load(audio_path)
         oenv = librosa.onset.onset_strength(y=y, sr=sr)
         tempogram = librosa.feature.tempogram(onset_envelope=oenv, sr=sr)
+        tempogram = normalize_features(tempogram)
         np.save(tempogram_path, tempogram)
 
     print('tempogram features of {} saved at {}'.format(audio_dir, tempogram_dir))
@@ -120,28 +125,36 @@ def extract_timbre_features(audio_dir):
             y, sr = librosa.load(audio_path)
             if not os.path.exists(mfcc_path):
                 mfcc = librosa.feature.chroma_cens(y=y, sr=sr)
+                mfcc = normalize_features(mfcc)
                 np.save(mfcc_path, mfcc)
             if not os.path.exists(mfcc_delta_path):
                 mfcc_delta = librosa.feature.delta(mfcc)
+                mfcc_delta = normalize_features(mfcc_delta)
                 np.save(mfcc_delta_path, mfcc_delta)
             if not os.path.exists(mfcc_delta2_path):
                 mfcc_delta2 = librosa.feature.delta(mfcc, order=2)
+                mfcc_delta2 = normalize_features(mfcc_delta2)
                 np.save(mfcc_delta2_path, mfcc_delta2)
             if not os.path.exists(spectral_centroid_path):
                 cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+                cent = normalize_features(cent)
                 np.save(spectral_centroid_path, cent)
             if not os.path.exists(spectral_bandwidth_path):
                 spec_bw = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+                spec_bw = normalize_features(spec_bw)
                 np.save(spectral_bandwidth_path, spec_bw)
             if not os.path.exists(spectral_contrast_path):
                 S = np.abs(librosa.stft(y))
                 contrast = librosa.feature.spectral_contrast(S=S, sr=sr)
+                contrast = normalize_features(contrast)
                 np.save(spectral_contrast_path, contrast)
             if not os.path.exists(spectral_flatness_path):
                 flatness = librosa.feature.spectral_flatness(y=y)
+                flatness = normalize_features(flatness)
                 np.save(spectral_flatness_path, flatness)
             if not os.path.exists(spectral_rolloff_path):       
                 rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+                rolloff = normalize_features(rolloff)
                 np.save(spectral_rolloff_path, rolloff)
             if not os.path.exists(melspectrogram_path):       
                 melspectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
@@ -270,7 +283,7 @@ if __name__ == '__main__':
         extract_chord_features(audio_sub_dir)
         extract_rhythm_features(audio_sub_dir)
         extract_timbre_features(audio_sub_dir)
-        extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
+        # extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
         
 
     
