@@ -50,6 +50,11 @@ var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
   return new bootstrap.Tooltip(tooltipTriggerEl)
 })
 
+$('label[for="toggle-hrd"]').hide();
+$('label[for="toggle-unhrd"]').hide();
+$('label[for="toggle-alhrd"]').hide();
+$('.skip_btn').hide();
+
 function generateToken(length) {
   var token           = '';
   var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -355,6 +360,7 @@ function playpauseTrack() {
     playTrack();
     playpause_btn.style.display = 'none';
     let hour = 1, min = 40, sec = 0;
+    // TODO: change total time after pilot study
     let totalTimeSec = 100*60;
     let timeLeftSec = 100*60;
     
@@ -371,7 +377,7 @@ function playpauseTrack() {
         clearInterval(timerStart);
         alert("Time's up! You failed to complete the experiment on time!");
         window.onbeforeunload = null;
-        window.location.href='index.html';
+        window.location.href='index.php';
       }
       
     }, 1000);
@@ -392,10 +398,9 @@ function progress(timeleft, timetotal, $element) {
   } else {
     alert("Time's up! You failed to complete the experiment on time!");
     window.onbeforeunload = null;
-    window.location.href='index.html';
+    window.location.href='index.php';
   }
 };
-
 
 function submitEmail() {
   // close modal if user filled necessary info
@@ -406,6 +411,7 @@ function submitEmail() {
     submitModal.toggle();
     startTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
     createRowInDB();
+    queryEmailInDB();
   } 
 }
 
@@ -418,9 +424,28 @@ function createRowInDB() {
   data = {"startTime": startTime, "email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr, "responsePositionStr": responsePositionStr, "experimentFinished": +experimentFinished};
   console.log(data);
   $.post('insert_row_to_db.php', data, function (response) {
+    if (response == "Database Error") {
+      window.onbeforeunload = null;
+      window.location.href='https://musicmem.mx500.com/index.php/?msg=error';
+    }
     console.log(response);
     console.log("create new user data for " + email + " in db !!");
   });
+}
+
+function queryEmailInDB() {
+  data = {"email": email};
+  console.log(data);
+
+  $.post('query_db.php', data, function (response) {
+    if (response == "Database Error") {
+      window.onbeforeunload = null;
+      window.location.href='https://musicmem.mx500.com/index.php/?msg=error';
+    }
+    
+    console.log(email + " does exists");
+  });
+  
 }
 
 function updateDB() {
@@ -436,6 +461,10 @@ function updateDB() {
 
   console.log(data);
   $.post('update_db.php', data, function (response) {
+    if (response == "Database Error") {
+      window.onbeforeunload = null;
+      window.location.href='https://musicmem.mx500.com/index.php/?msg=error';
+    }
     console.log(response);
     console.log("successfully updated user data to db !!");
   });
@@ -471,7 +500,3 @@ for (let i = 0; i < slotWithBreakOrder.length; i++) {
 slotWithBreakOrder[slotOrder.length/3*2-1] = -2; //first rest
 slotWithBreakOrder[slotOrder.length/3*2*2-1] = -2; //second rest
 
-$('label[for="toggle-hrd"]').hide();
-$('label[for="toggle-unhrd"]').hide();
-$('label[for="toggle-alhrd"]').hide();
-$('.skip_btn').hide();
