@@ -34,9 +34,10 @@ class Regression_MLP(nn.Module):
             # x = self.BatchNorm(x)
             x = self.Linear_2(x)
             predictions = self.Sigmoid(x)
-            loss = self.Loss_Function(predictions, labels.reshape(-1,1))
+            # loss = self.Loss_Function(predictions, labels.reshape(-1,1))
 
-            return predictions, loss
+            # return predictions, loss
+            return predictions, labels
         else:
             sequential_features, non_sequential_features = data
             sequential_features, non_sequential_features = sequential_features.to(self.device), non_sequential_features.to(self.device)
@@ -100,9 +101,10 @@ class Regression_LSTM(nn.Module):
             out = self.Linear(out)
 
             predictions = self.Sigmoid(out)            
-            loss = self.Loss_Function(predictions, labels.reshape(-1,1))
+            # loss = self.Loss_Function(predictions, labels.reshape(-1,1))
 
-            return predictions, loss
+            # return predictions, loss
+            return predictions, labels
         else:
             sequential_features, non_sequential_features = data
             sequential_features, non_sequential_features = sequential_features.to(self.device), non_sequential_features.to(self.device)
@@ -160,7 +162,7 @@ class RankNet(nn.Module):
             # true/false of prediction
             results = torch.logical_and( labels, (result_1>result_2).to(self.device))
             loss = self.Loss_Function(predictions, labels)
-            return predictions, results, loss
+            return results, loss
         else:
             sequential_features_1, non_sequential_features_1,\
                 sequential_features_2, non_sequential_features_2  = data

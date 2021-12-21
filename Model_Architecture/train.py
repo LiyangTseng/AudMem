@@ -4,6 +4,7 @@ import os
 import yaml
 import argparse
 import numpy as np
+import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -13,11 +14,15 @@ from dataset import HandCraftedDataset
 from model.memorability_model import Regression_MLP, Regression_LSTM, RankNet
 from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
 
-def train(args):
-    
+def check_device():
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu") 
-    print("Using device: ", device)
+    print("[INFO]", "Using device: ", device)
+    return device
+
+def train(args):
+    
+    device = check_device()
 
     with open(args.config, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -25,37 +30,23 @@ def train(args):
     features = []
     for feature_type in config["features"]:
         features.extend(config["features"][feature_type])
-    print("Using features: ", features)
+    print("[INFO]", "Using features: ", features)
     
     
     if args.model == "Regression_MLP":
         train_dataset = HandCraftedDataset(config=config, pooling=True, mode="train")
         valid_dataset = HandCraftedDataset(config=config, pooling=True, mode="valid")
         
-        model_config = config["model"]["Regression_MLP"]
-        model = Regression_MLP(model_config=model_config, device=device).to(device).double()
+        reg_model_config = config["model"]["Regression_MLP"]
+        regression_model = Regression_MLP(model_config=reg_model_config, device=device).to(device).double()
     
     elif args.model == "Regression_LSTM":
         train_dataset = HandCraftedDataset(config=config, pooling=False, mode="train")
         valid_dataset = HandCraftedDataset(config=config, pooling=False, mode="valid")
         
-        model_config = config["model"]["Regression_LSTM"]
-        model = Regression_LSTM(model_config=model_config, device=device).to(device).double()
-
-    elif args.model == "Ranking_MLP":
-        train_dataset = HandCraftedDataset(config=config, pooling=True, mode="train", pairwise_ranking=True)
-        valid_dataset = HandCraftedDataset(config=config, pooling=True, mode="valid", pairwise_ranking=True)
-
-        model_config = config["model"]["Ranking_MLP"]    
-        model = RankNet(model_config=model_config, device=device, backbone="MLP").to(device).double()
-    
-    elif args.model == "Ranking_LSTM":
-        train_dataset = HandCraftedDataset(config=config, pooling=False, mode="train", pairwise_ranking=True)
-        valid_dataset = HandCraftedDataset(config=config, pooling=False, mode="valid", pairwise_ranking=True)
-                
-        model_config = config["model"]["Ranking_LSTM"]
-        model = RankNet(model_config=model_config, device=device, backbone="LSTM").to(device).double()
-
+        reg_model_config = config["model"]["Regression_LSTM"]
+        regression_model = Regression_LSTM(model_config=reg_model_config, device=device).to(device).double()
+        
     else:
         raise Exception ("Invalid model")
 
@@ -64,10 +55,10 @@ def train(args):
     date_info = '%02d-%02d-%02d_%02d:%02d'%(now_tuple[0]%100,now_tuple[1],now_tuple[2],now_tuple[3],now_tuple[4])
     tensorboard_dir = os.path.join("tensorboard", "train_memorability", args.model, date_info)
     writer = SummaryWriter(log_dir=tensorboard_dir)
-    print("tensorboard dir located in {}".format(tensorboard_dir))
+    print("[INFO]", "tensorboard dir located at {}".format(tensorboard_dir))
 
-    writer.add_histogram("LabeledScore/train", train_dataset.filename_memorability_df["score"].values)
-    writer.add_histogram("LabeledScore/valid", valid_dataset.filename_memorability_df["score"].values)
+    writer.add_histogram("LabeledMemScore/train", train_dataset.filename_memorability_df["score"].values)
+    writer.add_histogram("LabeledMemScore/valid", valid_dataset.filename_memorability_df["score"].values)
 
     exp_config = config["experiment"]
     train_loader = DataLoader(dataset=train_dataset, batch_size=exp_config["batch_size"], shuffle=True, num_workers=15)
@@ -76,122 +67,104 @@ def train(args):
     dataiter = iter(train_loader)
     data = dataiter.next()
     # don't know why need to wrap data in another yet, but it works
-    writer.add_graph(model, [data])
+    writer.add_graph(regression_model, [data])
 
     if args.early_stopping:
         early_stopping = EarlyStopping(patience=10, verbose=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), model_config["learning_rate"])
+    reg_optimizer = torch.optim.Adam(regression_model.parameters(), reg_model_config["learning_rate"])
+    
 
-    if args.model not in ["Ranking_MLP", "Ranking_LSTM"]:
-        ''' not ranking model'''
+
+    if args.model in ["Regression_MLP", "Regression_LSTM"]:
+        
         smallest_valid_loss = 10000
         for epoch in range(exp_config["epochs"]):
             # train
-            model.train()
-            batch_train_loss = [] # record the loss of every batch
-            train_prediction_list, valid_prediction_list = [], []
+            print("\nepoch: {}/{}".format(epoch+1, exp_config["epochs"]))
+
+            regression_model.train()
+            train_reg_loss, train_rank_loss, train_total_loss = [], [], [] # record the loss of every batch
+            train_reg_prediction, train_rank_prediction = [], []
             for data in tqdm(train_loader, desc="train"):
                 
-                optimizer.zero_grad()           
-                # sequential_features, non_sequential_features, labels = data
-                # prediction, loss = model(sequential_features, non_sequential_features, labels) 
-                prediction, loss = model(data) 
-                train_prediction_list.append(prediction)
-                batch_train_loss.append(loss.cpu().detach().numpy())
-                loss.backward() # compute gradient
-                optimizer.step()
+                reg_optimizer.zero_grad()
 
+                predicted_mem_score, labeled_mem_score = regression_model(data) 
+                train_reg_prediction.append(predicted_mem_score)
+                reg_loss = nn.MSELoss()(predicted_mem_score, labeled_mem_score.reshape(-1,1))
+                train_reg_loss.append(reg_loss.cpu().detach().numpy())
+                
+                train_rank_prediction.append(predicted_mem_score[:data[0].size(0)//2] > predicted_mem_score[data[0].size(0)//2:])
+                predicted_binary_rank = nn.Sigmoid()(predicted_mem_score[:data[0].size(0)//2] - predicted_mem_score[data[0].size(0)//2:])
+                labeled_binary_rank = torch.unsqueeze((labeled_mem_score[:data[0].size(0)//2]>labeled_mem_score[data[0].size(0)//2:]).double(), 1).to(device)
+                rank_loss = nn.BCELoss()(predicted_binary_rank, labeled_binary_rank)
+                train_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-            writer.add_histogram("PredictedScore/train", torch.cat(train_prediction_list), epoch+1)    
-            epoch_train_loss = np.mean(batch_train_loss)
-            writer.add_scalar("Loss/train", epoch_train_loss, epoch)
+                loss = reg_loss + 0.2*rank_loss
+                train_total_loss.append(loss.cpu().detach().numpy())
+
+                loss.backward()
+                reg_optimizer.step()
+
+            epoch_train_total_loss = np.mean(train_total_loss)
+            epoch_train_reg_loss = np.mean(train_reg_loss)
+            epoch_train_rank_loss = np.mean(train_rank_loss)
+
+            writer.add_histogram("PredictedMemScore/train", torch.cat(train_reg_prediction), epoch+1)    
+            writer.add_scalar("RegLoss/train", epoch_train_reg_loss, epoch)
+            writer.add_scalar("RankLoss/train", epoch_train_rank_loss, epoch)
+            writer.add_scalar("TotalLoss/train", epoch_train_total_loss, epoch)
+            
+            print("train total loss {:.3f},  train reg loss {:.3f}, train rank loss {:.3f}".format(
+                                        epoch_train_total_loss, epoch_train_reg_loss, epoch_train_rank_loss))
+
             # validation
             with torch.no_grad():
-                model.eval()
-                batch_valid_loss = [] # record the loss of every batch
-                
+                regression_model.eval()
+                valid_reg_loss, valid_rank_loss, valid_total_loss = [], [], [] # record the loss of every batch
+                valid_reg_prediction, valid_rank_prediction = [], []
                 for data in tqdm(valid_loader, desc="valid"):
-                    prediction, loss = model(data)
-                    valid_prediction_list.append(prediction)
-                    batch_valid_loss.append(loss.cpu().detach().numpy())
+
+                    predicted_mem_score, labeled_mem_score = regression_model(data) 
+                    valid_reg_prediction.append(predicted_mem_score)
+                    reg_loss = nn.MSELoss()(predicted_mem_score, labeled_mem_score.reshape(-1,1))
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
                     
-                writer.add_histogram("PredictedScore/valid", torch.cat(valid_prediction_list), epoch+1)
-                epoch_valid_loss = np.mean(batch_valid_loss)
-                writer.add_scalar("Loss/valid", epoch_valid_loss, epoch)
-                if epoch_valid_loss < smallest_valid_loss:
-                    best_model = model
-            for name, param in model.named_parameters():
+                    valid_rank_prediction.append(predicted_mem_score[:data[0].size(0)//2] > predicted_mem_score[data[0].size(0)//2:])
+                    predicted_binary_rank = nn.Sigmoid()(predicted_mem_score[:data[0].size(0)//2] - predicted_mem_score[data[0].size(0)//2:])
+                    labeled_binary_rank = torch.unsqueeze((labeled_mem_score[:data[0].size(0)//2]>labeled_mem_score[data[0].size(0)//2:]).double(), 1).to(device)
+                    rank_loss = nn.BCELoss()(predicted_binary_rank, labeled_binary_rank)
+                    valid_rank_loss.append(rank_loss.cpu().detach().numpy())
+
+                    loss = reg_loss + 0.2*rank_loss
+                    valid_total_loss.append(loss.cpu().detach().numpy())
+                    
+                epoch_valid_total_loss = np.mean(valid_total_loss)
+                epoch_valid_reg_loss = np.mean(valid_reg_loss)
+                epoch_valid_rank_loss = np.mean(valid_rank_loss)
+                writer.add_histogram("PredictedMemScore/valid", torch.cat(valid_reg_prediction), epoch+1)    
+                writer.add_scalar("RegLoss/valid", epoch_valid_reg_loss, epoch)
+                writer.add_scalar("RankLoss/valid", epoch_valid_rank_loss, epoch)
+                writer.add_scalar("TotalLoss/valid", epoch_valid_total_loss, epoch)
+
+                if epoch_valid_total_loss < smallest_valid_loss:
+                    best_model = regression_model
+                    
+            for name, param in regression_model.named_parameters():
                 writer.add_histogram(name, param, epoch+1)
             
-            print('\nepoch: {:2}/{},  train loss {:.3f}  valid loss {:.3f}\n'.format(
-                                        epoch+1, exp_config["epochs"], epoch_train_loss, epoch_valid_loss))
+            print("valid total loss {:.3f},  valid reg loss {:.3f}, valid rank loss {:.3f}".format(
+                                        epoch_valid_total_loss, epoch_valid_reg_loss, epoch_valid_rank_loss))
             
             writer.flush()
-            early_stopping(epoch_valid_loss, model)
+            early_stopping(epoch_valid_total_loss, regression_model)
             if early_stopping.early_stop:
                 print("Early Stoppoing")
                 break
-
-
     else:
-        ''' ranking model'''
-        smallest_valid_loss = 10000
-        for epoch in range(exp_config["epochs"]):
-            # train
-            model.train()
-            batch_train_loss = [] # record the loss of every batch
-            batch_train_results = []
-            for data in tqdm(train_loader, desc="train"):
-    
-                optimizer.zero_grad()           
-                _, results, loss = model(data) 
-                
-                batch_train_loss.append(loss.cpu().detach().numpy())
-                batch_train_results.append(results.cpu().detach().numpy().squeeze(1))
-                loss.backward() # compute gradient
-                optimizer.step()
-                
-            epoch_train_loss = np.mean(batch_train_loss)
-            unique, counts = np.unique(np.concatenate(batch_train_results), return_counts=True)
-            occ_dict = dict(zip(unique, counts))
-            epoch_train_acc = occ_dict[True]/sum([a.shape[0] for a in batch_train_results])
-            
-            writer.add_scalar("Loss/train", epoch_train_loss, epoch)
-            writer.add_scalar("Accuracy/train", epoch_train_acc, epoch)
+        raise Exception ("Invalid model")
 
-            # validation
-            with torch.no_grad():
-                model.eval()
-                batch_valid_loss = [] # record the loss of every batch
-                batch_valid_results = []
-                
-                for data in tqdm(valid_loader, desc="valid"):
-                    _, results, loss = model(data) 
-                    batch_valid_loss.append(loss.cpu().detach().numpy())
-                    batch_valid_results.append(results.cpu().detach().numpy().squeeze(1))
-                    
-                epoch_valid_loss = np.mean(batch_valid_loss)
-
-                unique, counts = np.unique(np.concatenate(batch_valid_results), return_counts=True)
-                occ_dict = dict(zip(unique, counts))
-                epoch_valid_acc = occ_dict[True]/sum([a.shape[0] for a in batch_valid_results])
-
-                writer.add_scalar("Loss/valid", epoch_valid_loss, epoch)
-                writer.add_scalar("Accuracy/vakud", epoch_valid_acc, epoch)
-                if epoch_valid_loss < smallest_valid_loss:
-                    best_model = model
-
-            print('\nepoch: {:2}/{},  train loss {:.3f}  train acc {:.3f}  valid loss {:.3f} valid acc {:.3f}\n'.format(
-                epoch+1, exp_config["epochs"], epoch_train_loss, epoch_train_acc, epoch_valid_loss, epoch_valid_acc))
-            
-            writer.flush()
-            early_stopping(epoch_valid_loss, model)
-            if early_stopping.early_stop:
-                print("Early Stoppoing")
-                break
-
-    
 
     model_weight_dir = "weights/train_memorability"
     model_weight_subdir = os.path.join((model_weight_dir), args.model, date_info)
@@ -199,7 +172,7 @@ def train(args):
         os.makedirs(model_weight_subdir)
     model_weight_path = os.path.join(model_weight_subdir, "{}.pt".format(args.model))
     torch.save(best_model.state_dict(), model_weight_path)
-    print("weights of best model '{}' saved at {}".format(args.model, model_weight_path))
+    print("[INFO]", "weights of best model '{}' saved at {}".format(args.model, model_weight_path))
 
 
 
@@ -207,7 +180,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='train config')
     parser.add_argument("-c", "--config", help="config file location", default="config/engineered_config.yaml")
-    parser.add_argument("-m", "--model", help="Regression_MLP, Regression_LSTM, Ranking_LSTM, Ranking_MLP", default="Ranking_MLP")
+    parser.add_argument("-m", "--model", help="Regression_MLP, Regression_LSTM", default="Regression_MLP")
     parser.add_argument("-e", "--early_stopping", help="early stoppping or not", default=True, type=bool)
 
     args = parser.parse_args()

@@ -14,8 +14,8 @@ class HandCraftedDataset(Dataset):
         self.features_dir = config["path"]["features_dir"]
         self.lables_dir = config["path"]["labels_dir"]
         
-        if self.mode == "train":
-            self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
+        if self.mode != "test":
+            self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
             # self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
         else:
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
@@ -110,11 +110,15 @@ class ReconstructionDataset(Dataset):
         self.hidden_states_dir = config["path"]["hidden_states_dir"]
         self.features_dir = config["path"]["features_dir"]
         self.hidden_layer_num = 4
-        # self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1]
-        self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1:]
-        self.sequence_length = int(216/self.downsampling_factor)
-
         self.mode = mode
+        # self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1]
+        if self.mode == "test":
+            self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1:]
+        else:
+            self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[:]
+
+        self.sequence_length = config["model"]["seq_len"]//self.downsampling_factor
+
         if self.mode == "train":
             filename_memorability_df = pd.read_csv("data/labels/track_memorability_scores_beta.csv")[:200]
         elif self.mode == "test":
@@ -133,7 +137,7 @@ class ReconstructionDataset(Dataset):
                     hidden_states_path = os.path.join(self.hidden_states_dir, augment_type,
                                     self.idx_to_filename[audio_idx].replace(".wav", ""), str(layer_idx)+".pt")
                     hidden_states = torch.load(hidden_states_path, map_location=torch.device('cpu'))
-                    hidden_states = hidden_states[::self.downsampling_factor]                
+                    hidden_states = hidden_states[::self.downsampling_factor]               
                     self.hidden_states.append(hidden_states)
                 
                 if self.mode == "train":
@@ -154,7 +158,7 @@ class ReconstructionDataset(Dataset):
         features = self.hidden_states[index//self.sequence_length][sequence_idx,:]
         features = features.detach() # this line is necessary for num_workers > 1
         if self.mode == "train":
-            labels = torch.tensor(self.melspectrograms[index//(self.sequence_length*self.hidden_layer_num)][:, sequence_idx], dtype=torch.double)
+            labels = torch.tensor(self.melspectrograms[index//(self.sequence_length*self.hidden_layer_num)][:, sequence_idx*self.downsampling_factor:(sequence_idx+1)*self.downsampling_factor], dtype=torch.double)
             return features, labels
         else:
             return features

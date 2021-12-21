@@ -17,7 +17,7 @@ model:
         # ===================================================================
         
         hidden_size: 100
-        learning_rate: 0.0001
+        learning_rate: 0.0005
     Regression_LSTM:    
         seq_len: 216
         # ==== make sure size is consistent with the one from dataloader ====
@@ -28,26 +28,7 @@ model:
         layer_num: 4
         bidirectional: True
         learning_rate: 0.00005
-    Ranking_MLP:
-         # ==== make sure size is consistent with the one from dataloader ====
-        # sequential_input_size: 408 
-        sequential_input_size: 24 
-        non_sequential_input_size: 2
-        # ===================================================================
-        
-        hidden_size: 50
-        learning_rate: 0.0001
-    Ranking_LSTM:
-        seq_len: 216
-        # ==== make sure size is consistent with the one from dataloader ====
-        sequential_input_size: 408 
-        non_sequential_input_size: 2
-        # ===================================================================
-        hidden_size: 320
-        layer_num: 4
-        bidirectional: True
-        # learning_rate: 0.00005
-        learning_rate: 0.0001
+
 path:
     features_dir: "data/features"
     labels_dir: "data/labels"

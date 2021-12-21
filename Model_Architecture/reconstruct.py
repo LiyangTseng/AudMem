@@ -22,7 +22,7 @@ from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
 def check_device():
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu") 
-    print("Using device: ", device)
+    print("[INFO]", "using device: ", device)
     return device
 
 def get_hidden_states(args, recon_config):
@@ -30,7 +30,7 @@ def get_hidden_states(args, recon_config):
 
     device = check_device()
 
-    print("getting hidden states")
+    print("\n[INFO]", "getting hidden states\n")
 
     with open("config/engineered_config.yaml", 'r') as f:
         memo_config = yaml.load(f, Loader=yaml.FullLoader)
@@ -68,18 +68,17 @@ def get_hidden_states(args, recon_config):
                 hidden_states, _ = layer(inputs)
                 # save squeezed tensor (seq_len, feature_size) 
                 torch.save(torch.squeeze(hidden_states, 0), os.path.join(hidden_states_subdir, str(idx)+".pt"))
-        print("hidden states saved at {}".format(recon_config["path"]["hidden_states_dir"]))
+        print("[INFO]", "hidden states saved at {}".format(recon_config["path"]["hidden_states_dir"]))
 
     else:
         raise Exception("no implement error")
     # ========================== 
     
 
-def train_valid_split(config, dataset):
+def train_valid_split(config, dataset, batch_size):
 
     ''' ref: https://stackoverflow.com/a/50544887/4440387 '''
     
-    batch_size = config["experiment"]["batch_size"]
     validation_split = 0.2
     shuffle_dataset = True
     random_seed= 42
@@ -104,27 +103,28 @@ def train_valid_split(config, dataset):
 
 def train_reconstruction(args, config):
 
-    print("train audio reconstruction...\n")
+    print("\n[INFO]", "start training audio reconstruction\n")
     device = check_device()
-    train_dataset = ReconstructionDataset(config, downsampling_factor=4, mode="train")
-    
     model_config = config["model"]
-    model = Probing_Model(model_config=model_config, downsampling_factor=4, mode="train").to(device).double()
+
+    train_dataset = ReconstructionDataset(config, downsampling_factor=model_config["downsampling_factor"], mode="train")
+    
+    model = Probing_Model(model_config=model_config, mode="train").to(device).double()
     
     now_tuple = time.localtime(time.time())
     date_info = '%02d-%02d-%02d_%02d:%02d'%(now_tuple[0]%100,now_tuple[1],now_tuple[2],now_tuple[3],now_tuple[4])
     tensorboard_dir = os.path.join("tensorboard", "reconstruct_audios", args.probing_model, date_info)
     writer = SummaryWriter(log_dir=tensorboard_dir)
-    print("tensorboard dir located in {}".format(tensorboard_dir))
+    print("[INFO]", "tensorboard dir located at {}".format(tensorboard_dir))
 
-    train_loader, valid_loader = train_valid_split(config=config, dataset=train_dataset)
-
-    # dataiter = iter(train_loader)
-    # data = dataiter.next()
-    # data = [datum.to(device) for datum in data]
-    # # don't know why need to wrap data in another yet, but it works
-    # writer.add_graph(model, data)
-
+    train_loader, valid_loader = train_valid_split(config=config, dataset=train_dataset, batch_size=config["model"]["seq_len"]//config["model"]["downsampling_factor"])
+    
+    dataiter = iter(train_loader)
+    data = dataiter.next()
+    data = [datum.to(device) for datum in data]
+    # don't know why need to wrap data in another yet, but it works
+    writer.add_graph(model, data)
+    
 
     if args.early_stopping:
         early_stopping = EarlyStopping(patience=5, verbose=True)
@@ -133,6 +133,7 @@ def train_reconstruction(args, config):
     train_loss_list = []
     valid_loss_list = []
 
+    smallest_valid_loss = 10000
     for epoch in range(config["experiment"]["epochs"]):
         model.train()
         batch_train_loss = [] # record the loss of every batchd
@@ -163,18 +164,31 @@ def train_reconstruction(args, config):
                 predicted_mels, loss = model(hidden_states, melspectrogram)
                 batch_valid_loss.append(loss.cpu().detach().numpy())
                 
-            melspectrogram = melspectrogram.cpu().detach().numpy().T
-            fig = convert_mels_to_fig(melspectrogram)
-            writer.add_figure("Labe_Mels/valid", fig, epoch)
+                if idx%40 == 0:
+                    # (N, n_mels, downsmapling_factor) 
+                    melspectrogram = melspectrogram.permute(1,0,2)
+                    # (n_mels, N, downsmapling_factor) 
+                    melspectrogram = melspectrogram.reshape(-1, melspectrogram.size(1)*melspectrogram.size(2))
+                    # (n_mels, N*downsmapling_factor) 
+                    melspectrogram = melspectrogram.cpu().detach().numpy()
+                    fig = convert_mels_to_fig(melspectrogram)
+                    writer.add_figure("{}/valid_label".format(idx), fig, epoch)
 
-            predicted_mels = predicted_mels.cpu().detach().numpy().T
-            fig = convert_mels_to_fig(predicted_mels)
-            writer.add_figure("Pred_Mels/valid", fig, epoch)
-                
+                    # (N, n_mels, downsmapling_factor) 
+                    predicted_mels = predicted_mels.permute(1,0,2)
+                    # (n_mels, N, downsmapling_factor) 
+                    predicted_mels = predicted_mels.reshape(-1, predicted_mels.size(1)*predicted_mels.size(2))
+                    # (n_mels, N*downsmapling_factor) 
+                    predicted_mels = predicted_mels.cpu().detach().numpy()
+                    fig = convert_mels_to_fig(predicted_mels)
+                    writer.add_figure("{}/valid_pred".format(idx), fig, epoch)
+                    
                 
             epoch_valid_loss = np.mean(batch_valid_loss)
             valid_loss_list.append(epoch_valid_loss)
             writer.add_scalar("Loss/valid", epoch_valid_loss, epoch)
+            if epoch_valid_loss < smallest_valid_loss:
+                best_model = model
         
         print('epoch: {:2},  training loss {:.4f},  validation loss {:.4f}\n'.format(
             epoch+1, train_loss_list[epoch], valid_loss_list[epoch]))
@@ -191,8 +205,8 @@ def train_reconstruction(args, config):
     if not os.path.exists(model_weight_subdir):
         os.makedirs(model_weight_subdir)
     model_weight_path = os.path.join(model_weight_subdir, "{}.pt".format(args.probing_model))
-    torch.save(model.state_dict(), model_weight_path)
-    print("weights of model '{}' saved at {}".format(args.probing_model, model_weight_path))
+    torch.save(best_model.state_dict(), model_weight_path)
+    print("[INFO]", "weights of best model '{}' saved at {}".format(args.probing_model, model_weight_path))
 
 def convert_mels_to_fig(predicted_mels):
     ''' return figure (from matplotlib) of melspectrogram '''
@@ -208,11 +222,12 @@ def convert_mels_to_fig(predicted_mels):
 
 def inference_reconstruction(args, config):
     
+    print("\n[INFO]", "start testing audio reconstruction\n")
     device = check_device()
-    test_dataset = ReconstructionDataset(config, mode="test")
+    test_dataset = ReconstructionDataset(config, downsampling_factor=config["model"]["downsampling_factor"], mode="test")
     
     # set size of one batch to entire sequence length
-    test_loader = DataLoader(dataset=test_dataset, batch_size=config["model"]["seq_len"], shuffle=False, num_workers=15)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=config["model"]["seq_len"]//config["model"]["downsampling_factor"], shuffle=False, num_workers=15)
 
 
     model_config = config["model"]
@@ -228,7 +243,15 @@ def inference_reconstruction(args, config):
         hidden_states = hidden_states.to(device)
         
         predicted_mels = model(hidden_states)
-        predicted_mels = predicted_mels.cpu().detach().numpy().T
+        # (N, n_mels, downsmapling_factor) 
+
+        predicted_mels = predicted_mels.permute(1,0,2)
+        # (n_mels, N, downsmapling_factor) 
+
+        predicted_mels = predicted_mels.reshape(-1, predicted_mels.size(1)*predicted_mels.size(2))
+        # (n_mels, N*downsmapling_factor) 
+
+        predicted_mels = predicted_mels.cpu().detach().numpy()
 
         augment_type_idx = idx//(len(test_dataset.idx_to_filename)*test_dataset.hidden_layer_num)
         audio_idx = (idx%((len(test_dataset.idx_to_filename)*test_dataset.hidden_layer_num)))//test_dataset.hidden_layer_num
@@ -250,11 +273,14 @@ def inference_reconstruction(args, config):
         reconstructed_audio = librosa.feature.inverse.mel_to_audio(predicted_mels)
         sf.write(reconstructed_audio_path, reconstructed_audio, samplerate=22050)
 
+    print("[INFO]", "reconstructed audios saved at {}".format(reconstructed_audio_dir))
+    print("[INFO]", "reconstructed melspectrograms saved at {}".format(reconstructed_mels_dir))
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='reconstruct audio')
     parser.add_argument("-c", "--config", help="config file location", default="config/reconstruct_config.yaml")
-    parser.add_argument("-g", "--hidden_states", help="get hidden states or not", default=False, type=bool)
+    parser.add_argument("-g", "--hidden_states", help="get hidden states or not", default=True, type=bool)
     parser.add_argument("-t", "--train", help="train or not", default=True, type=bool)
     parser.add_argument("-i", "--inference", help="test or not", default=True, type=bool)
     parser.add_argument("-m", "--memorability_model", help="Regression_MLP, Regression_LSTM, Ranking_LSTM, Ranking_MLP", default="Regression_LSTM")
