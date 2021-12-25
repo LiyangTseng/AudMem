@@ -109,6 +109,20 @@ let slotOrder = [0, 1, 2, 3, 4, 0, 5, 6, 2, 7, 8, 9, 1, 10, 11, 12, 13, 4, 14, 1
   209, 217, 218, 216, 212, 190, 207, 219, 220, 221, 200, 204, 222, 223, 195, 221, 224, 225, 226, 227, 228, 
   229, 230, 214, 201, 215, 173, 211, 222, 171, 231, 224, 218, 232, 217, 174, 213, 223, 232, 219, 220, 233, 176, 225, 91, 226, 227, 234, 94];
 
+let vigilance_first_appearnce_idx = [];
+let vigilance_last_appearnce_idx = [];
+let vigilance_performance = [];
+let vigilance_progress_cnt = 0;
+let vigilance_progress_percent = 0;
+
+for (let index = 0; index < vigilance_idx_arr.length; index++) {
+  const vigilance_idx = vigilance_idx_arr[index];
+  
+  first_occ = slotOrder.indexOf(vigilance_idx);
+  last_occ = slotOrder.lastIndexOf(vigilance_idx);
+  vigilance_first_appearnce_idx.push(first_occ);
+  vigilance_last_appearnce_idx.push(last_occ);
+}
 
 let userResponses = [];
 let userResponsePositions = [];
@@ -180,22 +194,21 @@ function loadTrack(track_counter) {
   curr_track.addEventListener("ended", nextTrack);
 }
 
-function calculateVigilancePerformance() {
-  let vigilance_performance = [];
-  for (let index = 0; index < vigilance_idx_arr.length; index++) {
-    const vigilance_idx = vigilance_idx_arr[index];
-    first_occ = slotOrder.indexOf(vigilance_idx);
-    last_occ = slotOrder.lastIndexOf(vigilance_idx);
-    if (userResponses[first_occ] == 0 && userResponses[last_occ] == 1) {
-      vigilance_performance.push(1); // memorized
-    }
-    else if (userResponses[first_occ] == 0 && userResponses[last_occ] == 0) {
-      vigilance_performance.push(0); // not memorized
-    }
-    else {
-      vigilance_performance.push(-1); // not count, ex already heard before
-    }
+function calculateVigilancePerformance(vigilance_progress_cnt) {
+
+  // if a set of vigililance pair encountered
+  first_occ = vigilance_first_appearnce_idx[vigilance_progress_cnt];
+  last_occ = vigilance_last_appearnce_idx[vigilance_progress_cnt];
+  if (userResponses[first_occ] == 0 && userResponses[last_occ] == 1) {
+    vigilance_performance.push(1); // memorized
   }
+  else if (userResponses[first_occ] == 0 && userResponses[last_occ] == 0) {
+    vigilance_performance.push(0); // not memorized
+  }
+  else {
+    vigilance_performance.push(-1); // already heard before, not take into consideration
+  }
+  
   const counts = {'0': 0, '1': 0, '-1': 0};
 
   for (const num of vigilance_performance) {
@@ -250,10 +263,19 @@ function skip() {
     userResponsePositions.push(-1); // -1 indicate skipping in userResponsePositions
     userResponseInSec = 0;
     userResponses.push(-2); // -2 indicate skipping in userResponses
+
+    if (slot_cnt/2 == vigilance_last_appearnce_idx[vigilance_progress_cnt]) {
+      // encounter a set of vigilance
+      calculateVigilancePerformance(vigilance_progress_cnt);
+      vigilance_progress_cnt += 1;
+      vigilance_progress_percent = vigilance_progress_cnt/vigilance_last_appearnce_idx.length;
+    }
+
   }
   // check experiment over or not
   if (slot_cnt < slotWithBreakOrder.length-1) {
     // experiment not over
+    
     slot_cnt += 1;    
     loadTrack(slot_cnt);
     playTrack();  
@@ -261,7 +283,7 @@ function skip() {
     // experiment over
     experimentFinished = true;
     finished_token = generateToken(16);
-    calculateVigilancePerformance();
+    // calculateVigilancePerformance();
     if (vigilanceScore > vigilance_threshold) {
       $(".alert-success").show()
     }
@@ -299,10 +321,20 @@ async function nextTrack() {
       userResponses.push(1);
     }
 
+    if (slot_cnt/2 == vigilance_last_appearnce_idx[vigilance_progress_cnt]) {
+      // encounter a set of vigilance
+      calculateVigilancePerformance(vigilance_progress_cnt);
+      vigilance_progress_cnt += 1;
+      vigilance_progress_percent = vigilance_progress_cnt/vigilance_last_appearnce_idx.length;
+    }
+
+
   }
   // check experiment over or not
   if (slot_cnt < slotWithBreakOrder.length-1) {
     // experiment not over
+
+    
     slot_cnt += 1;    
     loadTrack(slot_cnt);
     playTrack();  
@@ -310,7 +342,7 @@ async function nextTrack() {
     // experiment over
     experimentFinished = true;
     finished_token = generateToken(16);
-    calculateVigilancePerformance();
+    // calculateVigilancePerformance();
     if (vigilanceScore > vigilance_threshold) {
       $(".alert-success").show()
     }
@@ -456,8 +488,8 @@ function updateDB() {
   let nowTime = new Date().toLocaleString('en-us', {timeZone: 'Asia/Taipei', hour12: false});
   // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
   data = {"startTime": startTime, "nowTime": nowTime, "email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr,
-   "responsePositionStr": responsePositionStr, "vigilanceDetail": vigilanceDetail, "vigilanceScore": vigilanceScore, "token": finished_token,
-    "experimentFinished": +experimentFinished};
+   "responsePositionStr": responsePositionStr, "vigilanceDetail": vigilanceDetail, "vigilanceProgress": vigilance_progress_percent, "vigilanceScore": vigilanceScore, 
+   "token": finished_token, "experimentFinished": +experimentFinished};
 
   console.log(data);
   $.post('update_db.php', data, function (response) {
