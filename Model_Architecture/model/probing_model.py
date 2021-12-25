@@ -1,35 +1,23 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
 class Highway(nn.Module):
-    ''' ref: https://github.com/kefirski/pytorch_Highway '''
-    def __init__(self, size, num_layers, f):
-
+    ''' ref: what does the network layer hear '''
+    def __init__(self, in_size, out_size):
         super(Highway, self).__init__()
-        self.num_layers = num_layers
-        self.nonlinear = nn.ModuleList([nn.Linear(size, size) for _ in range(num_layers)])
-        self.linear = nn.ModuleList([nn.Linear(size, size) for _ in range(num_layers)])
-        self.gate = nn.ModuleList([nn.Linear(size, size) for _ in range(num_layers)])
-        self.f = f
+        self.H = nn.Linear(in_size, out_size)
+        self.H.bias.data.zero_()
+        self.T = nn.Linear(in_size, out_size)
+        self.T.bias.data.fill_(-1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        """
-            :param x: tensor with shape of [batch_size, size]
-            :return: tensor with shape of [batch_size, size]
-            applies σ(x) ⨀ (f(G(x))) + (1 - σ(x)) ⨀ (Q(x)) transformation | G and Q is affine transformation,
-            f is non-linear transformation, σ(x) is affine transformation with sigmoid non-linearition
-            and ⨀ is element-wise multiplication
-        """
-
-        for layer in range(self.num_layers):
-            gate = torch.sigmoid(self.gate[layer](x))
-
-            nonlinear = self.f(self.nonlinear[layer](x))
-            linear = self.linear[layer](x)
-
-            x = gate * nonlinear + (1 - gate) * linear
-
-        return x
+        H = self.relu(self.H(x))
+        T = self.sigmoid(self.T(x))
+        y = H * T + x * (1.0 - T)
+        return y
 
 class Probing_Model(nn.Module):
     """ use to reconstruct audio """
@@ -39,30 +27,42 @@ class Probing_Model(nn.Module):
             self.mode = mode
         else:
             raise Exception("Invalid model mode")
+        self.downsampling_factor = model_config["downsampling_factor"]
+        self.output_size = model_config["output_size"]
 
-        self.Batch_Norm = nn.BatchNorm1d(640)
-        self.Highway_Network = Highway(size=model_config["input_size"], num_layers=model_config["layer_num"], f=torch.relu)
+        self.Batch_Norm = nn.BatchNorm1d(model_config["input_size"])
+        hidden_dim = model_config["output_size"]*self.downsampling_factor
+        self.Projection = nn.Linear(model_config["input_size"], hidden_dim)
+        # self.Highway_Network = Highway(size=model_config["output_size"]*self.downsampling_factor, num_layers=model_config["layer_num"])
+        self.Highway_Network = nn.Sequential(
+            *((model_config["layer_num"] - 1) * [Highway(hidden_dim, hidden_dim)]),   
+        )
         self.Relu_1 = nn.ReLU()
-        self.Linear = nn.Linear(model_config["input_size"], model_config["output_size"])
+        # self.Linear = nn.Linear(model_config["input_size"], model_config["output_size"]*self.downsampling_factor)
+        self.Linear = nn.Linear(hidden_dim, hidden_dim)
         self.Relu_2 = nn.ReLU()
         self.Loss_Function = nn.L1Loss()
 
-    # def forward(self, features, labels):
     def forward(self, *args):
         if self.mode == "train":
             (features, labels) = args
-            features = self.Batch_Norm(features)
-            out = self.Highway_Network(features)
-            out = self.Relu_1(out)
+            # features = self.Batch_Norm(features)
+            out = self.Projection(features)
+            out = self.Highway_Network(out)
+            # out = self.Relu_1(out)
             out = self.Linear(out)
-            predictions = self.Relu_2(out)
+            # reshape (upsampling)
+            predictions = out.reshape(-1, out.size(-1) // self.downsampling_factor, self.downsampling_factor)
+            # predictions = self.Relu_2(out)
             loss = self.Loss_Function(predictions, labels)
             return predictions, loss
         else:
             (features, ) = args
-            features = self.Batch_Norm(features)
-            out = self.Highway_Network(features)
-            out = self.Relu_1(out)
+            out = self.Projection(features)
+            out = self.Highway_Network(out)
+            # out = self.Relu_1(out)
             out = self.Linear(out)
-            predictions = self.Relu_2(out)
+            # reshape (upsampling)
+            predictions = out.reshape(-1, out.size(-1) // self.downsampling_factor, self.downsampling_factor)# reshape (upsampling)
             return predictions
+

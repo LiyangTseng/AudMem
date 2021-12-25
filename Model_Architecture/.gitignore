@@ -7,3 +7,4 @@ utils/smile.log
 data/
 weights/
 tensorboard/
+output/
