@@ -4,9 +4,10 @@ import sys
 import abc
 import math
 import yaml
+import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
-
+from src.option import default_hparas
 from src.util import human_format, Timer
 
 class BaseSolver():
@@ -21,49 +22,57 @@ class BaseSolver():
         self.config = config
         self.paras = paras
         self.mode = mode
+        for k,v in default_hparas.items():
+            setattr(self,k,v)
+
         self.device = torch.device('cuda') if self.paras.gpu and torch.cuda.is_available() else torch.device('cpu')
         
-        # Name experiment
+            
         self.exp_name = paras.name
-        if self.exp_name is None:
-            self.exp_name = paras.config.split('/')[-1].replace('.yaml','') # By default, exp is named after config file
-            if mode == 'train':
-                self.exp_name += '_sd{}'.format(paras.seed)
-
-        # Plugin list
-        self.emb_decoder = None
 
         if mode == 'train':
+
+            if self.exp_name is None:
+                now_tuple = time.localtime(time.time())
+                self.exp_name = '%02d-%02d-%02d_%02d:%02d'%(now_tuple[0]%100,now_tuple[1],now_tuple[2],now_tuple[3],now_tuple[4])
+            
             # Filepath setup
             os.makedirs(paras.ckpdir, exist_ok=True)
-            self.ckpdir = os.path.join(paras.ckpdir,self.exp_name)
+            self.ckpdir = os.path.join(paras.ckpdir, paras.model, self.exp_name)
             os.makedirs(self.ckpdir, exist_ok=True)
 
             # Logger settings
-            self.logdir = os.path.join(paras.logdir,self.exp_name)
-            self.log = SummaryWriter(self.logdir, flush_secs = self.TB_FLUSH_FREQ)
+            self.logdir = os.path.join(paras.logdir, paras.model, self.exp_name)
+            self.log = SummaryWriter(self.logdir)
             self.timer = Timer()
 
             # Hyperparameters
             self.step = 0
             self.valid_step = config['hparas']['valid_step']
             self.max_step = config['hparas']['max_step']
-            # if config['hparas'].get('grad_clip'):
-            #     self.GRAD_CLIP = float(config['hparas']['grad_clip'])
+            self.epoch = 1
+            self.max_epoch = config['hparas']['max_epoch']
+            if self.paras.patience > 0:
+                from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
+                self.early_stopping = EarlyStopping(patience=self.paras.patience, verbose=True)
+
             
             self.verbose('Exp. name : {}'.format(self.exp_name))
             self.verbose('Loading data... large corpus may took a while.')
             
         elif mode == 'test':
             # Output path
-            os.makedirs(paras.outdir, exist_ok=True)
-            self.ckpdir = os.path.join(paras.outdir,self.exp_name)
+            os.makedirs(self.paras.outdir, exist_ok=True)
+            assert self.exp_name is not None, "Please specify weights subdir"
+            self.ckpdir = os.path.join(paras.ckpdir, self.exp_name)
 
             # Load training config to get acoustic feat, text encoder and build model
-            self.src_config = yaml.load(open(config['src']['config'],'r'), Loader=yaml.FullLoader)
-            self.paras.load = config['src']['ckpt']
+            
+            # self.src_config = yaml.load(open(config['src']['config'],'r'), Loader=yaml.FullLoader)
+            # self.paras.load = config['src']['ckpt']
 
-            self.verbose('Evaluating result of tr. config @ {}'.format(config['src']['config'])) 
+            # self.verbose('Evaluating result of tr. config @ {}'.format(config['src']['config'])) 
+            self.verbose('Evaluating result of tr. config @ config/{}.yaml'.format(self.paras.model)) 
 
     def backward(self, loss):
         '''
@@ -87,11 +96,7 @@ class BaseSolver():
             # Load weights
             ckpt = torch.load(self.paras.load, map_location=self.device if self.mode=='train' else 'cpu')
             self.model.load_state_dict(ckpt['model'])
-            if self.emb_decoder is not None:
-                self.emb_decoder.load_state_dict(ckpt['emb_decoder'])
-            #if self.amp:
-            #    amp.load_state_dict(ckpt['amp'])
-            # Load task-dependent items
+
             if self.mode == 'train':
                 if cont:
                     self.step = ckpt['global_step']
@@ -102,8 +107,6 @@ class BaseSolver():
                     if type(v) is float:
                         metric, score = k,v
                 self.model.eval()
-                if self.emb_decoder is not None:
-                    self.emb_decoder.eval()
                 self.verbose('Evaluation target = {} (recorded {} = {:.2f} %)'.format(self.paras.load,metric,score))
 
     def verbose(self,msg):
@@ -133,18 +136,22 @@ class BaseSolver():
             pass
         elif len(log_value)>0:
             # ToDo : support all types of input
-            if 'align' in log_name or 'spec' in log_name or 'hist' in log_name:
+            if issubclass(type(log_name), torch.nn.Module):
+                self.log.add_graph(log_name, log_value)
+            elif 'distri' in log_name:
+                self.log.add_histogram(log_name, log_value, self.epoch)
+            elif 'align' in log_name or 'spec' in log_name or 'hist' in log_name:
                 img, form = log_value
-                self.log.add_image(log_name,img, global_step=self.step, dataformats=form)
+                self.log.add_image(log_name,img, global_step=self.epoch, dataformats=form)
             elif 'code' in log_name:
-                self.log.add_embedding(log_value[0], metadata=log_value[1], tag=log_name, global_step=self.step)
+                self.log.add_embedding(log_value[0], metadata=log_value[1], tag=log_name, global_step=self.epoch)
             elif 'wave' in log_name:
                 signal, sr = log_value
-                self.log.add_audio(log_name, torch.FloatTensor(signal).unsqueeze(0), self.step, sr)
+                self.log.add_audio(log_name, torch.FloatTensor(signal).unsqueeze(0), self.epoch, sr)
             elif 'text' in log_name or 'hyp' in log_name:
-                self.log.add_text(log_name, log_value, self.step)
+                self.log.add_text(log_name, log_value, self.epoch)
             else:
-                self.log.add_scalars(log_name,log_value,self.step)
+                self.log.add_scalars(log_name,log_value,self.epoch)
 
     def save_checkpoint(self, f_name, metric, score):
         '''' 
@@ -156,18 +163,14 @@ class BaseSolver():
         full_dict = {
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.get_opt_state_dict(),
-            "global_step": self.step,
+            # "global_step": self.step,
+            "global_epoch": self.epoch,
             metric: score
         }
-        # Additional modules to save
-        #if self.amp:
-        #    full_dict['amp'] = self.amp_lib.state_dict()
-        if self.emb_decoder is not None:
-            full_dict['emb_decoder'] = self.emb_decoder.state_dict()
 
         torch.save(full_dict, ckpt_path)
         self.verbose("Saved checkpoint (step = {}, {} = {:.2f}) and status @ {}".\
-                                       format(human_format(self.step),metric,score,ckpt_path))
+                                       format(human_format(self.epoch),metric,score,ckpt_path))
 
     def enable_apex(self):
         if self.amp:

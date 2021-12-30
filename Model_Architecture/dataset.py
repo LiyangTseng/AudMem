@@ -8,19 +8,18 @@ from itertools import combinations
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (classification) '''
-    def __init__(self, config, pooling=False, mode="train", pairwise_ranking=False):
+    def __init__(self, config, pooling=False, mode="train"):
         super().__init__()
         self.mode = mode
         self.features_dir = config["path"]["features_dir"]
         self.lables_dir = config["path"]["labels_dir"]
         
         if self.mode != "test":
-            self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
+            self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
             # self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
         else:
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
         self.pooling = pooling
-        self.pairwise_ranking = pairwise_ranking
 
         if self.mode == "train":
             self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[:200]
@@ -53,9 +52,10 @@ class HandCraftedDataset(Dataset):
                         feature_file_path = os.path.join(self.features_dir, augment_type, feature_type, subfeatures,
                              "{}_{}".format(subfeatures, self.idx_to_filename[audio_idx].replace("wav", "npy")))   
                         f = np.load(feature_file_path)
+                        f = np.float32(f)
                         if feature_type == "emotions":
                             # features not sequential
-                            non_sequential_features_list.append(float(f))
+                            non_sequential_features_list.append(f)
                         else:
                             # features are sequential 
                             if self.pooling:
@@ -67,35 +67,19 @@ class HandCraftedDataset(Dataset):
                                 sequential_features = np.concatenate(sequeutial_features_list, axis=0)
                                 sequential_features = np.transpose(sequential_features)   
                 # store features
-                self.sequential_features.append(torch.tensor(sequential_features))
-                self.non_sequential_features.append(torch.tensor(non_sequential_features_list))
-                self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx], dtype=torch.double))
+                self.sequential_features.append(torch.from_numpy(sequential_features))
+                self.non_sequential_features.append(torch.from_numpy(np.stack(non_sequential_features_list)))
+                self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx]))
         
-        if self.pairwise_ranking:
-            indices = [i for i in range(len(self.labels))]
-            self.indices_combinations = list(combinations(indices, 2))
 
     def __len__(self):
-        if self.pairwise_ranking:
-            return len(self.indices_combinations)
-        else:
-            return len(self.idx_to_filename)*len(self.augmented_type_list)       
+        return len(self.idx_to_filename)*len(self.augmented_type_list)       
 
     def __getitem__(self, index):
-        if self.pairwise_ranking:
-            if self.mode != "test":
-                (index_1, index_2) = self.indices_combinations[index]
-                return self.sequential_features[index_1], self.non_sequential_features[index_1], self.labels[index_1], \
-                        self.sequential_features[index_2], self.non_sequential_features[index_2], self.labels[index_2]
-            else:
-                (index_1, index_2) = self.indices_combinations[index]
-                return self.sequential_features[index_1], self.non_sequential_features[index_1],  \
-                        self.sequential_features[index_2], self.non_sequential_features[index_2]
+        if self.mode != "test":
+            return self.sequential_features[index], self.non_sequential_features[index], self.labels[index]
         else:
-            if self.mode != "test":
-                return self.sequential_features[index], self.non_sequential_features[index], self.labels[index]
-            else:
-                return self.sequential_features[index], self.non_sequential_features[index]
+            return self.sequential_features[index], self.non_sequential_features[index]
 
 class EndToEndDataset(Dataset):
     ''' End-to-end audio features to predict memorability (classification) '''
