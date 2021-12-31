@@ -27,11 +27,8 @@ class BaseSolver():
 
         self.device = torch.device('cuda') if self.paras.gpu and torch.cuda.is_available() else torch.device('cpu')
         
-            
-        self.exp_name = paras.name
-
         if mode == 'train':
-
+            self.exp_name = paras.name
             if self.exp_name is None:
                 now_tuple = time.localtime(time.time())
                 self.exp_name = '%02d-%02d-%02d_%02d:%02d'%(now_tuple[0]%100,now_tuple[1],now_tuple[2],now_tuple[3],now_tuple[4])
@@ -62,16 +59,8 @@ class BaseSolver():
             
         elif mode == 'test':
             # Output path
-            os.makedirs(self.paras.outdir, exist_ok=True)
-            assert self.exp_name is not None, "Please specify weights subdir"
-            self.ckpdir = os.path.join(paras.ckpdir, self.exp_name)
-
-            # Load training config to get acoustic feat, text encoder and build model
-            
-            # self.src_config = yaml.load(open(config['src']['config'],'r'), Loader=yaml.FullLoader)
-            # self.paras.load = config['src']['ckpt']
-
-            # self.verbose('Evaluating result of tr. config @ {}'.format(config['src']['config'])) 
+            self.outdir = self.paras.outdir
+            os.makedirs(self.outdir, exist_ok=True)
             self.verbose('Evaluating result of tr. config @ config/{}.yaml'.format(self.paras.model)) 
 
     def backward(self, loss):
@@ -95,7 +84,10 @@ class BaseSolver():
         if self.paras.load:
             # Load weights
             ckpt = torch.load(self.paras.load, map_location=self.device if self.mode=='train' else 'cpu')
-            self.model.load_state_dict(ckpt['model'])
+            if type(ckpt) == dict:
+                self.model.load_state_dict(ckpt['model'])
+            else:
+                self.model.load_state_dict(ckpt)
 
             if self.mode == 'train':
                 if cont:
@@ -103,11 +95,15 @@ class BaseSolver():
                     self.optimizer.load_opt_state_dict(ckpt['optimizer'])
                     self.verbose('Load ckpt from {}, restarting at step {}'.format(self.paras.load,self.step))
             else:
-                for k,v in ckpt.items():
-                    if type(v) is float:
-                        metric, score = k,v
-                self.model.eval()
-                self.verbose('Evaluation target = {} (recorded {} = {:.2f} %)'.format(self.paras.load,metric,score))
+                if type(ckpt) == dict:
+                    for k,v in ckpt.items():
+                        if type(v) is float:
+                            metric, score = k,v
+                    self.model.eval()
+                    self.verbose('Evaluation target = {} (recorded {} = {:.2f} %)'.format(self.paras.load,metric,score))
+                else:
+                    self.model.eval()
+
 
     def verbose(self,msg):
         ''' Verbose function for print information to stdout'''

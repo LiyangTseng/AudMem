@@ -1,19 +1,17 @@
 import yaml
 import argparse
-
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='test config')
-    
     parser.add_argument("--model", help="h_lstm, h_mlp", default="h_lstm")
-    parser.add_argument('--name', default="21-12-29_23:35", type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
     parser.add_argument('--no-msg', action='store_true', help='Hide all messages.')
     parser.add_argument('--outdir', default='result/', type=str,
                     help='Prediction output path.', required=False)
-    parser.add_argument('--load', default="weights/h_lstm/21-12-30_19:17/h_lstm_21.pth", type=str,
+    # parser.add_argument('--load', default="weights/train_memorability/Regression_LSTM/Regression_LSTM.pt", type=str,
+    parser.add_argument('--load', default="weights/h_lstm/21-12-31_00:13/h_lstm_25.pth", type=str,
                     help='ckpt path of pre-trained model', required=False)
 
 

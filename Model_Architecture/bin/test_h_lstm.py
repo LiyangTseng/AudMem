@@ -12,8 +12,8 @@ class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        self.memo_output_path = os.path.join(self.paras.outdir, "score", "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(self.paras.outdir, "score", "correlations.txt")
+        self.memo_output_path = os.path.join(self.outdir, "score", "predicted_memorability_scores.csv")
+        self.corr_output_path = os.path.join(self.outdir, "score", "correlations.txt")
         # self.ranking_weight = config["model"]["ranking_weight"]
         
     def fetch_data(self, data):
