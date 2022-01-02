@@ -13,6 +13,7 @@
     $responseStr = $_POST['responseStr'];
     $responsePositionStr = $_POST['responsePositionStr'];
     $vigilanceDetail = $_POST['vigilanceDetail'];
+    $vigilanceProgress = $_POST['vigilanceProgress'];
     $vigilanceScore = $_POST['vigilanceScore'];
     $token = $_POST['token'];
     $experimentFinished = $_POST['experimentFinished'];
@@ -27,7 +28,8 @@
 
     // TODO: update to experimentData after pilot study
     $sql = "UPDATE experimentData_beta SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', 
-    vigilanceDetail='$vigilanceDetail', vigilanceScore='$vigilanceScore', token='$token', experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
+            vigilanceDetail='$vigilanceDetail', vigilanceProgress='$vigilanceProgress', vigilanceScore='$vigilanceScore', token='$token', 
+            experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
     
     if ($conn->query($sql) === TRUE) {
         echo "Record updated successfully in update_db.php";
