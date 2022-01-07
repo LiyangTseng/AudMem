@@ -39,7 +39,7 @@ def extract_chord_features(audio_dir):
         else:
             y, sr = librosa.load(audio_path)
             if not os.path.exists(chroma_path):
-                chroma_cqt = librosa.feature.chroma_cens(y=y, sr=sr)
+                chroma_cqt = librosa.feature.chroma_cqt(y=y, sr=sr)
                 chroma_cqt = normalize_features(chroma_cqt)
                 np.save(chroma_path, chroma_cqt)
             if not os.path.exists(tonnetz_path):
@@ -124,7 +124,7 @@ def extract_timbre_features(audio_dir):
         else:
             y, sr = librosa.load(audio_path)
             if not os.path.exists(mfcc_path):
-                mfcc = librosa.feature.chroma_cens(y=y, sr=sr)
+                mfcc = librosa.feature.mfcc(y=y, sr=sr)
                 mfcc = normalize_features(mfcc)
                 np.save(mfcc_path, mfcc)
             if not os.path.exists(mfcc_delta_path):
