@@ -1,0 +1,75 @@
+# non end-to-end configuration
+features:
+    chords: ["chroma"]
+    rhythms: ["tempogram"]
+    timbre: ["mfcc"]
+    emotions: ["static_arousal", "static_valence"]
+    
+experiment:
+    batch_size: 16
+    num_workers: 15
+
+model:
+    image_size: 64
+    conv_kernel_size: 3
+    stride: 1
+    padding: 1
+
+    conv_1: 
+        in_channels: 1
+        out_channels: 64
+        pool_kernel: 2
+
+    conv_2: 
+        in_channels: 64
+        out_channels: 128
+        pool_kernel: 2
+
+    conv_3: 
+        in_channels: 128
+        out_channels: 256
+        pool_kernel: 2
+
+    gru: 
+        layer_num: 1
+        input_size: 2048 # conv_3[out_channel]*image_size//conv_1[pool_kernel]//conv_2[pool_kernel]/conv_3[pool_kernel]
+        hidden_size: 256
+        bidirectional: False
+
+    fc_1:
+        input_size: 2048
+        output_size: 512
+
+    fc_2:
+        input_size: 512
+        output_size: 256
+
+    output:
+        input_size: 256
+        output_size: 1
+
+
+
+    ranking_weight: 0.5
+
+hparas:                                   # Experiment hyper-parameters
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 100
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.000005
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+    freq_loss_type: 'l1'                         # 'l1'/'mse'
+    differential_loss: False
+    emphasize_linear_low: False
+
+path:
+    img_dir: "data/mels_img"
+    labels_dir: "data/labels"

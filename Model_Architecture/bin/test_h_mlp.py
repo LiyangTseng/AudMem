@@ -1,10 +1,11 @@
 import os
 import csv
+import torch
 import pandas as pd
 from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
-from model.memorability_model import H_LSTM
+from model.memorability_model import H_MLP
 from dataset import HandCraftedDataset
 from torch.utils.data import DataLoader
 
@@ -16,18 +17,19 @@ class Solver(BaseSolver):
         os.makedirs(output_dir, exist_ok=True)
         self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
         self.corr_output_path = os.path.join(output_dir, "correlations.txt")
-        
+
     def fetch_data(self, data):
         ''' Move data to device '''
         seq_feat, non_seq_feat = data
-        seq_feat, non_seq_feat = seq_feat.to(self.device), non_seq_feat.to(self.device)
+        feat = torch.cat((seq_feat, non_seq_feat), 1)
+        feat = feat.to(self.device)
 
-        return seq_feat, non_seq_feat
+        return feat
 
 
     def load_data(self):
         ''' Load data for testing '''
-        self.test_set = HandCraftedDataset(config=self.config, pooling=False, mode="test")
+        self.test_set = HandCraftedDataset(config=self.config, pooling=True, mode="test")
         
         self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
@@ -40,7 +42,7 @@ class Solver(BaseSolver):
     def set_model(self):
         ''' Setup ASR model '''
         # Model
-        self.model = H_LSTM(model_config=self.config["model"]).to(self.device)
+        self.model = H_MLP(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
 
         # Load target model in eval mode
@@ -54,9 +56,8 @@ class Solver(BaseSolver):
             writer = csv.writer(csvfile)
             writer.writerow(["track", "score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
-                seq_feat, non_seq_feat = self.fetch_data(data)
-                pred_scores = self.model(seq_feat, non_seq_feat)
-                # pred_scores = self.model(data)
+                feat = self.fetch_data(data)
+                pred_scores = self.model(feat)
                 writer.writerow([self.test_set.idx_to_filename[idx], pred_scores.cpu().detach().item()])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))

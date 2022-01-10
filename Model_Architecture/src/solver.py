@@ -104,7 +104,6 @@ class BaseSolver():
                 else:
                     self.model.eval()
 
-
     def verbose(self,msg):
         ''' Verbose function for print information to stdout'''
         if self.paras.verbose:

@@ -3,8 +3,10 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+import torchaudio
+from torchvision import transforms
 from tqdm import tqdm
-from itertools import combinations
+from PIL import Image
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (classification) '''
@@ -12,23 +14,23 @@ class HandCraftedDataset(Dataset):
         super().__init__()
         self.mode = mode
         self.features_dir = config["path"]["features_dir"]
-        self.lables_dir = config["path"]["labels_dir"]
+        self.labels_dir = config["path"]["labels_dir"]
         
         if self.mode != "test":
-            self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
-            # self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
+            # self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
+            self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
         else:
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
         self.pooling = pooling
 
         if self.mode == "train":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[:200]
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[:200]
         elif self.mode == "valid":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[200:220]
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[200:220]
         elif self.mode == "test":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))[220:]
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[220:]
         elif self.mode == "all":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.lables_dir, "track_memorability_scores_beta.csv"))            
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))            
         else:
             raise Exception ("Invalid dataset mode")
 
@@ -81,9 +83,92 @@ class HandCraftedDataset(Dataset):
         else:
             return self.sequential_features[index], self.non_sequential_features[index]
 
-class EndToEndDataset(Dataset):
+class EndToEndAudioDataset(Dataset):
     ''' End-to-end audio features to predict memorability (classification) '''
-    pass
+    def __init__(self, config, mode="train"):
+        super().__init__()
+        self.mode = mode
+        self.audio_dir = config["path"]["audio_dir"]
+        self.labels_dir = config["path"]["labels_dir"]
+        if self.mode != "test":
+            self.augmented_type_list = sorted(os.listdir(self.audio_dir))[-1:]
+            # self.augmented_type_list = sorted(os.listdir(self.audio_dir))[:]
+        else:
+            self.augmented_type_list = sorted(os.listdir(self.audio_dir))[-1:]
+
+        if self.mode == "train":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[:200]
+        elif self.mode == "valid":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[200:220]
+        elif self.mode == "test":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[220:]
+        elif self.mode == "all":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))            
+        else:
+            raise Exception ("Invalid dataset mode")
+
+        self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.filename_memorability_df["track"])}
+        self.idx_to_mem_score = {idx: score for idx, score in enumerate(self.filename_memorability_df["score"])}
+
+
+    def __len__(self):
+        return len(self.idx_to_filename)*len(self.augmented_type_list)       
+
+    def __getitem__(self, index):
+        audio_path = os.path.join(self.audio_dir, self.augmented_type_list[index//len(self.idx_to_mem_score)], self.idx_to_filename[index%len(self.idx_to_mem_score)])
+        wav, sr = torchaudio.load(audio_path)
+        label = self.idx_to_mem_score[index%len(self.idx_to_mem_score)]
+        
+        return  wav, sr, label
+
+class EndToEndImgDataset(Dataset):
+    ''' End-to-end audio features to predict memorability (classification) '''
+    def __init__(self, config, mode="train"):
+        super().__init__()
+        self.mode = mode
+        self.img_dir = config["path"]["img_dir"]
+        self.labels_dir = config["path"]["labels_dir"]
+        if self.mode != "test":
+            # self.augmented_type_list = sorted(os.listdir(self.img_dir))[-1:]
+            self.augmented_type_list = sorted(os.listdir(self.img_dir))[:]
+        else:
+            self.augmented_type_list = sorted(os.listdir(self.img_dir))[-1:]
+
+        if self.mode == "train":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[:200]
+        elif self.mode == "valid":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[200:220]
+        elif self.mode == "test":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[220:]
+        elif self.mode == "all":
+            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))            
+        else:
+            raise Exception ("Invalid dataset mode")
+
+        self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.filename_memorability_df["track"])}
+        self.idx_to_mem_score = {idx: score for idx, score in enumerate(self.filename_memorability_df["score"])}
+        
+        self.labels = []
+        self.mels_imgs = []
+        self.transforms = transforms.Compose([
+            transforms.Resize((config["model"]["image_size"], config["model"]["image_size"])),
+            transforms.ToTensor()
+        ])
+
+        for augment_type in tqdm(self.augmented_type_list):
+            for audio_idx in range(len(self.idx_to_filename)):         
+                img_path = os.path.join(self.img_dir, augment_type, "mels_"+self.idx_to_filename[audio_idx].replace(".wav", ".png"))        
+                image = Image.open(img_path).convert('L') # convert to grayscale
+                self.mels_imgs.append(self.transforms(image))
+
+                self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx]))
+
+
+    def __len__(self):
+        return len(self.idx_to_filename)*len(self.augmented_type_list)       
+
+    def __getitem__(self, index):
+        return self.mels_imgs[index], self.labels[index]
 
 class ReconstructionDataset(Dataset):
     ''' LSTM　hidden states to reconstruct mel-spectrograms ref: https://arxiv.org/pdf/1911.01102.pdf '''

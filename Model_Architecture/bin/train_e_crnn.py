@@ -6,10 +6,11 @@ import numpy as np
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from model.memorability_model import H_LSTM
-from dataset import HandCraftedDataset
+from model.memorability_model import E_CRNN
+from dataset import EndToEndImgDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader
+import shap
 
 CKPT_STEP = 10000
 
@@ -23,15 +24,15 @@ class Solver(BaseSolver):
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        seq_feat, non_seq_feat, labeled_scores = data
-        seq_feat, non_seq_feat, labeled_scores = seq_feat.to(self.device), non_seq_feat.to(self.device), labeled_scores.to(self.device)
+        mels_img, labeled_scores = data
+        mels_img, labeled_scores = mels_img.to(self.device), labeled_scores.to(self.device)
 
-        return seq_feat, non_seq_feat, labeled_scores
+        return mels_img, labeled_scores
 
     def load_data(self):
         ''' Load data for training/validation '''
-        self.train_set = HandCraftedDataset(config=self.config, pooling=False, mode="train")
-        self.valid_set = HandCraftedDataset(config=self.config, pooling=False, mode="valid")
+        self.train_set = EndToEndImgDataset(config=self.config, mode="train")
+        self.valid_set = EndToEndImgDataset(config=self.config, mode="valid")
         self.write_log('train_distri/lab', self.train_set.filename_memorability_df["score"].values)
         self.write_log('valid_distri/lab', self.valid_set.filename_memorability_df["score"].values)
 
@@ -40,23 +41,23 @@ class Solver(BaseSolver):
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
-        data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t'
-                .format(self.train_set.features_dict, self.train_set.sequential_features[0].shape, self.train_set.non_sequential_features[0].shape))
+        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
+                .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
 
         self.verbose(data_msg)
 
     def set_model(self):
-        ''' Setup h_lstm model and optimizer '''
+        ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = H_LSTM(model_config=self.config["model"]).to(self.device)
+        self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
 
         dataiter = iter(self.train_loader)
         data = dataiter.next()
-        seq_feat, non_seq_feat, _ = self.fetch_data(data)
+        mels_img, _ = self.fetch_data(data)
 
         # don't know why need to wrap data in another list yet, but it works
-        self.write_log(self.model, [seq_feat, non_seq_feat])
+        self.write_log(self.model, mels_img)
 
         # Losses
         self.reg_loss_func = nn.MSELoss() # regression loss
@@ -150,18 +151,18 @@ class Solver(BaseSolver):
                 total_loss = 0
 
                 # Fetch data
-                seq_feat, non_seq_feat, lab_scores = self.fetch_data(data)
+                mels_img, lab_scores = self.fetch_data(data)
                 self.timer.cnt('rd')
 
                 # Forward model
-                pred_scores = self.model(seq_feat, non_seq_feat)
+                pred_scores = self.model(mels_img)
                 reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
                 train_reg_prediction.append(pred_scores)
                 train_reg_loss.append(reg_loss.cpu().detach().numpy())
                 
-                train_rank_prediction.append(pred_scores[:seq_feat.size(0)//2] > pred_scores[seq_feat.size(0)//2:])
-                pred_binary_rank = nn.Sigmoid()(pred_scores[:seq_feat.size(0)//2] - pred_scores[seq_feat.size(0)//2:])
-                lab_binary_rank = (pred_scores[:seq_feat.size(0)//2]>pred_scores[seq_feat.size(0)//2:]).float().to(self.device)
+                train_rank_prediction.append(pred_scores[:lab_scores.size(0)//2] > pred_scores[lab_scores.size(0)//2:])
+                pred_binary_rank = nn.Sigmoid()(pred_scores[:lab_scores.size(0)//2] - pred_scores[lab_scores.size(0)//2:])
+                lab_binary_rank = (pred_scores[:lab_scores.size(0)//2]>pred_scores[lab_scores.size(0)//2:]).float().to(self.device)
                 rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
                 train_rank_loss.append(rank_loss.cpu().detach().numpy())
 
@@ -215,18 +216,18 @@ class Solver(BaseSolver):
         for i, data in enumerate(self.valid_loader):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
             # Fetch data
-            seq_feat, non_seq_feat, lab_scores = self.fetch_data(data)
+            mels_img, lab_scores = self.fetch_data(data)
 
             # Forward model
             with torch.no_grad():
-                pred_scores = self.model(seq_feat, non_seq_feat)
+                pred_scores = self.model(mels_img)
                 valid_reg_prediction.append(pred_scores)
                 reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
                 valid_reg_loss.append(reg_loss.cpu().detach().numpy())
 
-                valid_rank_prediction.append(pred_scores[:seq_feat.size(0)//2] > pred_scores[seq_feat.size(0)//2:])
-                pred_binary_rank = nn.Sigmoid()(pred_scores[:seq_feat.size(0)//2] - pred_scores[seq_feat.size(0)//2:])
-                lab_binary_rank = (pred_scores[:seq_feat.size(0)//2]>pred_scores[seq_feat.size(0)//2:]).float().to(self.device)
+                valid_rank_prediction.append(pred_scores[:lab_scores.size(0)//2] > pred_scores[lab_scores.size(0)//2:])
+                pred_binary_rank = nn.Sigmoid()(pred_scores[:lab_scores.size(0)//2] - pred_scores[lab_scores.size(0)//2:])
+                lab_binary_rank = (pred_scores[:lab_scores.size(0)//2]>pred_scores[lab_scores.size(0)//2:]).float().to(self.device)
                 rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
                 valid_rank_loss.append(rank_loss.cpu().detach().numpy())
 
@@ -251,7 +252,7 @@ class Solver(BaseSolver):
 
         # Regular ckpt
         self.save_checkpoint('epoch_{}.pth'.format(
-            self.epoch), 'h_lstm_loss', epoch_valid_total_loss)
+            self.epoch), '{}_loss'.format(self.paras.model), epoch_valid_total_loss)
 
 
         # Resume training

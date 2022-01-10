@@ -7,3 +7,5 @@ matplotlib
 tqdm
 sklearn
 librosa==0.8.1
+seaborn
+captum
