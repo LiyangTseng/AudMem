@@ -1,0 +1,55 @@
+# according to pase argparse
+experiment:
+    batch_size: 1
+    num_workers: 2
+    log_freq: 50
+    ckpt_continue: False
+    tensorboard: True
+    sup_exec: 
+    sup_freq: 1
+
+dataset: 
+    dataset_list: []
+    chunk_size: 16000
+    hop: 160
+    random_scale: False
+    trans_cache: 
+    preload_wav: False
+    do_eval: True
+    preload_wav: False
+
+hparas:    # Experiment hyper-parameters
+    fe_lr: 0.0005
+    min_lr: 0.0005
+    fe_opt: "Adam"
+    min_opt: "Adam"
+    lrdec_step: 30
+    lrdecay: 0.5
+    max_epoch: 1
+    lr_mode: "step"
+    max_ckpts: 5
+    backprop_mode: "base"
+    dropout_rate: 0.5
+
+    valid_step: 1000
+    curriculum: 0
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.0005
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+path:
+    data_root: ["data/audioset/wavs"]
+    data_cfg: ["data/audioset/audioset_data.cfg"]
+    stats: "data/audioset/audioset_stats.pkl"
+    net_cfg: "config/workers.cfg"
+    fe_cfg: "pase/cfg/frontend/PASE.cfg"
+    save_path: "tensorboard/pase"
+
+    features_dir: "data/features"
+    labels_dir: "data/labels"

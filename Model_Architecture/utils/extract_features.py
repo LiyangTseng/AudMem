@@ -12,7 +12,7 @@ import arff
 import pickle
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from PIL import Image
 
 '''
     this file is the modified version of the one in Feature_Extraction/extract_features.py
@@ -278,19 +278,36 @@ def extract_melspectrogram(mels_feat_dir, mels_img_dir, audio_dir):
         mels_feat_path = os.path.join(os.path.join(mels_feat_subdir, 'mels_' + audio_file.replace(".wav", ".npy")))
         mels_img_path = os.path.join(os.path.join(mels_img_subdir, 'mels_' + audio_file.replace(".wav", ".png")))
         if os.path.exists(mels_feat_path) and os.path.exists(mels_img_path):
-            continue
-        else:     
+        #     continue
+        # else:     
             y, sr = librosa.load(os.path.join(audio_dir, audio_file), sr=SAMPLING_RATE)
             mels = librosa.feature.melspectrogram(y=y, sr=sr)
             np.save(mels_feat_path, mels)
             # convert to log-melspectrogram for better visualization
             S_dB = librosa.power_to_db(mels, ref=np.max)
             # ref: https://stackoverflow.com/questions/63024701/obtaining-the-log-mel-spectrogram-in-python
+
+            '''
+            # remove extra space, ref: https://moonbooks.org/Articles/How-to-create-a-figure-with-no-axes-or-labels-using-matplotlib-/        
+            fig = plt.figure()
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
             # plt.imshow(S_dB, origin="lower", cmap=plt.get_cmap("magma"))
             plt.imshow(S_dB, origin="lower")
             plt.savefig(mels_img_path)
             plt.close() # save resoure and prevent slowing down
+            '''
 
+            def scale_minmax(X, min=0.0, max=1.0):
+                X_std = (X - X.min()) / (X.max() - X.min())
+                X_scaled = X_std * (max - min) + min
+                return X_scaled
+
+            image = Image.fromarray(scale_minmax(np.flip(S_dB, axis=0), 0, 255))
+            if image.mode == "F":
+                image = image.convert('RGB') 
+            image.save(mels_img_path)
 
 
 if __name__ == '__main__':
@@ -299,22 +316,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     audio_dir_root = "../data/raw_audios"
-    audio_sub_dir_list = ["-4_semitones", "-3_semitones", 
+    audio_sub_dir_list = ["original", "-5_semitones", "-4_semitones", "-3_semitones", 
                             "-2_semitones", "-1_semitones", "1_semitones", "2_semitones", "3_semitones", 
                             "4_semitones", "5_semitones"]
-    # audio_sub_dir_list = ["original", "-5_semitones", "-4_semitones", "-3_semitones", 
-    #                         "-2_semitones", "-1_semitones", "1_semitones", "2_semitones", "3_semitones", 
-    #                         "4_semitones", "5_semitones"]
     mels_feat_dir = "../data/mels_npy"
     mels_img_dir = "../data/mels_img"
     
     for sub_dir in audio_sub_dir_list:
         audio_sub_dir = os.path.join(audio_dir_root, sub_dir)
         print("==== Processing {} ====".format(audio_sub_dir))
-        extract_chord_features(audio_sub_dir)
-        extract_rhythm_features(audio_sub_dir)
-        extract_timbre_features(audio_sub_dir)
-        extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
+        # extract_chord_features(audio_sub_dir)
+        # extract_rhythm_features(audio_sub_dir)
+        # extract_timbre_features(audio_sub_dir)
+        # extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
         
         extract_melspectrogram(mels_feat_dir, mels_img_dir, audio_sub_dir)
 

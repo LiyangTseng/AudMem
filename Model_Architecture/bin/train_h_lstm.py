@@ -6,8 +6,8 @@ import numpy as np
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from model.memorability_model import H_LSTM
-from dataset import HandCraftedDataset
+from models.memorability_model import H_LSTM
+from src.dataset import HandCraftedDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader
 

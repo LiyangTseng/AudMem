@@ -5,18 +5,24 @@ import pandas as pd
 from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
-from model.memorability_model import H_MLP
-from dataset import HandCraftedDataset
+from models.memorability_model import H_MLP
+from src.dataset import HandCraftedDataset
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+import seaborn as sns
+from captum.attr import IntegratedGradients
+
 
 class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model, "score")
+        output_dir = os.path.join(self.outdir, paras.model)
         os.makedirs(output_dir, exist_ok=True)
         self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(output_dir, "correlations.txt")
+        self.corr_output_path = os.path.join(output_dir, "details.txt")
+        self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")
+        
 
     def fetch_data(self, data):
         ''' Move data to device '''
@@ -52,22 +58,49 @@ class Solver(BaseSolver):
     def exec(self):
         ''' Testing Memorabiliy Regression/Ranking System '''
 
+        self.pred_scores = []
+
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["track", "score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 feat = self.fetch_data(data)
-                pred_scores = self.model(feat)
-                writer.writerow([self.test_set.idx_to_filename[idx], pred_scores.cpu().detach().item()])
+                pred_score = self.model(feat).cpu().detach().item()
+                self.pred_scores.append(pred_score)
+                writer.writerow([self.test_set.idx_to_filename[idx], pred_score])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
         correlation = stats.spearmanr(prediction_df["score"].values, self.test_set.filename_memorability_df["score"].values)
-        
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df["score"].values).unsqueeze(0), torch.tensor(self.test_set.filename_memorability_df["score"].values).unsqueeze(0))
+
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation))
-        self.verbose("correlation result: {}, saved at {}".format(correlation, self.corr_output_path))
+            f.write("regression loss: {}".format(str(correlation)))
+
+        self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
+        
+        # TODO:
+        # self.interpret_model()
+
+    def interpret_model(self, N=5):
+        ''' Use Captum to interprete feature importance on top N memorability score '''
+        
+        # ref: https://github.com/pytorch/captum/issues/564
+        torch.backends.cudnn.enabled=False
+        ig = IntegratedGradients(self.model)
+
+        # ref: https://stackoverflow.com/questions/6618515/sorting-list-based-on-values-from-another-list
+        sorted_score_idx = [idx for score, idx in sorted(zip(self.pred_scores, [i for i in range(len(self.test_set))]), reverse=True)]
+        
+        for idx in sorted_score_idx[:N]:
+            data = (feat.unsqueeze(0) for feat in self.test_set[idx])
+            feat = self.fetch_data(data)
+            attributes = ig.attribute(feat, n_steps=2000)
+            sns.heatmap(attributes.squeeze(0).cpu().detach().numpy())
+            interp_path = os.path.join(self.interp_dir, "heatmap_"+self.test_set.idx_to_filename[220+idx].replace(".wav", ".png"))
+            plt.savefig(interp_path)
 
 
 

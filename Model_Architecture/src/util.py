@@ -8,14 +8,15 @@ import time
 import itertools
 from tqdm import tqdm
 import torch.multiprocessing as mp
-
+import json
 from numpy.lib.format import open_memmap
 import torch
 import numpy as np
 from numpy.linalg import norm
 from torch import nn
+import torch.nn.functional as F
 from torch._six import inf
-import editdistance as ed
+# import editdistance as ed
 from sklearn.metrics import roc_curve, auc, roc_auc_score, confusion_matrix
 
 import matplotlib
@@ -123,21 +124,21 @@ def human_format(num):
     return '{:3.1f}{}'.format(num, [' ', 'K', 'M', 'G', 'T', 'P'][magnitude])
 
 
-def cal_er(tokenizer, pred, truth, mode='wer', ctc=False):
-    # Calculate error rate of a batch
-    if pred is None:
-        return np.nan
-    elif len(pred.shape) >= 3:
-        pred = pred.argmax(dim=-1)
-    er = []
-    for p, t in zip(pred, truth):
-        p = tokenizer.decode(p.tolist(), ignore_repeat=ctc)
-        t = tokenizer.decode(t.tolist())
-        if mode == 'wer':
-            p = p.split(' ')
-            t = t.split(' ')
-        er.append(float(ed.eval(p, t))/len(t))
-    return sum(er)/len(er)
+# def cal_er(tokenizer, pred, truth, mode='wer', ctc=False):
+#     # Calculate error rate of a batch
+#     if pred is None:
+#         return np.nan
+#     elif len(pred.shape) >= 3:
+#         pred = pred.argmax(dim=-1)
+#     er = []
+#     for p, t in zip(pred, truth):
+#         p = tokenizer.decode(p.tolist(), ignore_repeat=ctc)
+#         t = tokenizer.decode(t.tolist())
+#         if mode == 'wer':
+#             p = p.split(' ')
+#             t = t.split(' ')
+#         er.append(float(ed.eval(p, t))/len(t))
+#     return sum(er)/len(er)
 
 
 def load_embedding(text_encoder, embedding_filepath):
@@ -369,3 +370,77 @@ def roc_score(spkr_emb, spkr_id):
     dcf2 = np.min(100*(0.01*(1-tpr)+0.99*fpr))
     dcf3 = np.min(1000*(0.001*(1-tpr)+0.999*fpr))
     return eer, dcf2, dcf3
+
+'=============================== from Pase ==============================='
+''' source: https://github.com/santi-pdp/pase '''
+
+class ContextualizedLoss(object):
+    """ With a possible composition of r
+        consecutive frames
+    """
+
+    def __init__(self, criterion, r=None):
+        self.criterion = criterion
+        self.r = r
+
+    def contextualize_r(self, tensor):
+        if self.r is None:
+            return tensor
+        assert isinstance(self.r, int), type(self.r)
+        # ensure it is a 3-D tensor
+        assert len(tensor.shape) == 3, tensor.shape
+        # pad tensor in the edges with zeros
+        pad_ = F.pad(tensor, (self.r // 2, self.r // 2))
+        pt = []
+        # Santi:
+        # TODO: improve this with some proper transposition and stuff
+        # rather than looping, at the expense of more memory I guess
+        for t in range(pad_.size(2) - (self.r - 1)):
+            chunk = pad_[:, :, t:t+self.r].contiguous().view(pad_.size(0),
+                                                             -1).unsqueeze(2)
+            pt.append(chunk)
+        pt = torch.cat(pt, dim=2)
+        return pt
+
+    def __call__(self, pred, gtruth):
+        gtruth_r = self.contextualize_r(gtruth)
+        loss = self.criterion(pred, gtruth_r)
+        return loss
+
+def worker_parser(cfg_fname, batch_acum=1, device='cpu', do_losses=True,
+                frontend=None):
+    with open(cfg_fname, 'r') as cfg_f:
+        cfg_list = json.load(cfg_f)
+        if do_losses:
+            # change loss section
+            for type, cfg_all in cfg_list.items():
+
+                for i, cfg in enumerate(cfg_all):
+                    loss_name = cfg_all[i]['loss']
+                    if hasattr(nn, loss_name):
+                        # retrieve potential r frames parameter
+                        r_frames = cfg_all[i].get('r', None)
+                        # loss in nn Modules
+                        cfg_all[i]['loss'] = ContextualizedLoss(getattr(nn, loss_name)(),
+                                                                r=r_frames)
+                    
+            cfg_list[type] = cfg_all
+        
+        return cfg_list
+
+def get_grad_norms(model, keys=[]):
+    grads = {}
+    for i, (k, param) in enumerate(dict(model.named_parameters()).items()):
+        accept = False
+        for key in keys:
+            # match substring in collection of model keys
+            if key in k:
+                accept = True
+                break
+        if not accept:
+            continue
+        if param.grad is None:
+            print('WARNING getting grads: {} param grad is None'.format(k))
+            continue
+        grads[k] = torch.norm(param.grad).cpu().item()
+    return grads

@@ -6,8 +6,8 @@ import numpy as np
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from model.memorability_model import E_CRNN
-from dataset import EndToEndImgDataset
+from models.memorability_model import E_CRNN
+from src.dataset import EndToEndImgDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader
 import shap

@@ -1,8 +1,8 @@
 # non end-to-end configuration
 features:
     chords: ["chroma"]
-    rhythms: ["tempogram"]
-    timbre: ["mfcc"]
+    # rhythms: ["tempogram"]
+    # timbre: ["mfcc"]
     emotions: ["static_arousal", "static_valence"]
     
 experiment:
@@ -12,8 +12,8 @@ experiment:
 model:
     seq_len: 157 # under 16kHz sampling rate
     # ==== make sure size is consistent with the one from dataloader ====
-    sequential_input_size: 416
-    # sequential_input_size: 32
+    # sequential_input_size: 416
+    sequential_input_size: 12
     non_sequential_input_size: 2
     # ===================================================================
     hidden_size: 100
@@ -32,7 +32,7 @@ hparas:                                   # Experiment hyper-parameters
     grad_clip: 'inf'
     optimizer:
         type: 'Adam'
-        lr: 0.001
+        lr: 0.00005
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
     freq_loss_type: 'l1'                         # 'l1'/'mse'
