@@ -5,7 +5,7 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn", default="h_lstm")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn", default="e_crnn")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
@@ -13,8 +13,13 @@ if __name__ == "__main__":
     parser.add_argument('--outdir', default='result/', type=str,
                     help='Prediction output path.', required=False)
     # parser.add_argument('--load', default="weights/train_memorability/Regression_LSTM/Regression_LSTM.pt", type=str,
-    parser.add_argument('--load', default="weights/h_lstm/22-01-10_20:58/h_lstm_6.pth", type=str,
+    # parser.add_argument('--load', default="weights/h_lstm/chords_0.00005/h_lstm_25.pth", type=str,
+    # parser.add_argument('--load', default="weights/h_mlp/all_0.0005/h_mlp_1.pth", type=str,
+    # parser.add_argument('--load', default="weights/e_crnn/0.0001/e_crnn_13.pth", type=str,
+    parser.add_argument('--load', default="weights/e_crnn/22-01-11_16:23/e_crnn_11.pth", type=str,
                     help='ckpt path of pre-trained model', required=False)
+    parser.add_argument('--features', default="all",
+                    help='all/chords/chords-timbre', required=False)
 
 
     paras = parser.parse_args()
@@ -23,6 +28,17 @@ if __name__ == "__main__":
 
     config = yaml.load(open("config/{}.yaml".format(paras.model), 'r'), Loader=yaml.FullLoader)
  
+    if paras.features == "all":
+        pass
+    elif paras.features == "chords-timbre":
+        config["features"] = {'chords': ['chroma'], 'timbre': ['mfcc'], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 32
+    elif paras.features == "chords":
+        config["features"] = {'chords': ['chroma'], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 12
+    else:
+        raise Exception("Not Implement Error")
+
     if paras.model == "h_lstm":
         from bin.test_h_lstm import Solver
     elif paras.model == "h_mlp":
