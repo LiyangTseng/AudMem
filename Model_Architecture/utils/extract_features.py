@@ -5,14 +5,20 @@ import argparse
 import numpy as np
 import pandas as pd
 import librosa
+import librosa.display
 from tqdm import tqdm
 from features import extract_all_wav_feature, extract_frame_feature, process_dynamic_feature
 import arff
 import pickle
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+from PIL import Image
+
 '''
     this file is the modified version of the one in Feature_Extraction/extract_features.py
 '''
+
+SAMPLING_RATE = 16000 # seems like most papers use sampling rate of 16kHz
 
 def normalize_features(np_array):
     ''' normalize numpy array to [-1, 1] '''
@@ -37,7 +43,7 @@ def extract_chord_features(audio_dir):
         if os.path.exists(chroma_path) and os.path.exists(tonnetz_path):
             continue
         else:
-            y, sr = librosa.load(audio_path)
+            y, sr = librosa.load(audio_path, sr=SAMPLING_RATE)
             if not os.path.exists(chroma_path):
                 chroma_cqt = librosa.feature.chroma_cqt(y=y, sr=sr)
                 chroma_cqt = normalize_features(chroma_cqt)
@@ -65,7 +71,7 @@ def extract_rhythm_features(audio_dir):
         if os.path.exists(tempogram_path):
             continue
 
-        y, sr = librosa.load(audio_path)
+        y, sr = librosa.load(audio_path, sr=SAMPLING_RATE)
         oenv = librosa.onset.onset_strength(y=y, sr=sr)
         tempogram = librosa.feature.tempogram(onset_envelope=oenv, sr=sr)
         tempogram = normalize_features(tempogram)
@@ -101,9 +107,6 @@ def extract_timbre_features(audio_dir):
     spectral_rolloff_dir = '{}/timbre/spectral_rolloff'.format(audio_dir.replace("raw_audios", "features"))
     if not os.path.exists(spectral_rolloff_dir):
         os.makedirs(spectral_rolloff_dir)
-    melspectrogram_dir = '{}/timbre/melspectrogram'.format(audio_dir.replace("raw_audios", "features"))
-    if not os.path.exists(melspectrogram_dir):
-        os.makedirs(melspectrogram_dir)
 
     for audio_file in tqdm(os.listdir(audio_dir), desc='Timbre Features', leave=True):
         audio_path = os.path.join(audio_dir, audio_file)
@@ -115,14 +118,13 @@ def extract_timbre_features(audio_dir):
         spectral_contrast_path = os.path.join(spectral_contrast_dir, 'spectral_contrast_' + audio_file.replace(".wav", ".npy"))
         spectral_flatness_path = os.path.join(spectral_flatness_dir, 'spectral_flatness_' + audio_file.replace(".wav", ".npy"))
         spectral_rolloff_path = os.path.join(spectral_rolloff_dir, 'spectral_rolloff_' + audio_file.replace(".wav", ".npy"))
-        melspectrogram_path = os.path.join(melspectrogram_dir, 'melspectrogram_' + audio_file.replace(".wav", ".npy"))
 
         if os.path.exists(mfcc_path) and os.path.exists(mfcc_delta_path) and os.path.exists(mfcc_delta2_path) and \
             os.path.exists(spectral_centroid_path) and os.path.exists(spectral_bandwidth_path) and os.path.exists(spectral_contrast_path) and \
-            os.path.exists(spectral_flatness_path) and os.path.exists(spectral_rolloff_path) and os.path.exists(melspectrogram_path):
+            os.path.exists(spectral_flatness_path) and os.path.exists(spectral_rolloff_path) :
             continue
         else:
-            y, sr = librosa.load(audio_path)
+            y, sr = librosa.load(audio_path, sr=SAMPLING_RATE)
             if not os.path.exists(mfcc_path):
                 mfcc = librosa.feature.mfcc(y=y, sr=sr)
                 mfcc = normalize_features(mfcc)
@@ -156,9 +158,6 @@ def extract_timbre_features(audio_dir):
                 rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
                 rolloff = normalize_features(rolloff)
                 np.save(spectral_rolloff_path, rolloff)
-            if not os.path.exists(melspectrogram_path):       
-                melspectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
-                np.save(melspectrogram_path, melspectrogram)
 
 
 
@@ -170,7 +169,7 @@ def extract_timbre_features(audio_dir):
     print('spectral_contrast features of {} saved at {}'.format(audio_dir, spectral_contrast_dir))
     print('spectral_flatness features of {} saved at {}'.format(audio_dir, spectral_flatness_dir))
     print('spectral_rolloff features of {} saved at {}'.format(audio_dir, spectral_rolloff_dir))
-    print('melspectrogram features of {} saved at {}'.format(audio_dir, melspectrogram_dir))
+    
 
 def extract_emotion_features(audio_dir, open_opensmile = False):
 
@@ -267,23 +266,70 @@ def extract_emotion_features(audio_dir, open_opensmile = False):
     print('dynamic arousal of {} saved at {}'.format(audio_dir, dynamic_arousal_dir))
     print('dynamic valence of {} saved at {}'.format(audio_dir, dynamic_valence_dir))
 
+def extract_melspectrogram(mels_feat_dir, mels_img_dir, audio_dir):
+    
+    ''' extract .npy version of melspectrogram and image version of melspectrogram '''
+    mels_feat_subdir = os.path.join(mels_feat_dir, audio_dir.split('/')[-1])
+    mels_img_subdir = os.path.join(mels_img_dir, audio_dir.split('/')[-1])
+    os.makedirs(mels_feat_subdir, exist_ok=True)
+    os.makedirs(mels_img_subdir, exist_ok=True)
+
+    for audio_file in tqdm(os.listdir(audio_dir), desc='melspectrogram', leave=True):
+        mels_feat_path = os.path.join(os.path.join(mels_feat_subdir, 'mels_' + audio_file.replace(".wav", ".npy")))
+        mels_img_path = os.path.join(os.path.join(mels_img_subdir, 'mels_' + audio_file.replace(".wav", ".png")))
+        if os.path.exists(mels_feat_path) and os.path.exists(mels_img_path):
+        #     continue
+        # else:     
+            y, sr = librosa.load(os.path.join(audio_dir, audio_file), sr=SAMPLING_RATE)
+            mels = librosa.feature.melspectrogram(y=y, sr=sr)
+            np.save(mels_feat_path, mels)
+            # convert to log-melspectrogram for better visualization
+            S_dB = librosa.power_to_db(mels, ref=np.max)
+            # ref: https://stackoverflow.com/questions/63024701/obtaining-the-log-mel-spectrogram-in-python
+
+            '''
+            # remove extra space, ref: https://moonbooks.org/Articles/How-to-create-a-figure-with-no-axes-or-labels-using-matplotlib-/        
+            fig = plt.figure()
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
+            # plt.imshow(S_dB, origin="lower", cmap=plt.get_cmap("magma"))
+            plt.imshow(S_dB, origin="lower")
+            plt.savefig(mels_img_path)
+            plt.close() # save resoure and prevent slowing down
+            '''
+
+            def scale_minmax(X, min=0.0, max=1.0):
+                X_std = (X - X.min()) / (X.max() - X.min())
+                X_scaled = X_std * (max - min) + min
+                return X_scaled
+
+            image = Image.fromarray(scale_minmax(np.flip(S_dB, axis=0), 0, 255))
+            if image.mode == "F":
+                image = image.convert('RGB') 
+            image.save(mels_img_path)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--extract_opensmile_features', help='use opensmile to extract features or not', type=bool, default=False)
     args = parser.parse_args()
 
-    audio_dir_root = '../data/raw_audios'
+    audio_dir_root = "../data/raw_audios"
     audio_sub_dir_list = ["original", "-5_semitones", "-4_semitones", "-3_semitones", 
                             "-2_semitones", "-1_semitones", "1_semitones", "2_semitones", "3_semitones", 
                             "4_semitones", "5_semitones"]
+    mels_feat_dir = "../data/mels_npy"
+    mels_img_dir = "../data/mels_img"
+    
     for sub_dir in audio_sub_dir_list:
         audio_sub_dir = os.path.join(audio_dir_root, sub_dir)
         print("==== Processing {} ====".format(audio_sub_dir))
-        extract_chord_features(audio_sub_dir)
-        extract_rhythm_features(audio_sub_dir)
-        extract_timbre_features(audio_sub_dir)
+        # extract_chord_features(audio_sub_dir)
+        # extract_rhythm_features(audio_sub_dir)
+        # extract_timbre_features(audio_sub_dir)
         # extract_emotion_features(audio_sub_dir, args.extract_opensmile_features)
         
+        extract_melspectrogram(mels_feat_dir, mels_img_dir, audio_sub_dir)
 
     

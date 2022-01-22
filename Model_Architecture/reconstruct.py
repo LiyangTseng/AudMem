@@ -13,9 +13,9 @@ from tqdm import tqdm
 import time
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.pyplot as plt
-from model.probing_model import Probing_Model
-from model.memorability_model import Regression_MLP, Regression_LSTM
-from dataset import HandCraftedDataset, ReconstructionDataset
+from models.probing_model import Probing_Model
+from models.memorability_model import Regression_MLP, Regression_LSTM
+from src.dataset  import HandCraftedDataset, ReconstructionDataset
 # https://github.com/Bjarten/early-stopping-pytorch
 from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
 
@@ -298,4 +298,4 @@ if __name__ == "__main__":
         train_reconstruction(args, config)
     if args.inference:
         inference_reconstruction(args, config)
-    
+        
