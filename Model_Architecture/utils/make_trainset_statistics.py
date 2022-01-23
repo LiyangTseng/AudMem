@@ -97,7 +97,8 @@ def extract_stats(opts):
     data = dict((k, torch.cat(v)) for k, v in data.items())
     for k, v in data.items():
         stats[k] = {'mean':torch.mean(torch.mean(v, dim=2), dim=0),
-                    'std':torch.std(torch.std(v, dim=2), dim=0)}
+                    # 'std':torch.std(torch.std(v, dim=2), dim=0)}
+                    'std':torch.std(torch.std(v, dim=2), dim=0)+1e-9} # to prevent 0 std => inf norm
     with open(opts.out_file, 'wb') as stats_f:
         pickle.dump(stats, stats_f)
 

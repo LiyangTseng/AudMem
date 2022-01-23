@@ -10,7 +10,6 @@ from models.memorability_model import E_CRNN
 from src.dataset import EndToEndImgDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader
-import shap
 
 CKPT_STEP = 10000
 
@@ -137,8 +136,8 @@ class Solver(BaseSolver):
             human_format(self.max_step)))
         self.timer.set()
 
-        for epoch in range(self.max_epoch):
-            print("\nepoch: {}/{}".format(epoch+1, self.max_epoch))
+        for self.epoch in range(self.max_epoch):
+            print("\nepoch: {}/{}".format(self.epoch+1, self.max_epoch))
             
             self.model.train()
             train_reg_loss, train_rank_loss, train_total_loss = [], [], [] # record the loss of every batch
@@ -202,7 +201,6 @@ class Solver(BaseSolver):
             # https://github.com/pytorch/pytorch/issues/13246#issuecomment-529185354
             torch.cuda.empty_cache()
             self.timer.set()
-            self.epoch += 1
             # if self.step > self.max_step:
             #     break
         self.log.close()
@@ -247,8 +245,8 @@ class Solver(BaseSolver):
         
         if epoch_valid_total_loss < self.best_valid_loss:
             self.best_valid_loss = epoch_valid_total_loss
-            self.save_checkpoint('{}_{}.pth'.format(
-                self.paras.model, self.epoch), '{}_loss'.format(self.paras.model), epoch_valid_total_loss)
+            self.save_checkpoint('{}_best.pth'.format(
+                self.paras.model), '{}_loss'.format(self.paras.model), epoch_valid_total_loss)
 
         # Regular ckpt
         self.save_checkpoint('epoch_{}.pth'.format(

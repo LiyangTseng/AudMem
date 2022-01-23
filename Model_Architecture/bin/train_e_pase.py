@@ -98,11 +98,12 @@ class Solver(BaseSolver):
                             minions_cfg=self.minions_cfg,
                             cls_lst=[], regr_lst=regr_lst,
                             pretrained_ckpt=None,
-                            name='Pase_base').to(self.device)
+                            name='Pase_base')
+        self.model = self.model.to(self.device)
         self.verbose(self.model.create_msg())
 
         # init param
-        self.epoch = self.config["hparas"]['max_epoch']
+        self.max_epoch = self.config["hparas"]['max_epoch']
         self.bsize = self.config["experiment"]['batch_size']
         self.log_freq = self.config["experiment"]['log_freq']
         self.bpe = self.config["dataset"]["bpe"]
@@ -121,7 +122,7 @@ class Solver(BaseSolver):
             self.frontend_optim = getattr(optim, self.config["hparas"]['fe_opt'])(self.model.frontend.parameters(),
                                                   lr=self.config["hparas"]['fe_lr'])
         self.fe_scheduler = LR_Scheduler(self.config["hparas"]["lr_mode"], lr_step=self.config["hparas"]['lrdec_step'], optim_name="frontend", base_lr=self.config["hparas"]['fe_lr'],
-                                    num_epochs=self.epoch,
+                                    num_epochs=self.max_epoch,
                                     iters_per_epoch=self.bpe)
         self.verbose("Lr_Scheduler: using {} for {}".format(self.config["hparas"]["lr_mode"], "frontend"))
             
@@ -146,7 +147,7 @@ class Solver(BaseSolver):
                 self.regr_optim[worker.name] = getattr(optim, min_opt)(worker.parameters(),
                                                                        lr=min_lr)
             worker_scheduler = LR_Scheduler(self.config["hparas"]["lr_mode"], lr_step=self.config["hparas"]['lrdec_step'], optim_name=worker.name, base_lr=min_lr,
-                                            num_epochs=self.epoch,
+                                            num_epochs=self.max_epoch,
                                             iters_per_epoch=self.bpe)
             self.verbose("Lr_Scheduler: using {} for {}".format(self.config["hparas"]["lr_mode"], worker.name))
             self.regr_scheduler[worker.name] = worker_scheduler
@@ -233,11 +234,19 @@ class Solver(BaseSolver):
         full_dict = {
             "model": self.model.frontend.state_dict(),
             "frontend_optimizer": self.frontend_optim.state_dict(),
-            "global_epoch": self.epoch
+            "global_epoch": self.epoch,
         }
+
+        if "total" not in pretext_losses:
+            total_loss = 0
+            for worker_name, loss in pretext_losses.items():
+                total_loss += pretext_losses[worker_name]
+            pretext_losses["total"] = total_loss
+
 
         for worker_name, loss in pretext_losses.items():
             full_dict[worker_name+"_loss"] = float(loss)
+
 
 
         torch.save(full_dict, ckpt_path)
@@ -301,20 +310,20 @@ class Solver(BaseSolver):
         else:
             self.epoch_beg = 0
 
-        for epoch in range(self.epoch_beg, self.epoch):
+        for self.epoch in range(self.epoch_beg, self.max_epoch):
 
             self.model.train()
             iterator = iter(self.train_loader)
 
             with trange(1, self.bpe + 1) as pbar:
                 for bidx in pbar:
-                    pbar.set_description("Epoch {}/{}".format(epoch, self.epoch))
+                    pbar.set_description("Epoch {}/{}".format(self.epoch+1, self.max_epoch))
                     try:
                         batch = next(iterator)
                     except StopIteration:
                         iterator = iter(self.train_loader)
                         batch = next(iterator)
-
+                    
                     # inference
                     h, chunk, preds, labels = self.model.forward(batch, self.alphaSG, self.device)
                     losses, self.alphaSG = self.backward(preds, labels, batch)
@@ -322,28 +331,27 @@ class Solver(BaseSolver):
                     if bidx % self.log_freq == 0 or bidx >= self.bpe:
                         # decrease learning rate
                         lrs = {}
-                        lrs["frontend"] = self.fe_scheduler(self.frontend_optim, bidx, epoch, losses["total"].item())
+                        lrs["frontend"] = self.fe_scheduler(self.frontend_optim, bidx, self.epoch, losses["total"].item())
 
                         for name, scheduler in self.cls_scheduler.items():
-                            lrs[name] = scheduler(self.cls_optim[name], bidx, epoch, losses[name].item())
+                            lrs[name] = scheduler(self.cls_optim[name], bidx, self.epoch, losses[name].item())
 
                         for name, scheduler in self.regr_scheduler.items():
-                            lrs[name] = scheduler(self.regr_optim[name], bidx, epoch, losses[name].item())
+                            lrs[name] = scheduler(self.regr_optim[name], bidx, self.epoch, losses[name].item())
 
                         for k in losses.keys():
                             if k not in lrs:
                                 lrs[k] = 0
 
-                        self.train_logger(preds, labels, losses, epoch, bidx, lrs, pbar)
-
+                        self.train_logger(preds, labels, losses, self.epoch, bidx, lrs, pbar)
 
                     self.step += 1
 
-            self.validate(epoch=epoch)
+            self.save_checkpoint(f_name='FE_e{}.ckpt'.format(self.epoch), pretext_losses=losses)
+            self.validate(epoch=self.epoch)
 
-            self.save_checkpoint(f_name='FE_e{}.ckpt'.format(epoch), pretext_losses=losses)
             for saver in self.savers:
-                saver.save(saver.prefix[:-1], epoch * self.bpe + bidx)
+                saver.save(saver.prefix[:-1], self.epoch * self.bpe + bidx)
 
 
         self.log.close()
@@ -401,7 +409,14 @@ class Solver(BaseSolver):
                         for name, loss in losses.items():
                             pbar.write('{} loss: {:.3f}'
                                   ''.format(name, loss.item()))
+                
             self.eval_logger(running_loss, epoch, pbar)
+
+            epoch_valid_total_loss = np.mean(running_loss["total"])
+            if epoch_valid_total_loss < self.best_valid_loss:
+                self.best_valid_loss = epoch_valid_total_loss
+                    
+                self.save_checkpoint(f_name='FE_best.ckpt', pretext_losses=losses)
 
 
 class AuxiliarSuperviser(object):

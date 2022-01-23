@@ -187,7 +187,7 @@ class ZNorm(object):
             self.stats = pickle.load(stats_f)
 
     # @profile
-    def __call__(self, pkg, ignore_keys=[]):
+    def __call__(self, pkg, ignore_keys=["tempogram"]):
         pkg = format_package(pkg)
         for k, st in self.stats.items():
             # assert k in pkg, '{} != {}'.format(list(pkg.keys()),
@@ -733,7 +733,7 @@ class Tempogram(object):
         else:
             # print(y.dtype)
             oenv = librosa.onset.onset_strength(y=y, sr=self.sr, hop_length=self.hop)
-            tempogram = librosa.feature.tempogram(onset_envelope=oenv,
+            tempogram = librosa.feature.tempogram(onset_envelope=oenv, sr=self.sr,
                                         hop_length=self.hop,
                                         #win_length=self.win,
                                         )[:, :max_frames]
@@ -804,7 +804,7 @@ class Prosody(object):
             zcr = torch.tensor(zcr.astype(np.float32))
             zcr = zcr[:, :max_frames]
             # finally obtain energy
-            egy = librosa.feature.rmse(y=wav, frame_length=self.win,
+            egy = librosa.feature.rms(y=wav, frame_length=self.win,
                                        hop_length=self.hop,
                                        pad_mode='constant')
             egy = torch.tensor(egy.astype(np.float32))
