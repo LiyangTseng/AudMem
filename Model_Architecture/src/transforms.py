@@ -358,6 +358,10 @@ class SingleChunkWav(object):
         raw = pkg['raw']
         self.assert_format(raw)
         chunk, beg_i, end_i = self.select_chunk(raw, ret_bounds=True)
+        while float(chunk.sum()) == 0:
+            # if select silence (all elements are zeros) => re-select
+            chunk, beg_i, end_i = self.select_chunk(raw, ret_bounds=True)
+
         pkg['chunk'] = chunk
         pkg['chunk_beg_i'] = beg_i
         pkg['chunk_end_i'] = end_i

@@ -1,7 +1,7 @@
-# according to pase argparse
+# according to pase+ argparse
 experiment:
-    batch_size: 50
-    num_workers: 2
+    batch_size: 1
+    num_workers: 4
     log_freq: 50
     ckpt_continue: False
     tensorboard: True
@@ -10,23 +10,23 @@ experiment:
 
 dataset: 
     dataset_list: []
-    chunk_size: 16000
+    chunk_size: 32000
     hop: 160
-    random_scale: False
+    random_scale: True
     trans_cache: 
     preload_wav: False
     do_eval: True
     preload_wav: False
 
 hparas:    # Experiment hyper-parameters
-    fe_lr: 0.0005
+    fe_lr: 0.001
     min_lr: 0.0005
     fe_opt: "Adam"
     min_opt: "Adam"
     lrdec_step: 30
     lrdecay: 0.5
-    max_epoch: 150
-    lr_mode: "step"
+    max_epoch: 2 # 400
+    lr_mode: "poly"
     max_ckpts: 5
     backprop_mode: "base"
     dropout_rate: 0.5
@@ -46,6 +46,6 @@ hparas:    # Experiment hyper-parameters
 path:
     data_root: ["data/audioset/wavs"]
     data_cfg: ["data/audioset/audioset_data.cfg"]
-    stats: "data/audioset/audioset_stats_pase.pkl"
-    net_cfg: "config/workers.cfg"
-    fe_cfg: "config/PASE.cfg"
+    stats: "data/audioset/audioset_stats_pase+.pkl"
+    net_cfg: "config/workers+.cfg"
+    fe_cfg: "config/PASE+.cfg"

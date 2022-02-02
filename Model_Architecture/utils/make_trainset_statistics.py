@@ -105,9 +105,9 @@ def extract_stats(opts):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_root', action='append', 
+    parser.add_argument('--data_root', action='append', help="['data/audioset/wav'] for audioset pretrain. ['data/raw_audios'] for memorability data inferece",
                         default=["data/audioset/wav"])
-    parser.add_argument('--data_cfg', action='append', 
+    parser.add_argument('--data_cfg', action='append', help="['data/audioset/audioset_data.cfg'] for audioset pretrain. ['data/memo_data.cfg'] for memorability data inferece",
                         default=["data/audioset/audioset_data.cfg"])
     parser.add_argument('--dataset', action='append', 
                         default=[])
@@ -116,7 +116,11 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=1)
     parser.add_argument('--chunk_size', type=int, default=16000)
     parser.add_argument('--max_batches', type=int, default=20)
-    parser.add_argument('--out_file', type=str, default="data/audioset/audioset_stats.pkl")
+    parser.add_argument('--out_file', type=str, help="data/audioset/audioset_stats_pase.pkl for pase audioset pretrain. \
+                                                    data/audioset/audioset_stats_pase+.pkl for pase+ audioset pretrain. \
+                                                        data/memo_stats_pase.pkl for pase memorability data inferece. \
+                                                        data/memo_stats_pase+.pkl for pase+ memorability data inferece",
+                        default="data/audioset/audioset_stats_pase+.pkl")
     parser.add_argument('--hop_size', type=int, default=160)
     #parser.add_argument('--win_size', type=int, default=400)
     
@@ -134,7 +138,8 @@ if __name__ == '__main__':
     #parser.add_argument('--prosody_hop', type=int, default=160)
     parser.add_argument('--prosody_win', type=int, default=400)
     parser.add_argument('--prosody_der_order', type=int, default=0)
-    parser.add_argument('--net_cfg', type=str, default="config/workers.cfg")
+    parser.add_argument('--net_cfg', type=str, help="config/workers+.cfg for pase+, config/workers.cfg for pase", 
+                        default="config/workers+.cfg")
 
     
     parser.add_argument('--ihm2sdm', type=str, default=None,

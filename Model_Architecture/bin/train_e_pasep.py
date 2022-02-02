@@ -75,7 +75,7 @@ class Solver(BaseSolver):
         self.verbose(data_msg)
 
     def set_model(self):
-        ''' Setup pase model and self.configimizer '''
+        ''' Setup pase+ model and self.configimizer '''
 
         regr_lst = []
 
@@ -84,7 +84,7 @@ class Solver(BaseSolver):
 
         self.verbose('Regression minions: {}'.format(regr_lst))
 
-        self.verbose("Pase config: {}".format(self.fe_cfg))
+        self.verbose("pase+ config: {}".format(self.fe_cfg))
         self.model = pase(frontend=None,
                             frontend_cfg=self.fe_cfg,
                             minions_cfg=self.minions_cfg,
@@ -288,14 +288,14 @@ class Solver(BaseSolver):
                                     global_step=epoch)
 
     def exec(self):
-        ''' Self-Supervised Pre-Training Pase '''
+        ''' Self-Supervised Pre-Training Pase+ '''
         
-        self.verbose("Training pase...")
+        self.verbose("Training pase+...")
         self.verbose('Loss schedule policy: {}'.format(self.backprop.mode))
         self.timer.set()
 
         if self.config["experiment"]["ckpt_continue"]:
-            # TODO: copy from pase
+            # TODO: copy from pase+
             # self.resume_training(device)
             pass
         else:
@@ -351,7 +351,7 @@ class Solver(BaseSolver):
         # Eval mode
         self.model.eval()
         with torch.no_grad():
-            self.verbose("Evaluate pase...")
+            self.verbose("Evaluate pase+...")
             running_loss = {}
             iterator = iter(self.valid_loader)
 
