@@ -98,15 +98,15 @@ def extract_stats(opts):
     for k, v in data.items():
         stats[k] = {'mean':torch.mean(torch.mean(v, dim=2), dim=0),
                     # 'std':torch.std(torch.std(v, dim=2), dim=0)}
-                    'std':torch.std(torch.std(v, dim=2), dim=0)+1e-9} # to prevent 0 std => inf norm
+                    'std':torch.std(torch.std(v, dim=2), dim=0)+1e-19} # to prevent 0 std => inf norm
     with open(opts.out_file, 'wb') as stats_f:
         pickle.dump(stats, stats_f)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_root', action='append', help="['data/audioset/wav'] for audioset pretrain. ['data/raw_audios'] for memorability data inferece",
-                        default=["data/audioset/wav"])
+    parser.add_argument('--data_root', action='append', help="['/media/lab812/53D8AD2D1917B29C/audioset/wav'] for audioset pretrain. ['data/raw_audios'] for memorability data inferece",
+                        default=["/media/lab812/53D8AD2D1917B29C/audioset/wav"])
     parser.add_argument('--data_cfg', action='append', help="['data/audioset/audioset_data.cfg'] for audioset pretrain. ['data/memo_data.cfg'] for memorability data inferece",
                         default=["data/audioset/audioset_data.cfg"])
     parser.add_argument('--dataset', action='append', 

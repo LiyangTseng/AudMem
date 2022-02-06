@@ -44,8 +44,10 @@ def generate_audioset_data_config(opts):
         print('Processing train file {:7d}/{:7d}'.format(idx, 
                             len(train_files)), end='\r')
 
-        data_cfg['train']['data'].append({'filename':train_file})
-        train_dur += get_file_dur(train_file)
+        file_dur = get_file_dur(train_file)
+        if file_dur != 0:
+            train_dur += file_dur
+            data_cfg['train']['data'].append({'filename':train_file})
     data_cfg['train']['total_wav_dur'] = train_dur
     print()
 
@@ -53,9 +55,10 @@ def generate_audioset_data_config(opts):
     for idx, valid_file in enumerate(valid_files, start=1):
         print('Processing valid file {:7d}/{:7d}'.format(idx, 
                             len(valid_files)), end='\r')
-
-        data_cfg['valid']['data'].append({'filename':valid_file})
-        valid_dur += get_file_dur(valid_file)
+        file_dur = get_file_dur(train_file)
+        if file_dur != 0:
+            train_dur += file_dur
+            data_cfg['valid']['data'].append({'filename':train_file})
     data_cfg['valid']['total_wav_dur'] = valid_dur
     print()
 
@@ -64,8 +67,9 @@ def generate_audioset_data_config(opts):
         print('Processing test file {:7d}/{:7d}'.format(idx, 
                             len(test_files)), end='\r')
 
-        data_cfg['test']['data'].append({'filename':test_file})
-        test_dur += get_file_dur(test_file)
+        if file_dur != 0:
+            train_dur += file_dur
+            data_cfg['test']['data'].append({'filename':train_file})
     data_cfg['test']['total_wav_dur'] = test_dur
     print()
 
@@ -131,14 +135,14 @@ def generate_memo_data_config(opts):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, help="audioset, memo", default="memo")
+    parser.add_argument('--task', type=str, help="audioset, memo", default="audioset")
     parser.add_argument('--val_ratio', type=float, default=0.25,
                         help='Validation ratio to take out of training '
                              'in utterances ratio (Def: 0.1).')
     opts = parser.parse_args()
     if opts.task == "audioset":
         print("processing audioset...")
-        setattr(opts, "data_root", 'data/audioset/wav')
+        setattr(opts, "data_root", '/media/lab812/53D8AD2D1917B29C/audioset/wav')
         setattr(opts, "cfg_file", 'data/audioset/audioset_data.cfg')
         generate_audioset_data_config(opts)
     elif opts.task == "memo":

@@ -187,7 +187,7 @@ class ZNorm(object):
             self.stats = pickle.load(stats_f)
 
     # @profile
-    def __call__(self, pkg, ignore_keys=["tempogram"]):
+    def __call__(self, pkg, ignore_keys=[]):
         pkg = format_package(pkg)
         for k, st in self.stats.items():
             # assert k in pkg, '{} != {}'.format(list(pkg.keys()),
