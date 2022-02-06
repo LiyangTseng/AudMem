@@ -10,7 +10,7 @@
 
     $TestLink = mysql_connect($servername, $username, $password);
     $db_selected = mysql_select_db($dbname, $TestLink);
-    $sql = "SELECT * FROM experimentData_beta where userEmail='$email'";
+    $sql = "SELECT * FROM experimentData where userEmail='$email'";
 
     $Result = mysql_query($sql, $TestLink);
     if (mysql_num_rows($Result) == 0) {

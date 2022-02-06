@@ -24,8 +24,7 @@
         echo "Database Error";
         exit;
     }
-    // TODO: update to experimentData after pilot study
-    $sql = "INSERT INTO experimentData_beta (startTime, updateTime, userEmail, audioOrder, userResponse, responsePosition, experimentFinished) VALUES ('$startTime', '$startTime', '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr', '$experimentFinished')";
+    $sql = "INSERT INTO experimentData (startTime, updateTime, userEmail, audioOrder, userResponse, responsePosition, experimentFinished) VALUES ('$startTime', '$startTime', '$email', '$audioOrderStr', '$responseStr', '$responsePositionStr', '$experimentFinished')";
 
     if ($conn->query($sql) === TRUE) {
         echo "Record inserted successfully in insert_row_to_db.php";

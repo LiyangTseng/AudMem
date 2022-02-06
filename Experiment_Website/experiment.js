@@ -1,4 +1,4 @@
-let vigilance_threshold = 0.3; // TODO: need to change after pilot study
+let vigilance_threshold = 0.65; 
 let now_playing = document.querySelector(".now-playing");
 let track_name = document.querySelector(".track-name");
 
@@ -391,10 +391,9 @@ function playpauseTrack() {
     loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
-    let hour = 1, min = 40, sec = 0;
-    // TODO: change total time after pilot study
-    let totalTimeSec = 100*60;
-    let timeLeftSec = 100*60;
+    let hour = 1, min = 15, sec = 0;
+    let totalTimeSec = 75*60;
+    let timeLeftSec = 75*60;
     
     timerStart = setInterval(function(){
       timeLeftSec --;

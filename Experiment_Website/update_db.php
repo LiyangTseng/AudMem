@@ -26,8 +26,7 @@
     }
 
 
-    // TODO: update to experimentData after pilot study
-    $sql = "UPDATE experimentData_beta SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', 
+    $sql = "UPDATE experimentData SET updateTime='$nowTime', userResponse='$responseStr', responsePosition='$responsePositionStr', 
             vigilanceDetail='$vigilanceDetail', vigilanceProgress='$vigilanceProgress', vigilanceScore='$vigilanceScore', token='$token', 
             experimentFinished='$experimentFinished' WHERE userEmail='$email' AND startTime='$startTime'";
     
