@@ -1,0 +1,57 @@
+# according to pase argparse
+experiment:
+    batch_size: 5
+    num_workers: 2
+    log_freq: 50
+    ckpt_continue: False
+    tensorboard: True
+    sup_exec: 
+    sup_freq: 1
+    encoder_mode: "fine-tune" # "frozen", "fine-tune", "from-scratch" 
+
+model:
+    input_dim: 500
+    dnn_lay: '256,1'
+    dnn_drop: '0.15,0.0'
+    dnn_use_batchnorm: 'False,False'
+    dnn_use_laynorm: 'True,False'
+    dnn_use_laynorm_inp: 'True'
+    dnn_use_batchnorm_inp: 'False'
+    dnn_act: 'relu,relu'
+    ranking_weight: 0.5
+
+dataset: 
+    dataset_list: []
+    chunk_size: 80000
+    hop: 160
+    random_scale: False
+    trans_cache: 
+    preload_wav: False
+    do_eval: True
+    preload_wav: False
+
+hparas:    # Experiment hyper-parameters
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 100
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+
+    optimizer:
+        type: 'Adam'
+        lr: 0.00001
+path:
+    encoder_ckpt: "weights/e_pase/22-01-23_12:47/FE_best.ckpt"
+    # after fine-tuned
+    finetuned_model_ckpt: "weights/pase_mlp/22-02-08_12:18/pase_mlp_best.pth"
+
+    data_root: ["data/raw_audios"]
+    data_cfg: ["data/memo_data.cfg"]
+    stats: "data/memo_stats_pase.pkl"
+    net_cfg: "config/workers.cfg"
+    fe_cfg: "pase/cfg/frontend/PASE.cfg"
+
+    label_file: "data/labels/track_memorability_scores_beta.csv"

@@ -6,7 +6,7 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_pase, e_pasep, pase_mlp", default="e_pase")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_pase, e_pasep, pase_mlp", default="pase_mlp")
     parser.add_argument("--patience", default=10, type=int, help="early stop patience")
     parser.add_argument('--name', default=None, type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU training.')
@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
     paras = parser.parse_args()
     setattr(paras, 'gpu', not paras.cpu)
+    # setattr(paras, 'gpu', False)
     setattr(paras, 'verbose', not paras.no_msg)
 
     config = yaml.load(open("config/{}.yaml".format(paras.model), 'r'), Loader=yaml.FullLoader)
