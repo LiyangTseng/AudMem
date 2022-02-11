@@ -40,9 +40,8 @@ class Solver(BaseSolver):
         # get labels from csv file
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
         # construct filename: score, ref: https://stackoverflow.com/questions/18012505/python-pandas-dataframe-columns-convert-to-dict-key-and-value
-        self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
-
-        self.test_set = MemoWavDataset(self.filename_to_score,
+        
+        self.test_set = MemoWavDataset(self.labels_df,
                                     self.config["path"]["data_root"][0],
                                     self.config["path"]["data_cfg"][0], 
                                     'test',

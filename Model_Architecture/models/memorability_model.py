@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 ''' train features to approximate memorability score (regression) '''
 
@@ -17,6 +18,7 @@ class H_MLP(nn.Module):
         self.BatchNorm = nn.BatchNorm1d(model_config["hidden_size"])
         self.Linear_2 = nn.Linear(model_config["hidden_size"], 1)
         self.Sigmoid = nn.Sigmoid()
+        self.Relu_2 = nn.ReLU()
 
     def create_msg(self):
         # Messages for user
@@ -37,7 +39,8 @@ class H_MLP(nn.Module):
         x = self.Relu(x)
         # x = self.BatchNorm(x)
         x = self.Linear_2(x)
-        predictions = self.Sigmoid(x)
+        predictions = self.Relu_2(x)
+        # predictions = self.Sigmoid(x)
         return predictions
     
 class H_LSTM(nn.Module):
@@ -64,7 +67,8 @@ class H_LSTM(nn.Module):
         # input shape: (batch_size, seq, input_size)
         self.Linear = nn.Linear(self.hidden_size*(1+int(self.bidirectional))+model_config["non_sequential_input_size"], 1)
 
-        self.Sigmoid = nn.Sigmoid()
+        # self.Sigmoid = nn.Sigmoid()
+        self.ReLU = nn.ReLU()
 
     def attention_layer(self, h):
         '''
@@ -107,9 +111,8 @@ class H_LSTM(nn.Module):
         out = self.Batch_Norm_2(out)
         out = self.Linear(out)
 
-        predictions = self.Sigmoid(out)
+        predictions = self.ReLU(out)
         return predictions
-
 
 class E_CRNN(nn.Module):
     '''
@@ -192,6 +195,167 @@ class E_CRNN(nn.Module):
         out = self.fcBlock2(out)
         out = self.output(out)
         return out
+
+''' modified from https://github.com/santi-pdp/pase/blob/master/emorec/neural_networks.py '''  
+class MLP(nn.Module):
+    def __init__(self, options,inp_dim):
+        super(MLP, self).__init__()
+        
+        self.input_dim=inp_dim
+        self.dnn_lay=list(map(int, options['dnn_lay'].split(',')))
+        self.dnn_drop=list(map(float, options['dnn_drop'].split(','))) 
+        self.dnn_use_batchnorm=list(map(strtobool, options['dnn_use_batchnorm'].split(',')))
+        self.dnn_use_laynorm=list(map(strtobool, options['dnn_use_laynorm'].split(','))) 
+        self.dnn_use_laynorm_inp=strtobool(options['dnn_use_laynorm_inp'])
+        self.dnn_use_batchnorm_inp=strtobool(options['dnn_use_batchnorm_inp'])
+        self.dnn_act=options['dnn_act'].split(',')
+        
+       
+        self.wx  = nn.ModuleList([])
+        self.bn  = nn.ModuleList([])
+        self.ln  = nn.ModuleList([])
+        self.act = nn.ModuleList([])
+        self.drop = nn.ModuleList([])
+       
+  
+        # input layer normalization
+        if self.dnn_use_laynorm_inp:
+           self.ln0=LayerNorm(self.input_dim)
+          
+        # input batch normalization    
+        if self.dnn_use_batchnorm_inp:
+           self.bn0=nn.BatchNorm1d(self.input_dim,momentum=0.05)
+           
+           
+        self.N_dnn_lay=len(self.dnn_lay)
+             
+        current_input=self.input_dim
+        
+        # Initialization of hidden layers
+        
+        for i in range(self.N_dnn_lay):
+            
+            # dropout
+            self.drop.append(nn.Dropout(p=self.dnn_drop[i]))
+            
+            # activation
+            self.act.append(act_fun(self.dnn_act[i]))
+            
+            
+            add_bias=True
+            
+            # layer norm initialization
+            self.ln.append(LayerNorm(self.dnn_lay[i]))
+            self.bn.append(nn.BatchNorm1d(self.dnn_lay[i],momentum=0.05))
+            
+            if self.dnn_use_laynorm[i] or self.dnn_use_batchnorm[i]:
+                add_bias=False
+            
+                
+            # Linear operations
+            self.wx.append(nn.Linear(current_input, self.dnn_lay[i],bias=add_bias))
+            
+            # weight initialization
+            self.wx[i].weight = torch.nn.Parameter(torch.Tensor(self.dnn_lay[i],current_input).uniform_(-np.sqrt(0.01/(current_input+self.dnn_lay[i])),np.sqrt(0.01/(current_input+self.dnn_lay[i]))))
+            self.wx[i].bias = torch.nn.Parameter(torch.zeros(self.dnn_lay[i]))
+            
+            current_input=self.dnn_lay[i]
+             
+        self.out_dim=current_input
+         
+    def forward(self, x):
+        
+        # Applying Layer/Batch Norm
+        if bool(self.dnn_use_laynorm_inp):
+            x=self.ln0((x))
+        
+        if bool(self.dnn_use_batchnorm_inp):
+
+            x=self.bn0((x))
+        
+        for i in range(self.N_dnn_lay):
+           
+            if self.dnn_use_laynorm[i] and not(self.dnn_use_batchnorm[i]):
+                x = self.drop[i](self.act[i](self.ln[i](self.wx[i](x))))
+          
+            if self.dnn_use_batchnorm[i] and not(self.dnn_use_laynorm[i]):
+                x = self.drop[i](self.act[i](self.bn[i](self.wx[i](x))))
+           
+            if self.dnn_use_batchnorm[i]==True and self.dnn_use_laynorm[i]==True:
+                x = self.drop[i](self.act[i](self.bn[i](self.ln[i](self.wx[i](x)))))
+          
+            if self.dnn_use_batchnorm[i]==False and self.dnn_use_laynorm[i]==False:
+                x = self.drop[i](self.act[i](self.wx[i](x)))
+            
+          
+        return x
+
+class LayerNorm(nn.Module):
+
+    def __init__(self, features, eps=1e-6):
+        super(LayerNorm,self).__init__()
+        self.gamma = nn.Parameter(torch.ones(features))
+        self.beta = nn.Parameter(torch.zeros(features))
+        self.eps = eps
+
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True)
+        std = x.std(-1, keepdim=True)
+        return self.gamma * (x - mean) / (std + self.eps) + self.beta
+
+def act_fun(act_type):
+
+ if act_type=="relu":
+    return nn.ReLU()
+            
+ if act_type=="tanh":
+    return nn.Tanh()
+            
+ if act_type=="sigmoid":
+    return nn.Sigmoid()
+           
+ if act_type=="leaky_relu":
+    return nn.LeakyReLU(0.2)
+            
+ if act_type=="elu":
+    return nn.ELU()
+                     
+ if act_type=="softmax":
+    return nn.LogSoftmax(dim=1)
+        
+ if act_type=="linear":
+     return nn.LeakyReLU(1) # initializzed like this, but not used in forward!
+
+def strtobool (val):
+    """Convert a string representation of truth to true (1) or false (0).
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+def context_window(fea,left,right):
+ 
+    N_elem=fea.shape[0]
+    N_fea=fea.shape[1]
+    
+    fea_conc=np.empty([N_elem,N_fea*(left+right+1)])
+    
+    index_fea=0
+    for lag in range(-left,right+1):
+        fea_conc[:,index_fea:index_fea+fea.shape[1]]=np.roll(fea,lag,axis=0)
+        index_fea=index_fea+fea.shape[1]
+        
+    fea_conc=fea_conc[left:fea_conc.shape[0]-right]
+    
+    return fea_conc
 
 
 if __name__ == "__main__":

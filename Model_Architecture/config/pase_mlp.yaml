@@ -46,7 +46,7 @@ hparas:    # Experiment hyper-parameters
 path:
     encoder_ckpt: "weights/e_pase/22-01-23_12:47/FE_best.ckpt"
     # after fine-tuned
-    finetuned_model_ckpt: "weights/pase_mlp/22-02-08_12:18/pase_mlp_best.pth"
+    finetuned_model_ckpt: "weights/pase_mlp/22-02-10_15:07/pase_mlp_best.pth"
 
     data_root: ["data/raw_audios"]
     data_cfg: ["data/memo_data.cfg"]

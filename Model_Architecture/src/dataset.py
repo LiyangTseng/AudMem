@@ -236,10 +236,15 @@ class MemoWavDataset(WavDataset):
         super().__init__(*args, **kwargs)
         if self.split == "train":
             self.labels_df = labels_df[:200]
-            self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
         elif self.split == "valid":
             self.labels_df = labels_df[200:220]
-            self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
+        elif self.split == "test":
+            self.labels_df = labels_df[220:]
+        else:
+            raise Exception ("Invalid split")
+            
+        self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
+        
         # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
         self.filename_options = [[] for _ in range(len(self.filename_to_score))]
 
@@ -297,8 +302,8 @@ class PairMemoWavDataset(WavDataset):
             index_1, index_2 = index_pair
             self.wav_combinations.append((self.filename_options[index_1],
                                             self.filename_options[index_2]))
-            self.score_combinations.append(list(self.labels_df.score)[index_1],
-                                            list(self.labels_df.score)[index_2])
+            self.score_combinations.append([list(self.labels_df.score)[index_1],
+                                            list(self.labels_df.score)[index_2]])
 
 
 
