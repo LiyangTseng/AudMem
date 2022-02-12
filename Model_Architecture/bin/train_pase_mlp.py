@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import torch.nn as nn
 from src.solver import BaseSolver
-from src.util import worker_parser
 from src.dataset import PairMemoWavDataset
 from models.pase_model import wf_builder
 from models.memorability_model import MLP
@@ -15,7 +14,6 @@ from tqdm import tqdm
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader
 
-seed = 1234
 CKPT_STEP = 10000
 SAMPLING_RATE = 16000
 
@@ -27,8 +25,8 @@ class Solver(BaseSolver):
         self.ranking_weight = config["model"]["ranking_weight"]
 
         # Seeds initialization
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+        np.random.seed(self.paras.seed)
+        torch.manual_seed(self.paras.seed)
 
         with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
             self.fe_cfg = json.load(fe_cfg_f)
@@ -46,9 +44,16 @@ class Solver(BaseSolver):
       
         # get labels from csv file
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # construct filename: score, ref: https://stackoverflow.com/questions/18012505/python-pandas-dataframe-columns-convert-to-dict-key-and-value
-        
-        self.train_set = PairMemoWavDataset(self.labels_df,
+        # indexing except testing indices
+        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
+        for_test = self.labels_df.index.isin(testing_range)
+        self.labels_df = self.labels_df[~for_test]
+        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
+        self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
+        self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
+
+        self.train_set = PairMemoWavDataset(self.train_labels_df,
                                     self.config["path"]["data_root"][0],
                                     self.config["path"]["data_cfg"][0], 
                                     'train',
@@ -56,7 +61,7 @@ class Solver(BaseSolver):
                                     preload_wav=self.config["dataset"]["preload_wav"],
                                     same_sr=True)
 
-        self.valid_set = PairMemoWavDataset(self.labels_df,
+        self.valid_set = PairMemoWavDataset(self.valid_labels_df,
                                     self.config["path"]["data_root"][0],
                                     self.config["path"]["data_cfg"][0], 
                                     'valid',
@@ -245,9 +250,9 @@ class Solver(BaseSolver):
                 self.step += 1
 
                 if i % self.log_freq == 0:
-                    self.log.add_scalar('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
-                    self.log.add_scalar('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
-                    self.log.add_scalar('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
+                    self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                    self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
+                    self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
         
 
             

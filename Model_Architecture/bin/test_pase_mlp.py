@@ -21,7 +21,8 @@ class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model)
+        if self.paras.do_kfold:
+            output_dir = os.path.join(self.outdir, paras.model, "fold_{}".format(self.paras.fold_index))
         os.makedirs(output_dir, exist_ok=True)
         self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
         self.corr_output_path = os.path.join(output_dir, "details.txt")
@@ -31,7 +32,7 @@ class Solver(BaseSolver):
             self.fe_cfg = json.load(fe_cfg_f)
 
         self.CUDA = True if self.paras.gpu else False
-        self.model_ckpt = torch.load(self.config["path"]["finetuned_model_ckpt"], map_location=self.device)
+        self.model_ckpt = torch.load(self.paras.load, map_location=self.device)
         self.verbose("Loaded model checkpoint @ {}".format(self.config["path"]["finetuned_model_ckpt"]))
 
     def load_data(self):
@@ -39,9 +40,12 @@ class Solver(BaseSolver):
 
         # get labels from csv file
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # construct filename: score, ref: https://stackoverflow.com/questions/18012505/python-pandas-dataframe-columns-convert-to-dict-key-and-value
         
-        self.test_set = MemoWavDataset(self.labels_df,
+        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
+        for_test = self.labels_df.index.isin(testing_range)
+        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
+        self.test_set = MemoWavDataset(self.test_labels_df,
                                     self.config["path"]["data_root"][0],
                                     self.config["path"]["data_cfg"][0], 
                                     'test',
@@ -97,13 +101,13 @@ class Solver(BaseSolver):
                 pred_scores = self.downstream_model(features).cpu().detach().item()
 
                 self.pred_scores.append(pred_scores)
-                writer.writerow([self.labels_df.track.values[220+idx], pred_scores, self.labels_df.score.values[220+idx]])
+                writer.writerow([self.test_labels_df.track.values[idx], pred_scores, self.test_labels_df.score.values[idx]])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df.pred_score.values, self.labels_df.score.values[220:])
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.labels_df.score.values[220:]).unsqueeze(0))
+        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
 
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation))

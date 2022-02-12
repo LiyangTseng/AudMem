@@ -234,26 +234,18 @@ class WavDataset(Dataset):
 class MemoWavDataset(WavDataset):
     def __init__(self, labels_df, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.split == "train":
-            self.labels_df = labels_df[:200]
-        elif self.split == "valid":
-            self.labels_df = labels_df[200:220]
-        elif self.split == "test":
-            self.labels_df = labels_df[220:]
-        else:
-            raise Exception ("Invalid split")
+        self.labels_df = labels_df
+        self.track_names = list(self.labels_df.track)
+        assert self.split=="test", ("Invalid split")
             
         self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
         
         # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
         self.filename_options = [[] for _ in range(len(self.filename_to_score))]
 
-        for wav in self.wavs:
-            # wave_path = os.path.join(self.data_root, wav["filename"])
-            wname = wav["filename"].split("/")[-1]
-            if wname in self.filename_to_score.keys():
-                # self.filename_options[wname].append(wav["filename"])
-                self.filename_options[list(self.labels_df.track).index(wname)].append(wav["filename"])
+        for wname in self.track_names:
+            self.filename_options[self.track_names.index(wname)].append(
+                    "data/raw_audios/original/{}".format(wname))
 
         self.scores = []
         for idx in range(len(self.labels_df)):
@@ -280,20 +272,30 @@ class MemoWavDataset(WavDataset):
 class PairMemoWavDataset(WavDataset):
     def __init__(self, labels_df, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.split == "train":
-            self.labels_df = labels_df[:200]
-        elif self.split == "valid":
-            self.labels_df = labels_df[200:220]
-        self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
+
+        assert self.split!="test", "pair dataset only for train and valid"
+        self.labels_df = labels_df
+        self.track_names = list(self.labels_df.track)
+        self.scores = list(self.labels_df.score)
+        self.filename_to_score = dict(zip(self.track_names, self.scores))
         # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
         self.filename_options = [[] for _ in range(len(self.labels_df))]
 
-        for wav in self.wavs:
-            # wave_path = os.path.join(self.data_root, wav["filename"])
-            wname = wav["filename"].split("/")[-1]
-            if wname in list(self.labels_df.track):
-                # self.filename_options[wname].append(wav["filename"])
-                self.filename_options[list(self.labels_df.track).index(wname)].append(wav["filename"])
+        # for wav in self.wavs:
+        #     wname = wav["filename"].split("/")[-1]
+        #     if wname in self.track_names:
+        #         # self.filename_options[wname].append(wav["filename"])
+        #         self.filename_options[self.track_names.index(wname)].append(wav["filename"])
+        augment_types = ["1_semitones", "2_semitones", "3_semitones", "4_semitones",
+                        "5_semitones", "-1_semitones","-2_semitones", 
+                        "-3_semitones", "-4_semitones", "-5_semitones", "original"]
+        for wname in self.track_names:
+            for augment_type in augment_types:
+                self.filename_options[self.track_names.index(wname)].append(
+                    "data/raw_audios/{}/{}".format(augment_type, wname))
+
+
+
 
         # get index combinations of wavs
         self.index_combinations = list(combinations([i for i in range(len(self.labels_df))], 2))
@@ -302,8 +304,8 @@ class PairMemoWavDataset(WavDataset):
             index_1, index_2 = index_pair
             self.wav_combinations.append((self.filename_options[index_1],
                                             self.filename_options[index_2]))
-            self.score_combinations.append([list(self.labels_df.score)[index_1],
-                                            list(self.labels_df.score)[index_2]])
+            self.score_combinations.append([self.scores[index_1],
+                                            self.scores[index_2]])
 
 
 

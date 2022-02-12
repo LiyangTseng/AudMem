@@ -20,7 +20,16 @@ if __name__ == "__main__":
     parser.add_argument('--lr_rate', default=None,
                     help='customized learning rate', required=False)
     parser.add_argument('--features', default="all",
-                    help='chords/rhythm/timbre', required=False)
+                    help='chords/rhythm/timbre', required=False)  
+    parser.add_argument('--do_kfold', default=True,
+                    help='do k-fold validation or not', required=False)  
+    parser.add_argument('--kfold_splits', default=10, type=int,
+                    help='number of k-fold splits', required=False)
+    parser.add_argument('--fold_index', default=0, type=int,
+                    help='index of 10 fold', required=False)
+    parser.add_argument('--seed', default=1234, type=int,
+                    help='random seed', required=False)
+    
 
 
     paras = parser.parse_args()
