@@ -52,7 +52,7 @@ class Solver(BaseSolver):
         # should say that an epoch happened after seeing at least as many
         # chunks as total_train_wav_dur // chunk_size
         bpe = (self.train_set.total_wav_dur // self.config["dataset"]["chunk_size"]) // self.config["experiment"]["batch_size"]
-        self.verbose("Train data length: {}".format(self.train_set.total_wav_dur/16000/3600.0))
+        self.verbose("Train data: {} hours".format(self.train_set.total_wav_dur/16000/3600.0))
         self.config["dataset"]["bpe"] = bpe
         if self.config["dataset"]["do_eval"]:
             assert self.valid_set is not None, (
@@ -63,6 +63,7 @@ class Solver(BaseSolver):
                                     num_workers=self.config["experiment"]["num_workers"],drop_last=True,
                                     pin_memory=self.CUDA)
             va_bpe = (self.valid_set.total_wav_dur // self.config["dataset"]["chunk_size"]) // self.config["experiment"]["batch_size"]
+            self.verbose("Valid data: {} hours".format(self.valid_set.total_wav_dur/16000/3600.0))
             self.config["dataset"]["va_bpe"] = va_bpe
         else:
             self.valid_loader = None

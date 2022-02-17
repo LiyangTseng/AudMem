@@ -55,10 +55,10 @@ def generate_audioset_data_config(opts):
     for idx, valid_file in enumerate(valid_files, start=1):
         print('Processing valid file {:7d}/{:7d}'.format(idx, 
                             len(valid_files)), end='\r')
-        file_dur = get_file_dur(train_file)
+        file_dur = get_file_dur(valid_file)
         if file_dur != 0:
-            train_dur += file_dur
-            data_cfg['valid']['data'].append({'filename':train_file})
+            valid_dur += file_dur
+            data_cfg['valid']['data'].append({'filename':valid_file})
     data_cfg['valid']['total_wav_dur'] = valid_dur
     print()
 
@@ -66,10 +66,10 @@ def generate_audioset_data_config(opts):
     for idx, test_file in enumerate(test_files, start=1):
         print('Processing test file {:7d}/{:7d}'.format(idx, 
                             len(test_files)), end='\r')
-
+        file_dur = get_file_dur(test_file)
         if file_dur != 0:
-            train_dur += file_dur
-            data_cfg['test']['data'].append({'filename':train_file})
+            test_dur += file_dur
+            data_cfg['test']['data'].append({'filename':test_file})
     data_cfg['test']['total_wav_dur'] = test_dur
     print()
 

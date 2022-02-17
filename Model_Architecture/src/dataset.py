@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from PIL import Image
 import json
+from itertools import combinations
 from src.transforms import *
 import sys
 
@@ -167,6 +168,7 @@ class WavDataset(Dataset):
                  cache_on_load=False,
                  distortion_probability=0.4,
                  verbose=True,
+                 same_sr = False,
                  *args, **kwargs):
         # sr: sampling rate, (Def: None, the one in the wav header)
         self.sr = sr
@@ -183,6 +185,7 @@ class WavDataset(Dataset):
         self.distortion_transforms = distortion_transforms
         self.preload_wav = preload_wav
         self.distortion_probability = distortion_probability
+        self.same_sr = same_sr
         with open(data_cfg_file, 'r') as data_cfg_f:
             self.data_cfg = json.load(data_cfg_f)
             wavs = self.data_cfg[split]['data']
@@ -204,6 +207,9 @@ class WavDataset(Dataset):
             return cache[fname]
         else:
             wav, rate = torchaudio.load(fname)
+            if self.same_sr:
+                assert self.sr!=None, "sampling rate must be specified"
+                wav = torchaudio.transforms.Resample(rate, self.sr)(wav)
             wav = wav.numpy().squeeze()
             #fix in case wav is stereo, in which case
             #pick first channel only
@@ -224,6 +230,108 @@ class WavDataset(Dataset):
         wav['cchunk'] = wav['chunk'].squeeze(0)
 
         return wav
+
+class MemoWavDataset(WavDataset):
+    def __init__(self, labels_df, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.labels_df = labels_df
+        self.track_names = list(self.labels_df.track)
+        assert self.split=="test", ("Invalid split")
+            
+        self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
+        
+        # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
+        self.filename_options = [[] for _ in range(len(self.filename_to_score))]
+
+        for wname in self.track_names:
+            self.filename_options[self.track_names.index(wname)].append(
+                    "data/raw_audios/original/{}".format(wname))
+
+        self.scores = []
+        for idx in range(len(self.labels_df)):
+            self.scores.append(self.filename_to_score[list(self.labels_df.track)[idx]])
+        # for wav in self.wavs:
+        #     wname = os.path.join(self.data_root, wav["filename"])
+        #     wname = wname.split("/")[-1]
+        #     self.scores.append(self.filename_to_score[wname])
+
+    def __len__(self):
+        return len(self.filename_to_score)
+
+    def __getitem__(self, index):
+        # track_name = self.labels_df.track[index]
+        # wav_options = self.filename_options[track_name]
+        # score = self.filename_to_score[track_name]
+        wav_options = self.filename_options[index]
+        score = self.scores[index]
+        wname = wav_options[np.random.randint(0, len(wav_options))]
+        wav = self.retrieve_cache(wname, self.wav_cache)
+
+        return wav, score
+
+class PairMemoWavDataset(WavDataset):
+    def __init__(self, labels_df, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        assert self.split!="test", "pair dataset only for train and valid"
+        self.labels_df = labels_df
+        self.track_names = list(self.labels_df.track)
+        self.scores = list(self.labels_df.score)
+        self.filename_to_score = dict(zip(self.track_names, self.scores))
+        # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
+        self.filename_options = [[] for _ in range(len(self.labels_df))]
+
+        # for wav in self.wavs:
+        #     wname = wav["filename"].split("/")[-1]
+        #     if wname in self.track_names:
+        #         # self.filename_options[wname].append(wav["filename"])
+        #         self.filename_options[self.track_names.index(wname)].append(wav["filename"])
+        augment_types = ["1_semitones", "2_semitones", "3_semitones", "4_semitones",
+                        "5_semitones", "-1_semitones","-2_semitones", 
+                        "-3_semitones", "-4_semitones", "-5_semitones", "original"]
+        for wname in self.track_names:
+            for augment_type in augment_types:
+                self.filename_options[self.track_names.index(wname)].append(
+                    "data/raw_audios/{}/{}".format(augment_type, wname))
+
+
+
+
+        # get index combinations of wavs
+        self.index_combinations = list(combinations([i for i in range(len(self.labels_df))], 2))
+        self.wav_combinations, self.score_combinations = [], []
+        for index_pair in self.index_combinations:
+            index_1, index_2 = index_pair
+            self.wav_combinations.append((self.filename_options[index_1],
+                                            self.filename_options[index_2]))
+            self.score_combinations.append([self.scores[index_1],
+                                            self.scores[index_2]])
+
+
+
+    def __len__(self):
+        return len(self.index_combinations)
+
+    def __getitem__(self, index):
+        
+        # wav_index_1, wav_index_2 = self.index_combinations[index]
+        # wav_options_1 = self.filename_options[wav_index_1]
+        # wav_options_2 = self.filename_options[wav_index_2]
+        # wname_1 = wav_options_1[np.random.randint(0, len(wav_options_1))]
+        # wname_2 = wav_options_2[np.random.randint(0, len(wav_options_2))]
+        # wav_1, wav_2 = self.retrieve_cache(wname_1, self.wav_cache), self.retrieve_cache(wname_2, self.wav_cache)
+
+        # score_1, score_2 = list(self.labels_df.score)[wav_index_1], list(self.labels_df.score)[wav_index_2]
+        
+        wav_options_1, wav_options_2 = self.wav_combinations[index]
+        wname_1 = wav_options_1[np.random.randint(0, len(wav_options_1))]
+        wname_2 = wav_options_2[np.random.randint(0, len(wav_options_2))]
+        wav_1, wav_2 = self.retrieve_cache(wname_1, self.wav_cache), self.retrieve_cache(wname_2, self.wav_cache)
+        score_1, score_2 = self.score_combinations[index]
+
+        return wav_1, wav_2, score_1, score_2
+
+
 
 def build_dataset_providers(config, minions_cfg):
 
