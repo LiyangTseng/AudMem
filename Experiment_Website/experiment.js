@@ -24,7 +24,7 @@ let updateTimer;
 let startTime = '';
 let vigilanceDetail = 'N/A';
 let vigilanceScore = -1;
-let finished_token = 'N/A';
+let qualified_token = 'N/A'; // finish and quailfied the experiment
 let experimentFinished = false;
 let waitForLoad = false;
 let waitTime = -1;
@@ -282,9 +282,9 @@ function skip() {
   } else {
     // experiment over
     experimentFinished = true;
-    finished_token = generateToken(16);
     // calculateVigilancePerformance();
-    if (vigilanceScore > vigilance_threshold) {
+    if (vigilanceScore >= vigilance_threshold) {
+      qualified_token = generateToken(16);
       $(".alert-success").show()
     }
     else {
@@ -341,9 +341,9 @@ async function nextTrack() {
   } else {
     // experiment over
     experimentFinished = true;
-    finished_token = generateToken(16);
     // calculateVigilancePerformance();
-    if (vigilanceScore > vigilance_threshold) {
+    if (vigilanceScore >= vigilance_threshold) {
+      qualified_token = generateToken(16);
       $(".alert-success").show()
     }
     else {
@@ -391,9 +391,9 @@ function playpauseTrack() {
     loadTrack(slot_cnt);
     playTrack();
     playpause_btn.style.display = 'none';
-    let hour = 1, min = 15, sec = 0;
-    let totalTimeSec = 75*60;
-    let timeLeftSec = 75*60;
+    let hour = 1, min = 20, sec = 0;
+    let totalTimeSec = 80*60;
+    let timeLeftSec = 80*60;
     
     timerStart = setInterval(function(){
       timeLeftSec --;
@@ -488,7 +488,7 @@ function updateDB() {
   // https://stackoverflow.com/questions/7820683/convert-boolean-result-into-number-integer
   data = {"startTime": startTime, "nowTime": nowTime, "email": email, "audioOrderStr": audioOrderStr, "responseStr": responseStr,
    "responsePositionStr": responsePositionStr, "vigilanceDetail": vigilanceDetail, "vigilanceProgress": vigilance_progress_percent, "vigilanceScore": vigilanceScore, 
-   "token": finished_token, "experimentFinished": +experimentFinished};
+   "token": qualified_token, "experimentFinished": +experimentFinished};
 
   console.log(data);
   $.post('update_db.php', data, function (response) {
@@ -504,7 +504,7 @@ function updateDB() {
 
 https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript
 function copyToClipboard() {
-    window.prompt("Copy to clipboard: Ctrl+C, Enter", finished_token);
+    window.prompt("Copy to clipboard: Ctrl+C, Enter", qualified_token);
   }
 
 // popup warning about leaving experiment
