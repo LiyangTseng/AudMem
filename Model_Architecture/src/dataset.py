@@ -14,41 +14,32 @@ import sys
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (classification) '''
-    def __init__(self, config, pooling=False, mode="train"):
+    def __init__(self, labels_df, config, pooling=False, split="train"):
         super().__init__()
-        self.mode = mode
+        assert split in ["train", "valid", "test"], "invalid split"
+        self.labels_df = labels_df
+        self.split = split
+
         self.features_dir = config["path"]["features_dir"]
-        self.labels_dir = config["path"]["labels_dir"]
         
-        if self.mode != "test":
+        if self.split != "test":
             # self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
         else:
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
         self.pooling = pooling
 
-        if self.mode == "train":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[:200]
-        elif self.mode == "valid":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[200:220]
-        elif self.mode == "test":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[220:]
-        elif self.mode == "all":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))            
-        else:
-            raise Exception ("Invalid dataset mode")
+        self.track_names = list(self.labels_df.track)
+        self.scores = list(self.labels_df.score)
+        self.filename_to_score = dict(zip(self.track_names, self.scores))
 
-        self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.filename_memorability_df["track"])}
-        self.idx_to_mem_score = {idx: score for idx, score in enumerate(self.filename_memorability_df["score"])}
 
         self.features_dict = config["features"]
 
-        self.sequential_features = []
-        self.non_sequential_features = []
-        self.labels = []
+        self.features_options = [[] for _ in range(len(self.labels_df))]
 
-        for augment_type in tqdm(self.augmented_type_list):
-            for audio_idx in range(len(self.idx_to_filename)):
+        for track_name in tqdm(self.track_names):
+            for augment_type in self.augmented_type_list:
                 
                 sequeutial_features_list = []
                 non_sequential_features_list = []
@@ -56,7 +47,7 @@ class HandCraftedDataset(Dataset):
                 for feature_type in self.features_dict:
                     for subfeatures in self.features_dict[feature_type]:
                         feature_file_path = os.path.join(self.features_dir, augment_type, feature_type, subfeatures,
-                             "{}_{}".format(subfeatures, self.idx_to_filename[audio_idx].replace("wav", "npy")))   
+                             "{}_{}".format(subfeatures, track_name.replace("wav", "npy")))   
                         f = np.load(feature_file_path)
                         f = np.float32(f)
                         if feature_type == "emotions":
@@ -72,20 +63,53 @@ class HandCraftedDataset(Dataset):
                                 sequeutial_features_list.append(f)
                                 sequential_features = np.concatenate(sequeutial_features_list, axis=0)
                                 sequential_features = np.transpose(sequential_features)   
-                # store features
-                self.sequential_features.append(torch.from_numpy(sequential_features))
-                self.non_sequential_features.append(torch.from_numpy(np.stack(non_sequential_features_list)))
-                self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx]))
-        
+
+                sequential_features = torch.from_numpy(sequential_features)
+                non_sequential_features = torch.from_numpy(np.stack(non_sequential_features_list))
+                
+                
+                self.features_options[self.track_names.index(track_name)].append(
+                        [sequential_features, non_sequential_features]
+                    )        
 
     def __len__(self):
-        return len(self.idx_to_filename)*len(self.augmented_type_list)       
+        return len(self.labels_df)       
 
     def __getitem__(self, index):
-        if self.mode != "test":
-            return self.sequential_features[index], self.non_sequential_features[index], self.labels[index]
-        else:
-            return self.sequential_features[index], self.non_sequential_features[index]
+        features_options = self.features_options[index]
+        features = features_options[np.random.randint(0, len(features_options))]
+        score = self.scores[index]
+
+        return features, score
+
+
+class PairHandCraftedDataset(HandCraftedDataset):
+    ''' Hand crafted audio features to predict memorability (classification) '''
+    def __init__(self, labels_df, config, pooling=False, split="train"):
+        super().__init__(labels_df=labels_df, config=config, pooling=pooling, split=split)
+        assert split in ["train", "valid"], "Split must be either train or valid"
+        # get index combinations of wavs
+        self.index_combinations = list(combinations([i for i in range(len(self.labels_df))], 2))
+        self.feature_combinations, self.score_combinations = [], []
+        for index_pair in self.index_combinations:
+            index_1, index_2 = index_pair
+            self.feature_combinations.append([self.features_options[index_1],
+                                            self.features_options[index_2]])
+            self.score_combinations.append([self.scores[index_1],
+                                            self.scores[index_2]])
+
+
+    def __len__(self):
+        return len(self.index_combinations)
+
+    def __getitem__(self, index):
+        features_options_1, features_options_2 = self.feature_combinations[index]
+        features_1 = features_options_1[np.random.randint(0, len(features_options_1))]
+        features_2 = features_options_2[np.random.randint(0, len(features_options_2))]
+        score_1, score_2 = self.score_combinations[index]
+
+        return features_1, features_2, score_1, score_2
+
 
 class DictCollater(object):
 
@@ -188,9 +212,18 @@ class WavDataset(Dataset):
         self.same_sr = same_sr
         with open(data_cfg_file, 'r') as data_cfg_f:
             self.data_cfg = json.load(data_cfg_f)
-            wavs = self.data_cfg[split]['data']
-            self.total_wav_dur = int(self.data_cfg[split]['total_wav_dur'])
-            self.wavs = wavs
+            
+            if split != "all":
+                wavs = self.data_cfg[split]['data']
+                self.total_wav_dur = int(self.data_cfg[split]['total_wav_dur'])
+                self.wavs = wavs
+            else:
+                self.total_wav_dur = 0
+                self.wavs = []
+                for _split in self.data_cfg:
+                    wavs = self.data_cfg[_split]['data']
+                    self.total_wav_dur += int(self.data_cfg[_split]['total_wav_dur'])
+                    self.wavs += wavs
         self.wav_cache = {}
         if preload_wav:
             print('Pre-loading wavs to memory')
@@ -232,20 +265,32 @@ class WavDataset(Dataset):
         return wav
 
 class MemoWavDataset(WavDataset):
+    '''
+    Note that data augmentation is done by randomly selecting shifting version of the wav when calling __getitem__,
+    hence the length of this dataset is the length of the label dataframe.
+    '''
     def __init__(self, labels_df, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.labels_df = labels_df
         self.track_names = list(self.labels_df.track)
-        assert self.split=="test", ("Invalid split")
             
         self.filename_to_score = dict(zip(self.labels_df.track, self.labels_df.score))
         
         # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
         self.filename_options = [[] for _ in range(len(self.filename_to_score))]
 
-        for wname in self.track_names:
-            self.filename_options[self.track_names.index(wname)].append(
-                    "data/raw_audios/original/{}".format(wname))
+        if self.split == "test":
+            for wname in self.track_names:
+                self.filename_options[self.track_names.index(wname)].append(
+                        "data/raw_audios/original/{}".format(wname))
+        else:
+            self.augment_types = ["1_semitones", "2_semitones", "3_semitones", "4_semitones",
+                        "5_semitones", "-1_semitones","-2_semitones", 
+                        "-3_semitones", "-4_semitones", "-5_semitones", "original"]
+            for track_name in self.track_names:
+                for augment_type in self.augment_types:
+                    self.filename_options[self.track_names.index(track_name)].append(
+                        "data/raw_audios/{}/{}".format(augment_type, track_name))
 
         self.scores = []
         for idx in range(len(self.labels_df)):
@@ -281,18 +326,13 @@ class PairMemoWavDataset(WavDataset):
         # self.filename_options = dict.fromkeys(self.filename_to_score.keys(), [])
         self.filename_options = [[] for _ in range(len(self.labels_df))]
 
-        # for wav in self.wavs:
-        #     wname = wav["filename"].split("/")[-1]
-        #     if wname in self.track_names:
-        #         # self.filename_options[wname].append(wav["filename"])
-        #         self.filename_options[self.track_names.index(wname)].append(wav["filename"])
         augment_types = ["1_semitones", "2_semitones", "3_semitones", "4_semitones",
                         "5_semitones", "-1_semitones","-2_semitones", 
                         "-3_semitones", "-4_semitones", "-5_semitones", "original"]
-        for wname in self.track_names:
+        for track_name in self.track_names:
             for augment_type in augment_types:
-                self.filename_options[self.track_names.index(wname)].append(
-                    "data/raw_audios/{}/{}".format(augment_type, wname))
+                self.filename_options[self.track_names.index(track_name)].append(
+                    "data/raw_audios/{}/{}".format(augment_type, track_name))
 
 
 
@@ -302,8 +342,8 @@ class PairMemoWavDataset(WavDataset):
         self.wav_combinations, self.score_combinations = [], []
         for index_pair in self.index_combinations:
             index_1, index_2 = index_pair
-            self.wav_combinations.append((self.filename_options[index_1],
-                                            self.filename_options[index_2]))
+            self.wav_combinations.append([self.filename_options[index_1],
+                                            self.filename_options[index_2]])
             self.score_combinations.append([self.scores[index_1],
                                             self.scores[index_2]])
 
@@ -314,15 +354,6 @@ class PairMemoWavDataset(WavDataset):
 
     def __getitem__(self, index):
         
-        # wav_index_1, wav_index_2 = self.index_combinations[index]
-        # wav_options_1 = self.filename_options[wav_index_1]
-        # wav_options_2 = self.filename_options[wav_index_2]
-        # wname_1 = wav_options_1[np.random.randint(0, len(wav_options_1))]
-        # wname_2 = wav_options_2[np.random.randint(0, len(wav_options_2))]
-        # wav_1, wav_2 = self.retrieve_cache(wname_1, self.wav_cache), self.retrieve_cache(wname_2, self.wav_cache)
-
-        # score_1, score_2 = list(self.labels_df.score)[wav_index_1], list(self.labels_df.score)[wav_index_2]
-        
         wav_options_1, wav_options_2 = self.wav_combinations[index]
         wname_1 = wav_options_1[np.random.randint(0, len(wav_options_1))]
         wname_2 = wav_options_2[np.random.randint(0, len(wav_options_2))]
@@ -330,8 +361,6 @@ class PairMemoWavDataset(WavDataset):
         score_1, score_2 = self.score_combinations[index]
 
         return wav_1, wav_2, score_1, score_2
-
-
 
 def build_dataset_providers(config, minions_cfg):
 
@@ -545,65 +574,58 @@ class EndToEndImgDataset(Dataset):
 
 class ReconstructionDataset(Dataset):
     ''' LSTM　hidden states to reconstruct mel-spectrograms ref: https://arxiv.org/pdf/1911.01102.pdf '''
-    def __init__(self, config, downsampling_factor=1, mode="train"):
+    def __init__(self, labels_df, config, split="train"):
 
         super().__init__()
-        self.downsampling_factor = downsampling_factor
+        self.downsampling_factor = config['model']['downsampling_factor']
         self.hidden_states_dir = config["path"]["hidden_states_dir"]
-        self.features_dir = config["path"]["features_dir"]
-        self.hidden_layer_num = 4
-        self.mode = mode
-        # self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1]
+        self.mels_dir = config["path"]["mels_dir"]
+        self.hidden_layer_num = config['experiment']['hidden_layer_num']
+        self.mode = split
+        self.augment_types = ["1_semitones", "2_semitones", "3_semitones", "4_semitones",
+                        "5_semitones", "-1_semitones","-2_semitones", 
+                        "-3_semitones", "-4_semitones", "-5_semitones", "original"]
         if self.mode == "test":
-            self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[-1:]
-        else:
-            self.augmented_type_list = sorted(os.listdir(self.hidden_states_dir))[:]
+            self.augment_types = self.augment_types[-1]
 
         self.sequence_length = config["model"]["seq_len"]//self.downsampling_factor
 
-        if self.mode == "train":
-            filename_memorability_df = pd.read_csv("data/labels/track_memorability_scores_beta.csv")[:200]
-        elif self.mode == "test":
-            filename_memorability_df = pd.read_csv("data/labels/track_memorability_scores_beta.csv")[200:]
-        else:
-            raise Exception ("Invalid dataset mode")
-
             
-        self.idx_to_filename = {idx: filename for idx, filename in enumerate(filename_memorability_df["track"])}
+        self.idx_to_filename = {idx: filename for idx, filename in enumerate(labels_df["track"])}
 
         self.hidden_states = []
         self.melspectrograms = []
-        for augment_type in tqdm(self.augmented_type_list, desc="defining dataset"):
+        for augment_type in tqdm(self.augment_types, desc="defining dataset"):
             for audio_idx in range(len(self.idx_to_filename)):
                 for layer_idx in range(self.hidden_layer_num):
-                    hidden_states_path = os.path.join(self.hidden_states_dir, augment_type,
-                                    self.idx_to_filename[audio_idx].replace(".wav", ""), str(layer_idx)+".pt")
-                    hidden_states = torch.load(hidden_states_path, map_location=torch.device('cpu'))
+                    hidden_states_path = os.path.join(self.hidden_states_dir,
+                                    self.idx_to_filename[audio_idx],
+                                    augment_type, str(layer_idx)+".npy")
+                    hidden_states = np.load(hidden_states_path)
                     hidden_states = hidden_states[::self.downsampling_factor]               
                     self.hidden_states.append(hidden_states)
                 
-                if self.mode == "train":
-                    melspetrogram_path = os.path.join(self.features_dir, 
-                                            augment_type, "timbre", "melspectrogram", 
-                                            "melspectrogram_{}.npy".format(self.idx_to_filename[audio_idx].replace(".wav", "")))
+                melspetrogram_path = os.path.join(self.mels_dir, 
+                                        augment_type, 
+                                        "mels_{}.npy".format(self.idx_to_filename[audio_idx].replace(".wav", "")))
 
-                    melspectrogram = np.load(melspetrogram_path)
-                    # melspectrogram = melspectrogram[::self.downsampling_factor]
-                    self.melspectrograms.append(melspectrogram)       
+                melspectrogram = np.load(melspetrogram_path)
+                # melspectrogram = melspectrogram[::self.downsampling_factor]
+                self.melspectrograms.append(melspectrogram)       
 
     def __len__(self):
-        return len(self.idx_to_filename)*len(self.augmented_type_list)*self.hidden_layer_num*self.sequence_length
+        return len(self.idx_to_filename)*len(self.augment_types)*self.hidden_layer_num*self.sequence_length
 
     def __getitem__(self, index):
         
         sequence_idx = index%self.sequence_length
-        features = self.hidden_states[index//self.sequence_length][sequence_idx,:]
-        features = features.detach() # this line is necessary for num_workers > 1
-        if self.mode == "train":
-            labels = torch.tensor(self.melspectrograms[index//(self.sequence_length*self.hidden_layer_num)][:, sequence_idx*self.downsampling_factor:(sequence_idx+1)*self.downsampling_factor], dtype=torch.double)
-            return features, labels
-        else:
-            return features
+        hidden_states = self.hidden_states[index//self.sequence_length][:,sequence_idx,:]
+        hidden_states = torch.tensor(hidden_states)
+        try:
+            mels = torch.tensor(self.melspectrograms[index//(self.sequence_length*self.hidden_layer_num)][:, sequence_idx*self.downsampling_factor:(sequence_idx+1)*self.downsampling_factor], dtype=torch.double)
+        except:
+            raise Exception("index out of range")
+        return hidden_states, mels
 
 if __name__ == "__main__":
     pass

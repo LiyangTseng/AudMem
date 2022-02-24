@@ -5,7 +5,7 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, pase_mlp", default="pase_mlp")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, pase_mlp, pase_lstm", default="pase_mlp")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
@@ -48,6 +48,8 @@ if __name__ == "__main__":
         from bin.test_e_crnn import Solver
     elif paras.model == "pase_mlp":
         from bin.test_pase_mlp import Solver
+    elif paras.model == "pase_lstm":
+        from bin.test_pase_lstm import Solver
     else:
         raise Exception("Not Implement Error")
 

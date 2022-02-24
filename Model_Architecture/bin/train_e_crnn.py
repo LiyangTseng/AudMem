@@ -150,6 +150,7 @@ class Solver(BaseSolver):
                 total_loss = 0
 
                 # Fetch data
+                # TODO: change to pair-wise data
                 mels_img, lab_scores = self.fetch_data(data)
                 self.timer.cnt('rd')
 

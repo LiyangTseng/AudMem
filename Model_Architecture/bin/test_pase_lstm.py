@@ -1,40 +1,46 @@
 import os
+import json
 import csv
 import torch
+import torch.nn as nn
 import pandas as pd
 from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
-from models.memorability_model import H_MLP
-from src.dataset import HandCraftedDataset
+from models.memorability_model import LSTM
+from models.pase_model import wf_builder
+from src.dataset import MemoWavDataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
 from captum.attr import IntegratedGradients
 
+SAMPLING_RATE = 16000
 
 class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model)
+        if self.paras.do_kfold:
+            output_dir = os.path.join(self.outdir, paras.model, "fold_{}".format(self.paras.fold_index))
+        else:
+            output_dir = os.path.join(self.outdir, paras.model)
+
         os.makedirs(output_dir, exist_ok=True)
         self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
         self.corr_output_path = os.path.join(output_dir, "details.txt")
         self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")
         
+        with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
+            self.fe_cfg = json.load(fe_cfg_f)
 
-    def fetch_data(self, data):
-        ''' Move data to device '''
-        (seq_feat, non_seq_feat), lab_scores = data
-        feat = torch.cat((seq_feat, non_seq_feat), 1)
-        feat = feat.to(self.device)
-
-        return feat
-
+        self.CUDA = True if self.paras.gpu else False
+        self.model_ckpt = torch.load(self.paras.load, map_location=self.device)
+        self.verbose("Loaded model checkpoint @ {}".format(self.paras.load))
 
     def load_data(self):
         ''' Load data for testing '''
+
         # get labels from csv file
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
         
@@ -42,26 +48,49 @@ class Solver(BaseSolver):
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
         self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
+        self.test_set = MemoWavDataset(self.test_labels_df,
+                                    self.config["path"]["data_root"][0],
+                                    self.config["path"]["data_cfg"][0], 
+                                    'test',
+                                    sr=SAMPLING_RATE,
+                                    preload_wav=self.config["dataset"]["preload_wav"],
+                                    same_sr=True)
 
-        self.test_set = HandCraftedDataset(labels_df=self.test_labels_df, config=self.config, pooling=True, split="test")
-        
-        self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=False)
-        
-        data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t'
-                .format(self.test_set.features_dict, self.test_set[0][0][0].shape, self.test_set[0][0][1].shape))
+        self.bpe = (self.test_set.total_wav_dur // self.config["dataset"]["chunk_size"]) // self.config["experiment"]["batch_size"]
+        self.verbose("Test data length: {}".format(self.test_set.total_wav_dur/16000/3600.0))
 
-        self.verbose(data_msg)
+        
+        self.test_loader = DataLoader(self.test_set, batch_size=1,
+                                        shuffle=False,
+                                        num_workers=self.config["experiment"]["num_workers"],drop_last=True,
+                                        pin_memory=self.CUDA)
+        
+    def fetch_data(self, data):
+        ''' Move data to device '''
+        wavs, scores = data
+        wavs, scores = wavs.view(wavs.size(0), 1, -1).to(self.device), scores.to(self.device).float()
+
+        return wavs, scores
 
     def set_model(self):
-        ''' Setup ASR model '''
-        # Model
-        self.model = H_MLP(model_config=self.config["model"]).to(self.device)
-        self.verbose(self.model.create_msg())
+        ''' Setup downstream memorability model '''
 
-        # Load target model in eval mode
-        self.load_ckpt()
+        self.encoder = wf_builder(self.fe_cfg).to(self.device)
+        self.encoder.load_state_dict(self.model_ckpt["encoder"])
 
+        # Downstream Model
+        options = self.config["model"]
+        inp_dim = options["input_dim"]
+
+        # set dropout to 0.0 for testing
+        options.update({"dropout": '0.0'})
+
+
+        self.downstream_model = LSTM(options,inp_dim).to(self.device)
+        self.downstream_model.load_state_dict(self.model_ckpt["model"])
+
+        self.reg_loss_func = nn.MSELoss()
+        
 
     def exec(self):
         ''' Testing Memorabiliy Regression/Ranking System '''
@@ -72,8 +101,11 @@ class Solver(BaseSolver):
             writer = csv.writer(csvfile)
             writer.writerow(["track", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
-                feat = self.fetch_data(data)
-                pred_score = self.model(feat).cpu().detach().item()
+                wavs, lab_scores = self.fetch_data(data)
+                features = self.encoder(wavs, self.device)
+                pred_score, _ = self.downstream_model(features)
+                pred_score = pred_score.cpu().detach().item()
+
                 self.pred_scores.append(pred_score)
                 writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
         
@@ -85,9 +117,9 @@ class Solver(BaseSolver):
 
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation))
-            f.write("regression loss: {}".format(str(reg_loss)))
+            f.write("regression loss: {}".format(str(correlation)))
 
-        self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
+        self.verbose("correlation result: {}, MSE loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         
         # TODO:
         # self.interpret_model()

@@ -8,7 +8,7 @@ import torch.nn as nn
 from src.solver import BaseSolver
 from src.dataset import PairMemoWavDataset
 from models.pase_model import wf_builder
-from models.memorability_model import MLP
+from models.memorability_model import LSTM
 from tqdm import tqdm
 
 from src.util import human_format, get_grad_norm
@@ -107,7 +107,8 @@ class Solver(BaseSolver):
         print(options)        
         inp_dim = options["input_dim"]
 
-        self.downstream_model = MLP(options,inp_dim).to(self.device)
+        self.verbose("using pase_lstm")
+        self.downstream_model = LSTM(options,inp_dim).to(self.device)
         
 
         # Pre-train Encoder
@@ -137,12 +138,6 @@ class Solver(BaseSolver):
                                                                 lr=self.config["hparas"]["optimizer"]["lr"])
         else:
             raise Exception("Not Implement Error")
-        # # set scheduler
-        # self.scheduler = getattr(torch.optim.lr_scheduler, self.config["hparas"]["scheduler"]["type"])(
-        #                                                         self.optimizer, 
-        #                                                         self.config["hparas"]["scheduler"]["lr_decay"],
-        #                                                         last_epoch=-1)      
-
 
     def backward(self, loss):
         '''
@@ -222,17 +217,15 @@ class Solver(BaseSolver):
                 self.optimizer.zero_grad()
 
                 wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                self.timer.cnt('rd')
                 lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+                self.timer.cnt('rd')
 
                 # inference
                 features_1 = self.encoder(wavs_1, self.device)
-                features_1 = torch.mean(features_1, dim=1)
-                pred_scores_1 = self.downstream_model(features_1)
+                pred_scores_1, _ = self.downstream_model(features_1)
 
                 features_2 = self.encoder(wavs_2, self.device)
-                features_2 = torch.mean(features_2, dim=1)
-                pred_scores_2 = self.downstream_model(features_2)
+                pred_scores_2, _ = self.downstream_model(features_2)
 
                 pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
@@ -250,9 +243,8 @@ class Solver(BaseSolver):
 
                 total_loss = reg_loss + self.ranking_weight*rank_loss
                 train_total_loss.append(total_loss.cpu().detach().numpy())
-                self.timer.cnt('fw')
                 
-                # Backprop
+                self.timer.cnt('fw')
                 grad_norm = self.backward(total_loss)
                 self.step += 1
 
@@ -303,12 +295,10 @@ class Solver(BaseSolver):
 
                 # inference
                 features_1 = self.encoder(wavs_1, self.device)
-                features_1 = torch.mean(features_1, dim=1)
-                pred_scores_1 = self.downstream_model(features_1)
+                pred_scores_1, _ = self.downstream_model(features_1)
 
                 features_2 = self.encoder(wavs_2, self.device)
-                features_2 = torch.mean(features_2, dim=1)
-                pred_scores_2 = self.downstream_model(features_2)
+                pred_scores_2, _ = self.downstream_model(features_2)
 
                 pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 

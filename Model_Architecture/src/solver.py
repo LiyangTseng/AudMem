@@ -3,7 +3,6 @@ import os
 import sys
 import abc
 import math
-import yaml
 import time
 import torch
 from torch.utils.tensorboard import SummaryWriter

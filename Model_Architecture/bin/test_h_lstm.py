@@ -26,21 +26,28 @@ class Solver(BaseSolver):
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        seq_feat, non_seq_feat = data
+        (seq_feat, non_seq_feat), lab_scores = data
         seq_feat, non_seq_feat = seq_feat.to(self.device), non_seq_feat.to(self.device)
 
         return seq_feat, non_seq_feat
 
-
     def load_data(self):
         ''' Load data for testing '''
-        self.test_set = HandCraftedDataset(config=self.config, pooling=False, mode="test")
+        # get labels from csv file
+        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
+        
+        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
+        for_test = self.labels_df.index.isin(testing_range)
+        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
+
+        self.test_set = HandCraftedDataset(labels_df=self.test_labels_df, config=self.config, pooling=False, split="test")
         
         self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
         data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t'
-                .format(self.test_set.features_dict, self.test_set.sequential_features[0].shape, self.test_set.non_sequential_features[0].shape))
+                .format(self.test_set.features_dict, self.test_set[0][0][0].shape, self.test_set[0][0][1].shape))
 
         self.verbose(data_msg)
 
@@ -61,29 +68,27 @@ class Solver(BaseSolver):
 
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "score"])
+            writer.writerow(["track", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 seq_feat, non_seq_feat = self.fetch_data(data)
-                pred_score = self.model(seq_feat, non_seq_feat)
-                self.pred_scores.append(pred_score)
-                writer.writerow([self.test_set.idx_to_filename[idx], pred_score.cpu().detach().item()])
+                pred_scores = self.model(seq_feat, non_seq_feat).cpu().detach().item()
+                self.pred_scores.append(pred_scores)
+                writer.writerow([self.test_labels_df.track.values[idx], pred_scores, self.test_labels_df.score.values[idx]])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df["score"].values, self.test_set.filename_memorability_df["score"].values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df["score"].values).unsqueeze(0), torch.tensor(self.test_set.filename_memorability_df["score"].values).unsqueeze(0))
-
-
+        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
         with open(self.corr_output_path, 'w') as f:
             f.write("using weight: {}\n".format(self.paras.load))
-            f.write(str(correlation)+"\n")
-            f.write("regression loss: {}\n".format(str(correlation)))
+            f.write(str(correlation))
+            f.write("regression loss: {}".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
-        
+
         # TODO:
-        self.interpret_model()
+        # self.interpret_model()
 
     def interpret_model(self, N=5):
         ''' Use Captum to interprete feature importance on top N memorability score '''

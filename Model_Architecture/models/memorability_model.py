@@ -290,6 +290,53 @@ class MLP(nn.Module):
           
         return x
 
+class LSTM(nn.Module):
+    
+    def __init__(self, options,inp_dim):
+        super(LSTM, self).__init__()
+        
+        self.input_dim=inp_dim
+        self.hidden_size=int(options['hidden_size'])
+        self.num_layers=int(options['num_layers'])
+        self.bias=bool(strtobool(options['bias']))
+        self.batch_first=bool(strtobool(options['batch_first']))
+        self.dropout=float(options['dropout'])
+        self.bidirectional=bool(strtobool(options['bidirectional']))
+        self.out_dim=self.hidden_size+self.bidirectional*self.hidden_size
+        
+        self.lstm = nn.ModuleList()
+        
+        for i in range(self.num_layers):
+            input_size = self.input_dim if i == 0 else self.out_dim
+            self.lstm.append(nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, 
+                                        bias=self.bias,dropout=self.dropout,bidirectional=self.bidirectional))
+        
+         
+        self.linear = nn.Linear(self.out_dim, 1)
+
+        self.relu = nn.ReLU()
+               
+        
+    def forward(self, x):
+
+        hidden_states_list = []                 
+        for idx, layer in enumerate(self.lstm):
+            inputs = x if idx == 0 else hidden_states
+
+            # in shape: (batch_size, seq_len, input_size)
+            hidden_states, _ = layer(inputs)
+            # out shape: (batch_size, seq_length, hidden_size*bidirectional)
+            
+            hidden_states_list.append(hidden_states)
+
+        # use last time step
+        out = hidden_states[:, -1, :]
+        out = self.linear(out)
+
+        predictions = self.relu(out)
+                
+        return predictions, hidden_states_list
+
 class LayerNorm(nn.Module):
 
     def __init__(self, features, eps=1e-6):

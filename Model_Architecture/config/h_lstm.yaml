@@ -8,7 +8,7 @@ features:
 experiment:
     batch_size: 64
     num_workers: 15
-
+    log_freq: 50
 model:
     seq_len: 157 # under 16kHz sampling rate
     # ==== make sure size is consistent with the one from dataloader ====
@@ -41,4 +41,4 @@ hparas:                                   # Experiment hyper-parameters
 
 path:
     features_dir: "data/features"
-    labels_dir: "data/labels"
+    label_file: "data/labels/track_memorability_scores_beta.csv"
