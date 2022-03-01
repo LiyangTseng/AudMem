@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy import stats
 
-VIGILANCE_THRESHOLD = 0.65
+VIGILANCE_THRESHOLD = 0.6
 SHORT_TERM_BOUNDARY = (10, 49)
 MEDIUM_TERM_BOUNDARY = (61, 131)
 LONG_TERM_BOUNDARY = (155, 258)
@@ -72,22 +72,21 @@ target_responses = [[] for i in range(len(target_last_appearnce_idx))]
 def filter_data(data_df):
     ''' prune repeated participations and incomplete fields '''
     
+    # prune 
+    data_df = data_df[data_df['userResponse'].notna()]
+    # only keep the very first userEmail
+    data_df = data_df.drop_duplicates(subset='userEmail', keep='first')
     # drop rows without completing experiment
-    # TODO: should consider unfinished but qualified data
-    data_df = data_df.drop(data_df[data_df['experimentFinished']==0].index)
-
+    
     # TODO: should able to prune by vigilance on new data format
     # calculate vigilance score for all users, then filter unqualified
     for idx, row in data_df.iterrows():
-        _, vigilance_score, _, _, _ = calculate_datum_stats(row, id_to_track)
+        _, _, vigilance_score, _, _, _ = calculate_datum_stats(row, id_to_track)
         data_df.loc[idx,"vigilanceScore"] = vigilance_score
+    
     data_df = data_df.drop(data_df[data_df['vigilanceScore']<VIGILANCE_THRESHOLD].index)
     
-    # drop rows with NaN column
-    data_df = data_df.dropna()
-    # only keep the very first userEmail
-    data_df = data_df.drop_duplicates(subset='userEmail', keep='first')
-
+    
     return data_df
 
 def calculate_datum_stats(singleUserData, id_to_track):
@@ -134,6 +133,8 @@ def calculate_datum_stats(singleUserData, id_to_track):
                 target_responses[target_progress_cnt].append(0)
             target_progress_cnt += 1
 
+    vigilance_progress = vigilance_progress_cnt/len(vigilance_last_appearnce_idx)
+
     vigilance_score = 0 if len(vigilance_performance)==0 \
                         else float(vigilance_performance.count(1))/len(vigilance_performance)
     vigilance_detail = "{}/{}".format(vigilance_performance.count(1), len(vigilance_performance))
@@ -142,7 +143,7 @@ def calculate_datum_stats(singleUserData, id_to_track):
                         else float(target_performance.count(1))/len(target_performance)
     target_detail = "{}/{}".format(target_performance.count(1), len(target_performance))
     
-    return track_to_memo, vigilance_score, vigilance_detail, target_score, target_detail
+    return vigilance_progress, track_to_memo, vigilance_score, vigilance_detail, target_score, target_detail
 
 def get_experiment_stats(qualified_data_df):
     ''' returns:
@@ -159,7 +160,7 @@ def get_experiment_stats(qualified_data_df):
     user_stats["target_score"] = 0
     user_stats["target_stats"] = 0
     for index, singleUserData in qualified_data_df.iterrows():
-        track_to_memo, vigilance_score, vigilance_stats, target_score, target_stats = calculate_datum_stats(singleUserData, id_to_track)
+        vigilance_progress, track_to_memo, vigilance_score, vigilance_stats, target_score, target_stats = calculate_datum_stats(singleUserData, id_to_track)
         if vigilance_score < VIGILANCE_THRESHOLD:
             continue
         for track, memorability in track_to_memo.items():
@@ -170,6 +171,7 @@ def get_experiment_stats(qualified_data_df):
         user_stats.loc[index, "target_score"] = target_score
         user_stats.loc[index, "vigilance_stats"] = vigilance_stats
         user_stats.loc[index, "target_stats"] = target_stats
+        user_stats.loc[index, "vigilance_progress"] = vigilance_progress
     return user_stats, track_stats
 
 def save_stats(args, user_stats, track_stats, track_order):
@@ -326,9 +328,10 @@ def record_macro_stats(args, track_stats):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.scatter(np.log10(np.array(interval_list)[short_term_slice]), np.array(memorability_score_list)[short_term_slice], c=np.array(fatigue_list)[short_term_slice], cmap="plasma", label="short term", marker='o')
-    ax.scatter(np.log10(np.array(interval_list)[medium_term_slice]), np.array(memorability_score_list)[medium_term_slice], c=np.array(fatigue_list)[medium_term_slice], cmap="plasma", label="medium term", marker='^')
-    ax.scatter(np.log10(np.array(interval_list)[long_term_slice]), np.array(memorability_score_list)[long_term_slice], c=np.array(fatigue_list)[long_term_slice],  cmap="plasma", label="long term", marker='s')
+    # _r tacked on the end to reverse colormap
+    ax.scatter(np.log10(np.array(interval_list)[short_term_slice]), np.array(memorability_score_list)[short_term_slice], c=np.array(fatigue_list)[short_term_slice], cmap="plasma_r", label="short term", marker='o')
+    ax.scatter(np.log10(np.array(interval_list)[medium_term_slice]), np.array(memorability_score_list)[medium_term_slice], c=np.array(fatigue_list)[medium_term_slice], cmap="plasma_r", label="medium term", marker='^')
+    ax.scatter(np.log10(np.array(interval_list)[long_term_slice]), np.array(memorability_score_list)[long_term_slice], c=np.array(fatigue_list)[long_term_slice],  cmap="plasma_r", label="long term", marker='s')
     plt.legend(loc='lower left')
     cbar = fig.colorbar(ax.collections[0], ticks=[20, 125])
     cbar.ax.set_ylabel('fatigue level')
