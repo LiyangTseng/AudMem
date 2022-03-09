@@ -14,11 +14,13 @@ class H_MLP(nn.Module):
         super(H_MLP, self).__init__()
         self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
         self.Linear_1 = nn.Linear(self.input_size, model_config["hidden_size"])
+        self.Linear_2 = nn.Linear(model_config["hidden_size"],32)
         self.Relu = nn.ReLU()
         self.BatchNorm = nn.BatchNorm1d(model_config["hidden_size"])
-        self.Linear_2 = nn.Linear(model_config["hidden_size"], 1)
+        self.Linear_3 = nn.Linear(32, 1)
         self.Sigmoid = nn.Sigmoid()
         self.Relu_2 = nn.ReLU()
+        self.Dropout = nn.Dropout(p=model_config["dropout_rate"])
 
     def create_msg(self):
         # Messages for user
@@ -36,11 +38,16 @@ class H_MLP(nn.Module):
     def forward(self, features):
         
         x = self.Linear_1(features)
+        x = self.Dropout(x)
+        x = self.Relu(x)
+        x = self.Linear_2(x)
+        x = self.Dropout(x)
         x = self.Relu(x)
         # x = self.BatchNorm(x)
-        x = self.Linear_2(x)
-        predictions = self.Relu_2(x)
-        # predictions = self.Sigmoid(x)
+        x = self.Linear_3(x)
+        x = self.Dropout(x)
+        # predictions = self.Relu_2(x)
+        predictions = self.Sigmoid(x)
         return predictions
     
 class H_LSTM(nn.Module):
@@ -148,7 +155,7 @@ class E_CRNN(nn.Module):
                                batch_first=True,
                                bidirectional=model_config["gru"]["bidirectional"])
 
-        self.GruLayerF = nn.Sequential(nn.BatchNorm1d(model_config["gru"]["input_size"]),
+        self.GruLayerF = nn.Sequential(nn.BatchNorm1d(model_config["fc_1"]["input_size"]),
                                        nn.Dropout(0.6))
 
         self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
@@ -175,26 +182,83 @@ class E_CRNN(nn.Module):
         return msg
 
     def forward(self, inp):
-        # _input (batch_size, time, freq)
-
+        # (N, C, H, W) = (16, 1, 64, 64)
         out = self.convBlock1(inp)
+        # (N, C, H, W) = (16, 4, 32, 32)
         out = self.convBlock2(out)
-        # 16, 32, 16, 16
-        out = self.convBlock3(out)
-        # 16, 64, 8, 8
-        # [N, 256, 8, 8]
+        # (N, C, H, W) = (16, 4, 16, 16)
+        # out = self.convBlock3(out)
+        # (N, C, H, W) = (16, 16, 8, 8)
+        
         out = out.contiguous().view(out.size()[0], out.size()[2], -1)
-        # [N, 8, 2048]
+        # [N, 16, 64]
         out, _ = self.GruLayer(out)
-        # [N, 8, 256]
+        # [N, 16, 32]
         out = out.contiguous().view(out.size()[0],  -1)
-        # [N, 2048]
+        # [N, 512]
 
         out = self.GruLayerF(out)
         out = self.fcBlock1(out)
         out = self.fcBlock2(out)
         out = self.output(out)
         return out
+
+class E_Transformer(nn.Module):
+    '''
+        use Transformer encoder (visual transformer) for melspectrogram inputs, ref:
+        https://arxiv.org/pdf/1706.03762.pdf
+    '''
+    def __init__(self, model_config):
+        super(E_Transformer, self).__init__()
+        self.d_model = model_config["transformer_encoder"]["d_model"]
+        self.nhead = model_config["transformer_encoder"]["nhead"]
+        self.dim_feedforward = model_config["transformer_encoder"]["dim_feedforward"]
+        self.dropout = model_config["transformer_encoder"]["dropout"]
+        self.seq_len = model_config["seq_len"]
+        encoder_layers = nn.TransformerEncoderLayer(d_model=self.d_model,
+                                                    nhead=self.nhead,
+                                                    dim_feedforward=self.dim_feedforward,
+                                                    dropout=self.dropout)
+
+        self.transforer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
+        self.transforer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
+                                                  nn.Dropout(0.6))
+
+        self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
+                                      nn.ReLU(),
+                                      nn.Dropout(0.5))
+
+        self.fcBlock2 = nn.Sequential(nn.Linear(in_features=model_config["fc_2"]["input_size"], out_features=model_config["fc_2"]["output_size"]),
+                                      nn.ReLU(),
+                                      nn.Dropout(0.5))
+
+        self.output = nn.Sequential(nn.Linear(in_features=model_config["output"]["input_size"], out_features=model_config["output"]["output_size"]),
+                                    nn.Sigmoid())
+    def create_msg(self):
+        # Messages for user
+        msg = []
+        msg.append('Model spec.| E_Transformer: use Transformer encoder for melspectrogram inputs(img)')
+        return msg
+
+    def forward(self, inp):
+
+        # pad zero to seq_len (need to be divisible by n_head)
+        # inp = F.pad(input=inp, pad=(0,  self.d_model - inp.size(-1), 0, 0), mode='constant', value=0)
+
+        # (batch_size, 1(gray scale), embed_dim(n_mels), seq_len)
+        out = inp.squeeze(1)
+        # (batch_size, embed_dim(n_mels), seq_len)
+        out = torch.transpose(out, 1, 2) # swap seq_len and embed_dim
+        # (batch_size, seq_len, embed_dim(n_mels))
+        out = self.transforer_encoder(out)
+
+        out = self.transforer_encoder_f(out)
+        out = out.contiguous().view(out.size()[0], -1)
+        out = self.fcBlock1(out)
+        out = self.fcBlock2(out)
+        out = self.output(out)
+        return out
+
 
 ''' modified from https://github.com/santi-pdp/pase/blob/master/emorec/neural_networks.py '''  
 class MLP(nn.Module):

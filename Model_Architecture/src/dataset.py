@@ -73,7 +73,7 @@ class HandCraftedDataset(Dataset):
                     )        
 
     def __len__(self):
-        return len(self.labels_df)       
+        return len(self.labels_df)*len(self.augmented_type_list)   
 
     def __getitem__(self, index):
         features_options = self.features_options[index]
@@ -335,8 +335,6 @@ class PairMemoWavDataset(WavDataset):
                     "data/raw_audios/{}/{}".format(augment_type, track_name))
 
 
-
-
         # get index combinations of wavs
         self.index_combinations = list(combinations([i for i in range(len(self.labels_df))], 2))
         self.wav_combinations, self.score_combinations = [], []
@@ -346,7 +344,6 @@ class PairMemoWavDataset(WavDataset):
                                             self.filename_options[index_2]])
             self.score_combinations.append([self.scores[index_1],
                                             self.scores[index_2]])
-
 
 
     def __len__(self):
@@ -524,53 +521,149 @@ def make_transforms(chunk_size, workers_cfg, hop,
 
 
 class EndToEndImgDataset(Dataset):
-    ''' End-to-end audio features to predict memorability (classification) '''
-    def __init__(self, config, mode="train"):
+    ''' End-to-end audio features to predict memorability '''
+    def __init__(self, labels_df, config, split="train"):
         super().__init__()
-        self.mode = mode
+        self.labels_df = labels_df
+        self.split = split
+        
         self.img_dir = config["path"]["img_dir"]
-        self.labels_dir = config["path"]["labels_dir"]
-        if self.mode != "test":
+        
+        if self.split != "test":
             # self.augmented_type_list = sorted(os.listdir(self.img_dir))[-1:]
             self.augmented_type_list = sorted(os.listdir(self.img_dir))[:]
         else:
             self.augmented_type_list = sorted(os.listdir(self.img_dir))[-1:]
 
-        if self.mode == "train":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[:200]
-        elif self.mode == "valid":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[200:220]
-        elif self.mode == "test":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))[220:]
-        elif self.mode == "all":
-            self.filename_memorability_df = pd.read_csv(os.path.join(self.labels_dir, "track_memorability_scores_beta.csv"))            
-        else:
-            raise Exception ("Invalid dataset mode")
-
-        self.idx_to_filename = {idx: filename for idx, filename in enumerate(self.filename_memorability_df["track"])}
-        self.idx_to_mem_score = {idx: score for idx, score in enumerate(self.filename_memorability_df["score"])}
+        self.track_names = list(self.labels_df.track)
+        self.scores = torch.tensor(self.labels_df.score)
+        self.filename_to_score = dict(zip(self.track_names, self.scores))
+        self.img_options = [[] for _ in range(len(self.labels_df))]
         
-        self.labels = []
         self.mels_imgs = []
         self.transforms = transforms.Compose([
             transforms.Resize((config["model"]["image_size"], config["model"]["image_size"])),
             transforms.ToTensor()
         ])
 
-        for augment_type in tqdm(self.augmented_type_list):
-            for audio_idx in range(len(self.idx_to_filename)):         
-                img_path = os.path.join(self.img_dir, augment_type, "mels_"+self.idx_to_filename[audio_idx].replace(".wav", ".png"))        
+        for track_name in tqdm(self.track_names):
+            for augment_type in self.augmented_type_list:
+                       
+                img_path = os.path.join(self.img_dir, augment_type, "mels_"+track_name.replace(".wav", ".png"))        
                 image = Image.open(img_path).convert('L') # convert to grayscale
-                self.mels_imgs.append(self.transforms(image))
-
-                self.labels.append(torch.tensor(self.idx_to_mem_score[audio_idx]))
+                self.img_options[self.track_names.index(track_name)].append(self.transforms(image))
 
 
     def __len__(self):
-        return len(self.idx_to_filename)*len(self.augmented_type_list)       
+        return len(self.labels_df)
 
     def __getitem__(self, index):
-        return self.mels_imgs[index], self.labels[index]
+        img_options = self.img_options[index]
+        img =  img_options[np.random.randint(0, len(img_options))]
+        score = self.scores[index]
+        return img, score
+
+class PairEndToEndImgDataset(EndToEndImgDataset):
+    ''' Hand crafted audio features to predict memorability (classification) '''
+    def __init__(self, labels_df, config, pooling=False, split="train"):
+        super().__init__(labels_df=labels_df, config=config, split=split)
+        assert split in ["train", "valid"], "Split must be either train or valid"
+        # get index combinations of wavs
+        self.index_combinations = list(combinations([i for i in range(len(self.labels_df))], 2))
+        self.img_combinations, self.score_combinations = [], []
+        for index_pair in self.index_combinations:
+            index_1, index_2 = index_pair
+            self.img_combinations.append([self.img_options[index_1],
+                                            self.img_options[index_2]])
+            self.score_combinations.append([self.scores[index_1],
+                                            self.scores[index_2]])
+
+
+    def __len__(self):
+        return len(self.index_combinations)
+
+    def __getitem__(self, index):
+        img_options_1, img_options_2 = self.img_combinations[index]
+        img_1 = img_options_1[np.random.randint(0, len(img_options_1))]
+        img_2 = img_options_2[np.random.randint(0, len(img_options_2))]
+        score_1, score_2 = self.score_combinations[index]
+
+        return img_1, img_2, score_1, score_2
+
+def scale_minmax(X, min=0.0, max=1.0):
+                X_std = (X - X.min()) / (X.max() - X.min())
+                X_scaled = X_std * (max - min) + min
+                return X_scaled
+
+class AudioDataset(Dataset):
+    ''' Audio features to predict memorability '''
+    def __init__(self, labels_df, config, split="train"):
+        super().__init__()
+        self.sr = config["hparas"]["sample_rate"]
+        self.labels_df = labels_df
+        self.split = split
+        self.track_names = list(self.labels_df.track)
+        # self.scores = torch.tensor(self.labels_df.score)
+        self.filename_to_score = dict(zip(self.track_names, self.labels_df.score))
+        self.audio_root = config["path"]["audio_root"]
+        self.audio_paths = []
+        self.scores = []
+        self.audios = []
+        self.imgs = []
+        if self.split == "train":
+            self.audio_transforms = transforms.Compose([
+                        # PitchShift(),
+                        Reverb(ir_files=[],\
+                                ir_fmt=config["augmentation"]["reverb"]["ir_fmt"],\
+                                data_root=config["augmentation"]["reverb"]["data_root"], \
+                                prob=config["augmentation"]["reverb"]["prob"]),
+                        SimpleAdditive(noises_dir=config["augmentation"]["add_noise"]["path"], \
+                                        snr_levels=config["augmentation"]["add_noise"]["snr_options"], \
+                                        prob=config["augmentation"]["add_noise"]["prob"]),
+                        TimeStretch(rates=config["augmentation"]["time_stretch"]["speed_range"], \
+                                    probability=config["augmentation"]["time_stretch"]["prob"]),
+                        Melspectrogram(sample_rate=self.sr),
+                        # torchaudio.transforms.MelSpectrogram(sample_rate=self.sr, n_fft=2048, hop_length=512),
+                    ])
+        else:
+            self.audio_transforms = transforms.Compose([
+                        Melspectrogram(sample_rate=self.sr),
+                    ])
+
+
+        self.image_transforms = transforms.Compose([
+            transforms.Resize((config["model"]["image_size"], config["model"]["image_size"])),
+            transforms.ToTensor()
+        ])
+
+        if self.split != "test":
+            self.audio_dirs = os.listdir(self.audio_root)
+        else:
+            self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
+        
+        for audio_dir in tqdm(self.audio_dirs):
+            for track_name in self.track_names:
+                self.scores.append(torch.tensor(self.filename_to_score[track_name]))
+                
+                fname = os.path.join(self.audio_root, audio_dir, track_name)
+                wav, rate = torchaudio.load(fname)
+                wav = wav.numpy().squeeze()
+                # wav, rate = librosa.load(fname, sr=self.sr)
+                # self.audios.append(wav)
+                mels = self.audio_transforms(wav)
+                S_dB = librosa.power_to_db(mels, ref=np.max)
+                image = Image.fromarray(scale_minmax(np.flip(S_dB, axis=0), 0, 255))
+                
+                self.imgs.append(self.image_transforms(image))
+                
+                
+    def __len__(self):
+        return len(self.imgs)
+
+    def __getitem__(self, index):
+        mels = self.imgs[index]
+        score = self.scores[index]
+        return mels, score
 
 class ReconstructionDataset(Dataset):
     ''' LSTM　hidden states to reconstruct mel-spectrograms ref: https://arxiv.org/pdf/1911.01102.pdf '''

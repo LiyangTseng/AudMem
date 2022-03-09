@@ -74,6 +74,7 @@ class Solver(BaseSolver):
             for idx, data in enumerate(tqdm(self.test_loader)):
                 feat = self.fetch_data(data)
                 pred_score = self.model(feat).cpu().detach().item()
+                # pred_score = 0.6560147067
                 self.pred_scores.append(pred_score)
                 writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
         
@@ -82,7 +83,7 @@ class Solver(BaseSolver):
         prediction_df = pd.read_csv(self.memo_output_path)
         correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
         reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
-
+        # reg_loss = torch.sqrt(reg_loss)
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation))
             f.write("regression loss: {}".format(str(reg_loss)))

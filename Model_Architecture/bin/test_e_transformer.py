@@ -6,8 +6,8 @@ import pandas as pd
 from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
-from models.memorability_model import E_CRNN
-from src.dataset import EndToEndImgDataset, AudioDataset
+from models.memorability_model import E_Transformer
+from src.dataset import EndToEndImgDataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -35,14 +35,15 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for testing '''
-        # self.test_set = EndToEndImgDataset(config=self.config, mode="test")
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
         
         fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
         self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
-        self.test_set = AudioDataset(labels_df=self.test_labels_df, config=self.config, split="test")
+
+        self.test_set = EndToEndImgDataset(labels_df=self.test_labels_df, config=self.config, split="test")
+        
         self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
@@ -54,7 +55,7 @@ class Solver(BaseSolver):
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
+        self.model = E_Transformer(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
 
         # Load target model in eval mode
@@ -68,19 +69,18 @@ class Solver(BaseSolver):
         
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "pred_score", "lab_score"])
+            writer.writerow(["track", "score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 mels_img, lab_scores = self.fetch_data(data)
-                pred_score = self.model(mels_img).cpu().detach().item()
+                pred_score = self.model(mels_img)
                 self.pred_scores.append(pred_score)
-                writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
-
+                writer.writerow([self.test_labels_df.track.values[idx], pred_score.cpu().detach().item()])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
+        correlation = stats.spearmanr(prediction_df["score"].values, self.test_labels_df.score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df["score"].values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
 
         with open(self.corr_output_path, 'w') as f:
             f.write("using weight: {}\n".format(self.paras.load))
@@ -88,7 +88,7 @@ class Solver(BaseSolver):
             f.write("regression loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
-        # self.interpret_model()
+        self.interpret_model()
 
     def interpret_model(self, N=5):
         ''' Use Captum to interprete feature importance on top N memorability score '''
@@ -113,7 +113,7 @@ class Solver(BaseSolver):
 
 
             # sns.heatmap(attributes[0].squeeze(0).cpu().detach().numpy().T)
-            interp_path = os.path.join(self.interp_dir, "heatmap_"+self.test_set.idx_to_filename[220+idx].replace(".wav", ".png"))
+            interp_path = os.path.join(self.interp_dir, "heatmap_"+self.test_labels_df.track[idx].replace(".wav", ".png"))
             plt.savefig(interp_path)
             plt.close()
         

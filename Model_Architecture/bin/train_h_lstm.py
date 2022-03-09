@@ -139,7 +139,7 @@ class Solver(BaseSolver):
         }
 
         torch.save(full_dict, ckpt_path)
-        self.verbose("Saved checkpoint (step = {}, {} = {:.2f}) and status @ {}".
+        self.verbose("Saved checkpoint (epochs = {}, {} = {:.2f}) and status @ {}".
                     #  format(human_format(self.step), metric, score, ckpt_path))
                      format(human_format(self.epoch), metric, score, ckpt_path))
 

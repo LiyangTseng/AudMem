@@ -1,0 +1,44 @@
+experiment:
+    batch_size: 16
+    num_workers: 15
+    log_freq: 50
+
+model:
+    image_size: 64
+    seq_len: 157
+    transformer_encoder:
+        d_model: 128 
+        nhead: 8
+        dim_feedforward: 2048
+        dropout: 0.1
+        num_layers: 6
+    fc_1:
+        input_size: 20096 # d_moel * seq_len
+        output_size: 1000
+    fc_2:
+        input_size: 1000
+        output_size: 50
+    output:
+        input_size: 50
+        output_size: 1 
+    use_ranking_loss: True
+    ranking_weight: 0.4
+
+hparas:                                   # Experiment hyper-parameters
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 100
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.00005
+    lr_scheduler:
+        type: 'decay'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+
+path:
+    img_dir: "data/mels_img"
+    label_file: "data/labels/track_memorability_scores_beta.csv"

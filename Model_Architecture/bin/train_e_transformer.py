@@ -7,8 +7,8 @@ import pandas as pd
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from models.memorability_model import H_MLP
-from src.dataset import PairHandCraftedDataset
+from models.memorability_model import E_Transformer
+from src.dataset import EndToEndImgDataset, PairEndToEndImgDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
@@ -20,27 +20,25 @@ class Solver(BaseSolver):
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
         self.log_freq = self.config["experiment"]['log_freq']
+        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
         self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
     def fetch_data(self, data):
         ''' Move data to device '''
-
-        feat_1, feat_2, lab_scores_1, lab_scores_2 = data
-
-        seq_feat_1, non_seq_feat_1 = feat_1
-        seq_feat_2, non_seq_feat_2 = feat_2
-        feat_1 = torch.cat((seq_feat_1, non_seq_feat_1), dim=1)
-        feat_2 = torch.cat((seq_feat_2, non_seq_feat_2), dim=1)
-
-        feat_1, feat_2 = feat_1.to(self.device), feat_2.to(self.device)
-        lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
-
-        return feat_1, feat_2, lab_scores_1, lab_scores_2
+        if self.use_ranking_loss:
+            img_1, img_2, lab_scores_1, lab_scores_2 = data
+            img_1, img_2 = img_1.to(self.device), img_2.to(self.device)
+            lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
+            return img_1, img_2, lab_scores_1, lab_scores_2
+        else:
+            img, score = data
+            img, = img.to(self.device)
+            score = score.to(self.device).float()
+            return img, score
 
     def load_data(self):
         ''' Load data for training/validation '''
-        
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
         # indexing except testing indices
         fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
@@ -50,42 +48,46 @@ class Solver(BaseSolver):
         self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-
-        self.train_set = PairHandCraftedDataset(labels_df=self.train_labels_df, config=self.config, pooling=True, split="train")
-        self.valid_set = PairHandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, pooling=True, split="valid")
+        
         self.write_log('train_distri/lab', self.train_labels_df.score.values)
         self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
+
+        if self.use_ranking_loss:
+            self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
+            self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+        else:
+            self.train_set = EndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
+            self.valid_set = EndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
         #----------------------Weighted Random Sampler-------------------------------
         
-        bin_count = 10
-        hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
+        # bin_count = 10
+        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
+        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
 
 
-        sample_w = []
-        for score in self.train_set.scores:
-            # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-            bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-            sample_w.append(weighted[bin_idx-1])
+        # sample_w = []
+        # for score in self.train_set.scores:
+        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
+        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
+        #     sample_w.append(weighted[bin_idx-1])
 
-        sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
+        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
         #----------------------Weighted Random Sampler-------------------------------
 
-
-        self.train_loader = DataLoader(dataset=self.train_set, sampler=sampler, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"])
+        self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
+                            num_workers=self.config["experiment"]["num_workers"], shuffle=True)
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
-        data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t'
-                .format(self.train_set.features_dict, self.train_set[0][0][0].shape, self.train_set[0][0][1].shape))
+        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
+                .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
 
         self.verbose(data_msg)
 
     def set_model(self):
-        ''' Setup h_mlp model and optimizer '''
+        ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = H_MLP(model_config=self.config["model"]).to(self.device)
+        self.model = E_Transformer(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
 
         # Losses
@@ -156,9 +158,9 @@ class Solver(BaseSolver):
         }
 
         torch.save(full_dict, ckpt_path)
-        self.verbose("Saved checkpoint (epoch = {}, {} = {:.2f}) and status @ {}".
+        self.verbose("Saved checkpoint (epochs = {}, {} = {:.2f}) and status @ {}".
                     #  format(human_format(self.step), metric, score, ckpt_path))
-                     format(self.epoch, metric, score, ckpt_path))
+                     format(human_format(self.epoch), metric, score, ckpt_path))
 
     def exec(self):
         ''' Training Memorabiliy Regression/Ranking System '''
@@ -177,16 +179,18 @@ class Solver(BaseSolver):
                 # Pre-step : update tf_rate/lr_rate and do zero_grad
                 # tf_rate = self.optimizer.pre_step(self.step)
                 self.optimizer.opt.zero_grad()
+                total_loss = 0
 
                 # Fetch data
-                feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                # TODO: change to pair-wise data
+                img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
                 self.timer.cnt('rd')
                 lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
 
                 # Forward model
-                pred_scores_1 = self.model(feat_1)
-                pred_scores_2 = self.model(feat_2)
+                pred_scores_1 = self.model(img_1)
+                pred_scores_2 = self.model(img_2)
                 pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
                 reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
@@ -247,13 +251,13 @@ class Solver(BaseSolver):
         for i, data in enumerate(self.valid_loader):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
             # Fetch data
-            feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+            img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
             lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
             # Forward model
             with torch.no_grad():
-                pred_scores_1 = self.model(feat_1)
-                pred_scores_2 = self.model(feat_2)
+                pred_scores_1 = self.model(img_1)
+                pred_scores_2 = self.model(img_2)
                 pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
                 valid_reg_prediction.append(pred_scores)
