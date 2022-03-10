@@ -613,6 +613,11 @@ class AudioDataset(Dataset):
         if self.split == "train":
             self.audio_transforms = transforms.Compose([
                         # PitchShift(),
+                        VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
+                                prob=config["augmentation"]["vol"]["prob"]),
+                        BandDrop(filt_files=config["augmentation"]["banddrop"]["ir_files"],\
+                                data_root=config["augmentation"]["banddrop"]["data_root"], \
+                                prob=config["augmentation"]["banddrop"]["prob"]),
                         Reverb(ir_files=[],\
                                 ir_fmt=config["augmentation"]["reverb"]["ir_fmt"],\
                                 data_root=config["augmentation"]["reverb"]["data_root"], \
@@ -620,6 +625,12 @@ class AudioDataset(Dataset):
                         SimpleAdditive(noises_dir=config["augmentation"]["add_noise"]["path"], \
                                         snr_levels=config["augmentation"]["add_noise"]["snr_options"], \
                                         prob=config["augmentation"]["add_noise"]["prob"]),
+                        Fade(sample_rate=self.sr ,\
+                            prob=config["augmentation"]["fade"]["prob"], \
+                            fade_in_second=config["augmentation"]["fade"]["fade_in_sec"], \
+                            fade_out_second=config["augmentation"]["fade"]["fade_out_sec"], \
+                            fade_shape=config["augmentation"]["fade"]["fade_shape"]),
+
                         TimeStretch(rates=config["augmentation"]["time_stretch"]["speed_range"], \
                                     probability=config["augmentation"]["time_stretch"]["prob"]),
                         Melspectrogram(sample_rate=self.sr),
