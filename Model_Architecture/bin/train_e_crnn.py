@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from models.memorability_model import E_CRNN
+from models.memorability_model import E_CRNN, CRNN
 from src.dataset import PairEndToEndImgDataset, EndToEndImgDataset, AudioDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -23,6 +23,7 @@ class Solver(BaseSolver):
         self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
         self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
+
 
     def fetch_data(self, data):
         ''' Move data to device '''
@@ -50,15 +51,10 @@ class Solver(BaseSolver):
         # self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-        # self.train_labels_df = self.labels_df[:20].reset_index(drop=True)
-        # self.train_labels_df = self.labels_df[20:70].reset_index(drop=True)
-        # self.train_labels_df = self.labels_df[70:].reset_index(drop=True)
         if self.use_ranking_loss:
             self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
             self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
         else:
-            # self.train_set = EndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-            # self.valid_set = EndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
             self.train_set = AudioDataset(labels_df=self.train_labels_df, config=self.config, split="train")
             self.valid_set = AudioDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
 
@@ -82,9 +78,9 @@ class Solver(BaseSolver):
         #----------------------Weighted Random Sampler-------------------------------
 
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=True)
+                            num_workers=self.config["experiment"]["num_workers"], shuffle=True, drop_last=True)
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=False)
+                            num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
         
         data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
                 .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
@@ -94,9 +90,14 @@ class Solver(BaseSolver):
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
+        # self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
+        self.model = CRNN(imgH=self.config["model"]["image_size"][0], \
+                        nc=self.config["model"]["nc"], \
+                        nclass=self.config["model"]["nclass"], \
+                        nh=self.config["model"]["nh"], \
+                        n_rnn=self.config["model"]["n_rnn"], \
+                        leakyRelu=self.config["model"]["leakyRelu"]).to(self.device)
         self.verbose(self.model.create_msg())
-
         # Losses
         self.reg_loss_func = nn.MSELoss() # regression loss
         self.rank_loss_func = nn.BCELoss() # ranking loss
@@ -107,7 +108,7 @@ class Solver(BaseSolver):
         self.verbose(self.optimizer.create_msg())
 
         # Automatically load pre-trained model if self.paras.load is given
-        self.load_ckpt(cont=False)
+        self.load_ckpt(cont=True)
 
     def backward(self, loss):
         '''
@@ -134,15 +135,13 @@ class Solver(BaseSolver):
             ckpt = torch.load(
                 self.paras.load, map_location=self.device if self.mode == 'train' else 'cpu')
             
-            self.asr.load_state_dict(ckpt['model'])
-            if self.emb_decoder is not None:
-                self.emb_decoder.load_state_dict(ckpt['emb_decoder'])
+            self.model.load_state_dict(ckpt['model'])
 
             # Load task-dependent items
             if self.mode == 'train':
                 if cont:
-                    self.tts.load_state_dict(ckpt['tts'])
                     self.step = ckpt['global_step']
+                    self.epoch = ckpt['global_epoch']
                     self.optimizer.load_opt_state_dict(ckpt['optimizer'])
                     self.verbose('Load ckpt from {}, restarting at step {}'.format(
                         self.paras.load, self.step))
@@ -159,7 +158,7 @@ class Solver(BaseSolver):
         full_dict = {
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.get_opt_state_dict(),
-            # "global_step": self.step,
+            "global_step": self.step,
             "global_epoch": self.epoch,
             metric: float(score)
         }

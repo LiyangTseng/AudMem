@@ -4,6 +4,7 @@ import sys
 import abc
 import math
 import time
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from src.option import default_hparas
@@ -52,7 +53,11 @@ class BaseSolver():
                 from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
                 self.early_stopping = EarlyStopping(patience=self.paras.patience, verbose=True)
 
-            
+            # Seeds initialization
+            np.random.seed(self.paras.seed)
+            torch.manual_seed(self.paras.seed)
+            self.verbose("Random seed set to {}".format(self.paras.seed))
+
             self.verbose('Exp. name : {}'.format(self.exp_name))
             self.verbose('Loading data... large corpus may took a while.')
             
