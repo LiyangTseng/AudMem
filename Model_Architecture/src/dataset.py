@@ -612,7 +612,6 @@ class AudioDataset(Dataset):
         self.imgs = []
         if self.split == "train":
             self.audio_transforms = transforms.Compose([
-                        # PitchShift(),
                         VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
                                 prob=config["augmentation"]["vol"]["prob"]),
                         BandDrop(filt_files=config["augmentation"]["banddrop"]["ir_files"],\
@@ -634,16 +633,15 @@ class AudioDataset(Dataset):
                         TimeStretch(rates=config["augmentation"]["time_stretch"]["speed_range"], \
                                     probability=config["augmentation"]["time_stretch"]["prob"]),
                         Melspectrogram(sample_rate=self.sr),
-                        # torchaudio.transforms.MelSpectrogram(sample_rate=self.sr, n_fft=2048, hop_length=512),
                     ])
         else:
             self.audio_transforms = transforms.Compose([
                         Melspectrogram(sample_rate=self.sr),
                     ])
 
-
+        size = tuple(config["model"]["image_size"]) # h, w
         self.image_transforms = transforms.Compose([
-            transforms.Resize((config["model"]["image_size"], config["model"]["image_size"])),
+            transforms.Resize(size),
             transforms.ToTensor()
         ])
 
@@ -659,11 +657,11 @@ class AudioDataset(Dataset):
                 fname = os.path.join(self.audio_root, audio_dir, track_name)
                 wav, rate = torchaudio.load(fname)
                 wav = wav.numpy().squeeze()
-                # wav, rate = librosa.load(fname, sr=self.sr)
-                # self.audios.append(wav)
                 mels = self.audio_transforms(wav)
+                # mels still to need to go through librosa.power_to_db, don't know why
                 S_dB = librosa.power_to_db(mels, ref=np.max)
-                image = Image.fromarray(scale_minmax(np.flip(S_dB, axis=0), 0, 255))
+                S_dB = scale_minmax(np.flip(S_dB, axis=0), 0, 255)
+                image = Image.fromarray(S_dB)
                 
                 self.imgs.append(self.image_transforms(image))
                 

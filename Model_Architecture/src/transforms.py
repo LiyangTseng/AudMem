@@ -2324,7 +2324,21 @@ class Fade(Transform):
         else:
             return wav
         
+class FrequencyMasking(Transform):
+    """ apply freqency masking """
+    def __init__(self, freq_mask_param, prob):
+        self.freq_mask_param = freq_mask_param
+        self.prob = prob
+        self.transform = torchaudio.transforms.FrequencyMasking(freq_mask_param)
 
+    def __call__(self, wav):
+        if np.random.rand() < self.prob:
+            if not isinstance(wav, torch.Tensor):
+                wav = torch.from_numpy(wav)
+            masked = self.transform(wav)
+            return masked.numpy().squeeze()
+        else:
+            return wav
 class Melspectrogram(Transform):
     ''' generate melspectrogram from audio '''
     def __init__(self, sample_rate, **kwargs):

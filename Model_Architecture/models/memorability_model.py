@@ -230,7 +230,7 @@ class CRNN(nn.Module):
         ks = [3, 3, 3, 3, 3, 3, 2]
         ps = [1, 1, 1, 1, 1, 1, 0]
         ss = [1, 1, 1, 1, 1, 1, 1]
-        nm = [64, 128, 256, 256, 512, 512, 512]
+        nm = [8, 16, 16, 32, 64, 32, 32]
         # ks = [3, 3, 3, 3, 3, 3, 2]
         # ps = [1, 1, 1, 1, 1, 1, 0]
         # ss = [1, 1, 1, 1, 1, 1, 1]
@@ -241,36 +241,39 @@ class CRNN(nn.Module):
         def convRelu(i, batchNormalization=False):
             nIn = nc if i == 0 else nm[i - 1]
             nOut = nm[i]
-            cnn.add_module('conv{0}'.format(i),
-                           nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i]))
+            layer = nn.Sequential()
+            layer.add_module('conv{0}'.format(i),
+                            nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i]))
+            
             if batchNormalization:
-                cnn.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(nOut))
+                layer.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(nOut))
             if leakyRelu:
-                cnn.add_module('relu{0}'.format(i),
-                               nn.LeakyReLU(0.2, inplace=True))
+                layer.add_module('relu{0}'.format(i),
+                                nn.LeakyReLU(0.2, inplace=True))
             else:
-                cnn.add_module('relu{0}'.format(i), nn.ReLU(True))
+                layer.add_module('relu{0}'.format(i), nn.ReLU(True))
+            return layer
 
         # N, C, H, W
 
-        # N, 1, 32, 128
-        convRelu(0)
-        cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # 64x16x64
-        convRelu(1)
-        cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # 128x8x32
-        convRelu(2, True)
-        convRelu(3)
-        cnn.add_module('pooling{0}'.format(2),
-                       nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 256x4x16
-        convRelu(4, True)
-        convRelu(5)
-        cnn.add_module('pooling{0}'.format(3),
-                       nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512x2x16
-        convRelu(6, True)  # 512x1x16
+        # N, 1, 16, 64
+        self.Conv1 = convRelu(0)
+        # N, 6, 16, 64
+        # N, 8, 8, 32
+        self.Conv2 = convRelu(1)
+        # N, 16, 8, 32
+        self.MaxPool2 = nn.MaxPool2d(2, 2)
+        # N, 16, 4, 16
+        self.Conv3 = convRelu(2, True)
+        # N, 16, 4, 16
+        self.Conv4 = convRelu(3)
+        # N, 32, 4, 16
+        self.MaxPool1 = nn.MaxPool2d((2, 3), (2, 1), (0, 1))
+        self.MaxPool2 = nn.MaxPool2d(2, 2)
 
         self.cnn = cnn
         self.rnn = nn.Sequential(
-            BidirectionalLSTM(512, nh, nh),
+            BidirectionalLSTM(32, nh, nh),
             BidirectionalLSTM(nh, nh, nclass))
 
     def create_msg(self):
@@ -281,7 +284,21 @@ class CRNN(nn.Module):
 
     def forward(self, input):
         # conv features
-        conv = self.cnn(input)
+        # conv = self.cnn(input)
+
+        conv = input
+        conv = self.Conv1(conv)
+        conv = self.MaxPool1(conv)
+        conv = self.Conv2(conv)
+        conv = self.MaxPool1(conv)
+        conv = self.Conv3(conv)
+        conv = self.MaxPool2(conv)
+        conv = self.Conv4(conv)
+        conv = self.MaxPool2(conv)
+        
+        
+
+
         b, c, h, w = conv.size()
         assert h == 1, "the height of conv must be 1"
         conv = conv.squeeze(2)
