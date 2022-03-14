@@ -227,10 +227,10 @@ class CRNN(nn.Module):
         super(CRNN, self).__init__()
         assert imgH % 16 == 0, 'imgH has to be a multiple of 16'
 
-        ks = [3, 3, 3, 3, 3, 3, 2]
-        ps = [1, 1, 1, 1, 1, 1, 0]
-        ss = [1, 1, 1, 1, 1, 1, 1]
-        nm = [8, 16, 16, 32, 64, 32, 32]
+        ks = [3, 3, 3, 3, 3]
+        ps = [1, 1, 1, 1, 1]
+        ss = [1, 1, 1, 1, 1]
+        nm = [16, 32, 64, 128]
         # ks = [3, 3, 3, 3, 3, 3, 2]
         # ps = [1, 1, 1, 1, 1, 1, 0]
         # ss = [1, 1, 1, 1, 1, 1, 1]
@@ -273,7 +273,7 @@ class CRNN(nn.Module):
 
         self.cnn = cnn
         self.rnn = nn.Sequential(
-            BidirectionalLSTM(32, nh, nh),
+            BidirectionalLSTM(128, nh, nh),
             BidirectionalLSTM(nh, nh, nclass))
 
     def create_msg(self):
@@ -302,10 +302,12 @@ class CRNN(nn.Module):
         b, c, h, w = conv.size()
         assert h == 1, "the height of conv must be 1"
         conv = conv.squeeze(2)
+        # TODO: check if this is correct
         conv = conv.permute(2, 0, 1)  # [w, b, c]
 
         # rnn features
-        output = self.rnn(conv)
+        # output = self.rnn(conv)
+        output = self.rnn(conv)[-1]
 
         return output
 
@@ -326,8 +328,8 @@ class E_Transformer(nn.Module):
                                                     dim_feedforward=self.dim_feedforward,
                                                     dropout=self.dropout)
 
-        self.transforer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
-        self.transforer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
+        self.transformer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
                                                   nn.Dropout(0.6))
 
         self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
@@ -348,17 +350,15 @@ class E_Transformer(nn.Module):
 
     def forward(self, inp):
 
-        # pad zero to seq_len (need to be divisible by n_head)
-        # inp = F.pad(input=inp, pad=(0,  self.d_model - inp.size(-1), 0, 0), mode='constant', value=0)
 
         # (batch_size, 1(gray scale), embed_dim(n_mels), seq_len)
         out = inp.squeeze(1)
         # (batch_size, embed_dim(n_mels), seq_len)
         out = torch.transpose(out, 1, 2) # swap seq_len and embed_dim
         # (batch_size, seq_len, embed_dim(n_mels))
-        out = self.transforer_encoder(out)
+        out = self.transformer_encoder(out)
 
-        out = self.transforer_encoder_f(out)
+        out = self.transformer_encoder_f(out)
         out = out.contiguous().view(out.size()[0], -1)
         out = self.fcBlock1(out)
         out = self.fcBlock2(out)

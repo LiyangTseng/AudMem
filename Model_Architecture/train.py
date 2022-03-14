@@ -6,8 +6,8 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_transformer, e_pase, e_pasep, pase_mlp, pase_lstm, probing", default="e_crnn")
-    parser.add_argument("--patience", default=500, type=int, help="early stop patience")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_transformer, e_pase, e_pasep, pase_mlp, pase_lstm, probing, ssast", default="ssast")
+    parser.add_argument("--patience", default=100, type=int, help="early stop patience")
     parser.add_argument('--name', default=None, type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU training.')
     parser.add_argument('--logdir', default='tensorboard/', type=str,
@@ -69,6 +69,8 @@ if __name__ == "__main__":
         from bin.train_pase_mlp import Solver        
     elif paras.model == "pase_lstm":
         from bin.train_pase_lstm import Solver     
+    elif paras.model == "ssast":
+        from bin.train_ssast import Solver
     elif paras.model == "probing":
         from bin.train_probing import Solver
     else:
@@ -77,8 +79,8 @@ if __name__ == "__main__":
     
     solver = Solver(config=config, paras=paras, mode="train")
     solver.load_data()
-    solver.set_model()
-    solver.exec()
+    # solver.set_model()
+    # solver.exec()
 
     
  

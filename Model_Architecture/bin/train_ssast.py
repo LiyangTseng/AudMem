@@ -1,13 +1,15 @@
 import os
 import math
+import json
 import torch
+import argparse
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from models.memorability_model import E_CRNN, CRNN
+from ssast.src.models.ast_models import ASTModel
 from src.dataset import PairEndToEndImgDataset, EndToEndImgDataset, AudioDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -19,26 +21,109 @@ class Solver(BaseSolver):
 
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
-        self.log_freq = self.config["experiment"]['log_freq']
-        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
-        self.ranking_weight = config["model"]["ranking_weight"]
+        if not os.path.exists(self.config["path"]["pretrain_weight_file"]):
+            os.system("wget {} - O {}".format("https://www.dropbox.com/s/ewrzpco95n9jdz6/SSAST-Base-Patch-400.pth?dl=1", self.config["path"]["pretrain_weight_file"]))
+        
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        self.args = parser.parse_args()
+        setattr(self.arg, "dataset", "audioset")
+        setattr(self.arg, "set", "balanced")
+        setattr(self.arg, "dataset_mean", -4.2677393)
+
+        setattr(self.arg, "dataset_std", 4.5689974)
+        setattr(self.arg, "target_length",  1024)
+        setattr(self.arg, "noise",  False)
+        setattr(self.arg, "task",  "ft_avgtok")
+        setattr(self.arg, "model_size",  "base")
+        setattr(self.arg, "head_lr",  1)
+        setattr(self.arg, "warmup",  True)
+        setattr(self.arg, "bal",  "none")
+        setattr(self.arg, "lr",  5e-5)
+        setattr(self.arg, "epoch",  25)
+        setattr(self.arg, "tr_data",  "~/Code/AudMem/Model_Architecture/data/ssast_input/train.json")
+        setattr(self.arg, "freqm", 48)
+        setattr(self.arg, "timem", 192)
+        setattr(self.arg, "mixup", 0.5)
+        setattr(self.arg, "fstride", 10)
+        setattr(self.arg, "tstride", 10)
+        setattr(self.arg, "fshape", 16)
+        setattr(self.arg, "tshape", 16)
+        setattr(self.arg, "batch_size", 12)
+        setattr(self.arg, "exp_dir", "exp/test01-${dataset}-f${fstride}-${fshape}-t${tstride}-${tshape}-b${batch_size}-lr${lr}-${task}-${model_size}-${pretrain_exp}-${pretrain_model}-${head_lr}x-noise${noise}-3")
+        
+        setattr(self.arg, "save_model", False)
+        setattr(self.arg, "label-csv", "./data/class_labels_indices.csv")
+        setattr(self.arg, "n_class", 527)
+        setattr(self.arg, "warmup", False)
+        setattr(self.arg, "adaptschedule", False)
+        setattr(self.arg, "num_mel_bins", 128)
+        setattr(self.arg, "lrscheduler_start", 10)
+        setattr(self.arg, "lrscheduler_step", 5)
+        setattr(self.arg, "lrscheduler_decay", 0.5)
+        setattr(self.arg, "wa", True)
+        setattr(self.arg, "wa_start", 6)
+        setattr(self.arg, "wa_end", 25)
+
+
+        # CUDA_CACHE_DISABLE=1 python -W ignore ../../run.py --dataset ${dataset} \
+        # --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
+        # --label-csv ./data/class_labels_indices.csv --n_class 527 \
+        # --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model False \
+        # --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
+        # --tstride $tstride --fstride $fstride --fshape ${fshape} --tshape ${tshape} --warmup False --task ${task} \
+        # --model_size ${model_size} --adaptschedule False \
+        # --pretrained_mdl_path ${pretrain_path} \
+        # --dataset_mean ${dataset_mean} --dataset_std ${dataset_std} --target_length ${target_length} \
+        # --num_mel_bins 128 --head_lr ${head_lr} --noise ${noise} \
+        # --lrscheduler_start 10 --lrscheduler_step 5 --lrscheduler_decay 0.5 --wa True --wa_start 6 --wa_end 25 \
+        # --loss BCE --metrics mAP
+
+        # self.log_freq = self.config["experiment"]['log_freq']
+        # self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
+        # self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        if self.use_ranking_loss:
-            img_1, img_2, lab_scores_1, lab_scores_2 = data
+        # if self.use_ranking_loss:
+        #     img_1, img_2, lab_scores_1, lab_scores_2 = data
 
-            img_1, img_2 = img_1.to(self.device), img_2.to(self.device)
-            lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
+        #     img_1, img_2 = img_1.to(self.device), img_2.to(self.device)
+        #     lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
 
-            return img_1, img_2, lab_scores_1, lab_scores_2
-        else:
-            img, score = data
-            img = img.to(self.device)
-            score = score.to(self.device).float()
-            return img, score
+        #     return img_1, img_2, lab_scores_1, lab_scores_2
+        # else:
+        #     img, score = data
+        #     img = img.to(self.device)
+        #     score = score.to(self.device).float()
+        #     return img, score
+
+    def generate_json_format(self, df, split):
+        """ format should be 'data': {'wav': '', 'labels': ''}, ... """
+        assert split in ['train', 'valid', 'test']
+        
+        audio_root = os.path.abspath(self.config["path"]["audio_root"])
+        audio_subdir = os.listdir(audio_root)
+        data_arr = df.to_numpy()
+        
+        data = {}
+        data["data"] = []
+        
+        for row in data_arr:
+            wav, label = row
+            for subdir in audio_subdir:
+                data["data"].append({"wav": os.path.join(audio_root, subdir, wav), "labels": label})
+        
+        json_input_dir = self.config["path"]["ssast_input_dir"]
+        os.makedirs(json_input_dir, exist_ok=True)        
+        json_data_path = os.path.join(json_input_dir, split+'.json')
+        
+        with open(json_data_path, 'w') as f:
+            json.dump(data, f)
+        
+        self.verbose("{} data saved at {}".format(split, json_data_path))
+
 
     def load_data(self):
         ''' Load data for training/validation '''
@@ -47,20 +132,28 @@ class Solver(BaseSolver):
         fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
+        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
+        
         self.labels_df = self.labels_df[~for_test]
         # self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-        if self.use_ranking_loss:
-            self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-            self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
-        else:
-            self.train_set = AudioDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-            self.valid_set = AudioDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+
+        # generate json data for this fold
+        self.generate_json_format(self.train_labels_df, "train")
+        self.generate_json_format(self.valid_labels_df, "valid")
+        self.generate_json_format(self.test_labels_df, "test")
+
+        # if self.use_ranking_loss:
+        #     self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
+        #     self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+        # else:
+        #     self.train_set = AudioDataset(labels_df=self.train_labels_df, config=self.config, split="train")
+        #     self.valid_set = AudioDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
 
 
-        self.write_log('train_distri/lab', self.train_labels_df.score.values)
-        self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
+        # self.write_log('train_distri/lab', self.train_labels_df.score.values)
+        # self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
         #----------------------Weighted Random Sampler-------------------------------
         
         # bin_count = 10
@@ -77,31 +170,21 @@ class Solver(BaseSolver):
         # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
         #----------------------Weighted Random Sampler-------------------------------
 
-        self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=True, drop_last=True)
-        self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
+        # self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
+        #                     num_workers=self.config["experiment"]["num_workers"], shuffle=True, drop_last=True)
+        # self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
+        #                     num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
         
-        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-                .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
+        # data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
+        #         .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
 
-        self.verbose(data_msg)
+        # self.verbose(data_msg)
 
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        # self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
-        self.model = CRNN(imgH=self.config["model"]["image_size"][0], \
-                        nc=self.config["model"]["nc"], \
-                        nclass=self.config["model"]["nclass"], \
-                        nh=self.config["model"]["nh"], \
-                        n_rnn=self.config["model"]["n_rnn"], \
-                        leakyRelu=self.config["model"]["leakyRelu"]).to(self.device)
-        self.verbose(self.model.create_msg())
-        # Losses
-        self.reg_loss_func = nn.MSELoss() # regression loss
-        self.rank_loss_func = nn.BCELoss() # ranking loss
-        
+        self.model = ASTModel()
+
 
         # Optimizer
         self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])

@@ -6,7 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
-from models.memorability_model import E_CRNN
+from models.memorability_model import E_CRNN, CRNN
 from src.dataset import EndToEndImgDataset, AudioDataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
@@ -47,14 +47,20 @@ class Solver(BaseSolver):
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
         data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-                .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
+                .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
 
         self.verbose(data_msg)
 
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
+        # self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
+        self.model = CRNN(imgH=self.config["model"]["image_size"][0], \
+                        nc=self.config["model"]["nc"], \
+                        nclass=self.config["model"]["nclass"], \
+                        nh=self.config["model"]["nh"], \
+                        n_rnn=self.config["model"]["n_rnn"], \
+                        leakyRelu=self.config["model"]["leakyRelu"]).to(self.device)
         self.verbose(self.model.create_msg())
 
         # Load target model in eval mode

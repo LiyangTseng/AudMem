@@ -102,8 +102,8 @@ hparas:                                   # Experiment hyper-parameters
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 
 path:
+    pretrain_weight_file: "ssast/SSAST-Base-Patch-400.pth"
     audio_root: "data/raw_audios"
-    # noise_path: [data/pink_noise_3m.wav]
-    
+    ssast_input_dir: "data/ssast_input"    
     img_dir: "data/mels_img"
     label_file: "data/labels/track_memorability_scores_beta.csv"

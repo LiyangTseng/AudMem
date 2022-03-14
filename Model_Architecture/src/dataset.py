@@ -638,8 +638,10 @@ class AudioDataset(Dataset):
             self.audio_transforms = transforms.Compose([
                         Melspectrogram(sample_rate=self.sr),
                     ])
-
-        size = tuple(config["model"]["image_size"]) # h, w
+        if isinstance (config["model"]["image_size"], list):
+            size = tuple(config["model"]["image_size"]) # h, w
+        else:
+            size = tuple((config["model"]["image_size"], config["model"]["image_size"]))
         self.image_transforms = transforms.Compose([
             transforms.Resize(size),
             transforms.ToTensor()
@@ -656,6 +658,8 @@ class AudioDataset(Dataset):
                 
                 fname = os.path.join(self.audio_root, audio_dir, track_name)
                 wav, rate = torchaudio.load(fname)
+                # change sampling rate
+                wav = torchaudio.transforms.Resample(rate, self.sr)(wav)
                 wav = wav.numpy().squeeze()
                 mels = self.audio_transforms(wav)
                 # mels still to need to go through librosa.power_to_db, don't know why

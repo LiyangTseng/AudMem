@@ -5,9 +5,9 @@ import numpy as np
 import subprocess
 import shlex
 import random
-# import pysptk
+import pysptk
 import os
-# from python_speech_features import logfbank
+from python_speech_features import logfbank
 import librosa
 import struct
 import glob
@@ -21,8 +21,8 @@ import multiprocessing as mp
 from scipy.signal import lfilter, resample
 from scipy.interpolate import interp1d
 from torchvision.transforms import Compose
-# from ahoproc_tools.interpolate import interpolation
-# from ahoproc_tools.io import *
+from ahoproc_tools.interpolate import interpolation
+from ahoproc_tools.io import *
 from joblib import Parallel, delayed
 import math
 from typing import Optional

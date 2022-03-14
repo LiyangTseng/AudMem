@@ -48,7 +48,7 @@ class Solver(BaseSolver):
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
         data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-                .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
+                .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
 
         self.verbose(data_msg)
 

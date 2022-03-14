@@ -8,7 +8,7 @@ from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
 from models.memorability_model import E_Transformer
-from src.dataset import EndToEndImgDataset, PairEndToEndImgDataset
+from src.dataset import AudioDataset, PairEndToEndImgDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
@@ -33,7 +33,7 @@ class Solver(BaseSolver):
             return img_1, img_2, lab_scores_1, lab_scores_2
         else:
             img, score = data
-            img, = img.to(self.device)
+            img = img.to(self.device)
             score = score.to(self.device).float()
             return img, score
 
@@ -56,8 +56,8 @@ class Solver(BaseSolver):
             self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
             self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
         else:
-            self.train_set = EndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-            self.valid_set = EndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+            self.train_set = AudioDataset(labels_df=self.train_labels_df, config=self.config, split="train")
+            self.valid_set = AudioDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
         #----------------------Weighted Random Sampler-------------------------------
         
         # bin_count = 10
@@ -79,8 +79,13 @@ class Solver(BaseSolver):
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
-        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-                .format("melspectrogram", self.config["model"]["image_size"], self.config["model"]["image_size"]))
+        if isinstance(self.config["model"]["image_size"], list):
+            data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
+                .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
+        else:
+            data_msg = ('I/O spec.  | visual feature = {}\t| image shape = \t'
+                .format("melspectrogram", self.config["model"]["image_size"]))
+
 
         self.verbose(data_msg)
 
@@ -152,7 +157,7 @@ class Solver(BaseSolver):
         full_dict = {
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.get_opt_state_dict(),
-            # "global_step": self.step,
+            "global_step": self.step,
             "global_epoch": self.epoch,
             metric: float(score)
         }
@@ -182,42 +187,63 @@ class Solver(BaseSolver):
                 total_loss = 0
 
                 # Fetch data
-                # TODO: change to pair-wise data
-                img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                self.timer.cnt('rd')
-                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+
+                if self.use_ranking_loss:
+                    img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                    self.timer.cnt('rd')
+                    lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
 
-                # Forward model
-                pred_scores_1 = self.model(img_1)
-                pred_scores_2 = self.model(img_2)
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                    # Forward model
+                    pred_scores_1 = self.model(img_1)
+                    pred_scores_2 = self.model(img_2)
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                # reg_loss = torch.sqrt(reg_loss)
-                train_reg_prediction.append(pred_scores)
-                train_reg_loss.append(reg_loss.cpu().detach().numpy())
-                
-                # ref: https://www.cnblogs.com/little-horse/p/10468311.html
-                train_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                train_rank_loss.append(rank_loss.cpu().detach().numpy())
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    train_reg_prediction.append(pred_scores)
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    
+                    # ref: https://www.cnblogs.com/little-horse/p/10468311.html
+                    train_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    train_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                train_total_loss.append(total_loss.cpu().detach().numpy())
-                self.timer.cnt('fw')
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    train_total_loss.append(total_loss.cpu().detach().numpy())
+                    self.timer.cnt('fw')
 
-                # Backprop
-                grad_norm = self.backward(total_loss)
-                self.step += 1
+                    # Backprop
+                    grad_norm = self.backward(total_loss)
+                    self.step += 1
 
-                if i % self.log_freq == 0:
-                    self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
+                    if i % self.log_freq == 0:
+                        self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
 
+                else:
+                    img, lab_scores = self.fetch_data(data)
+                    self.timer.cnt('rd')
+
+                    # Forward model
+                    pred_scores = self.model(img)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    train_reg_prediction.append(pred_scores)
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    total_loss = reg_loss
+                    train_total_loss.append(total_loss.cpu().detach().numpy())
+                    self.timer.cnt('fw')
+
+                    # Backprop
+                    grad_norm = self.backward(total_loss)
+                    self.step += 1
+
+                    if i % self.log_freq == 0:
+                        # self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
 
             # Logger
             self.progress('Tr stat | Loss - {:.2f} | Grad. Norm - {:.2f} | {}'
@@ -251,49 +277,57 @@ class Solver(BaseSolver):
         for i, data in enumerate(self.valid_loader):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
             # Fetch data
-            img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-            lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+            if self.use_ranking_loss:
+                img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
-            # Forward model
-            with torch.no_grad():
-                pred_scores_1 = self.model(img_1)
-                pred_scores_2 = self.model(img_2)
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                # Forward model
+                with torch.no_grad():
+                    pred_scores_1 = self.model(img_1)
+                    pred_scores_2 = self.model(img_2)
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
-                valid_reg_prediction.append(pred_scores)
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                # reg_loss = torch.sqrt(reg_loss)
-                valid_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    valid_reg_prediction.append(pred_scores)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
 
-                valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                valid_rank_loss.append(rank_loss.cpu().detach().numpy())
+                    valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    valid_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                valid_total_loss.append(total_loss.cpu().detach().numpy())
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
+            else:
+                img, lab_scores = self.fetch_data(data)
+                with torch.no_grad():
+                    pred_scores = self.model(img)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    valid_reg_prediction.append(pred_scores)
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    total_loss = reg_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
 
-
-        epoch_valid_total_loss = np.mean(valid_total_loss)
-        epoch_valid_reg_loss = np.mean(valid_reg_loss)
-        epoch_valid_rank_loss = np.mean(valid_rank_loss)
-        self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
-        self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
-        self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
-        self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
-        
+        if self.use_ranking_loss:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            epoch_valid_reg_loss = np.mean(valid_reg_loss)
+            epoch_valid_rank_loss = np.mean(valid_rank_loss)
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
+            self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
+            self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
+        else:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_total_loss})    
         # Ckpt if performance improves
         
         if epoch_valid_total_loss < self.best_valid_loss:
             self.best_valid_loss = epoch_valid_total_loss
             self.save_checkpoint('{}_best.pth'.format(
                 self.paras.model), 'total_loss', epoch_valid_total_loss)
-
-        # Regular ckpt
-        self.save_checkpoint('epoch_{}.pth'.format(
-            self.epoch), 'total_loss', epoch_valid_total_loss)
-
 
         # Resume training
         self.model.train()
