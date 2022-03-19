@@ -1,7 +1,13 @@
 experiment:
-    batch_size: 16
+    batch_size: 12
     num_workers: 15
     log_freq: 50
+
+    dataset: "audioset"
+    set: "balanced"
+    dataset_mean: -4.2677393
+    dataset_std: 4.5689974
+    save_model: False
     
 augmentation:
     vol:
@@ -35,52 +41,20 @@ augmentation:
 
 
 model:
+    n_class: 1
+    fshape: 16
+    tshape: 16
+    fstride: 16
+    tstride: 16
+    input_fdim: 128
+    model_size: "base"
+
+    target_length: 500 # 5 second clips
+    noise: False
+    task: "ft_avgtok"
+    
     use_ranking_loss: False
-    image_size: [16, 64]
-    nc: 1
-    nclass: 1
-    nh: 100
-    n_rnn: 2
-    leakyRelu: False
-
-
-    conv_kernel_size: 3
-    stride: 1
-    padding: 1
-
-    conv_1: 
-        in_channels: 1
-        out_channels: 4
-        pool_kernel: 2
-
-    conv_2: 
-        in_channels: 4
-        out_channels: 8
-        pool_kernel: 2
-
-    conv_3: 
-        in_channels: 8
-        out_channels: 16
-        pool_kernel: 2
-
-    gru: 
-        layer_num: 1
-        input_size: 128 # conv_3[out_channel]*image_size//conv_1[pool_kernel]//conv_2[pool_kernel]/conv_3[pool_kernel]
-        hidden_size: 32
-        bidirectional: False
-
-    fc_1:
-        input_size: 256 # gru[hidden_size]*conv_3[out_channel]//conv_2[pool_kernel]/conv_3[pool_kernel]
-        output_size: 128
-
-    fc_2:
-        input_size: 128
-        output_size: 64
-
-    output:
-        input_size: 64
-        output_size: 1
-
+    
 
 
     ranking_weight: 0.4
@@ -89,7 +63,7 @@ hparas:                                   # Experiment hyper-parameters
     sample_rate: 16000
     valid_step: 1000
     curriculum: 0
-    max_epoch: 2000
+    max_epoch: 25
     max_step: 15001
     tf_start: 1.0
     tf_end: 1.0
@@ -101,9 +75,29 @@ hparas:                                   # Experiment hyper-parameters
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 
+    head_lr: 1
+    warmup: False
+    bal: "none"
+    lr: 5e-5
+    freqm: 48
+    timem: 192
+    mixup: 0.0 # mixup rate seems to only be for classification, see https://arxiv.org/pdf/1711.10282.pdf
+    adaptschedule: False
+    num_mel_bins: 128
+    lrscheduler_start: 10
+    lrscheduler_step: 5
+    lrscheduler_decay: 0.5
+    wa: True
+    wa_start: 6
+    wa_end: 25
+
 path:
-    pretrain_weight_file: "ssast/SSAST-Base-Patch-400.pth"
+    pretrained_mdl_path: "ssast/SSAST-Base-Patch-400.pth"
     audio_root: "data/raw_audios"
     ssast_input_dir: "data/ssast_input"    
+    data_train: "data/ssast_input/train.json"
+    data_val: "data/ssast_input/valid.json"
+    data_eval: "data/ssast_input/test.json"
+
     img_dir: "data/mels_img"
     label_file: "data/labels/track_memorability_scores_beta.csv"

@@ -10,7 +10,7 @@ from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
 from ssast.src.models.ast_models import ASTModel
-from src.dataset import PairEndToEndImgDataset, EndToEndImgDataset, AudioDataset
+from src.dataset import AST_AudioDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
@@ -21,83 +21,86 @@ class Solver(BaseSolver):
 
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
-        if not os.path.exists(self.config["path"]["pretrain_weight_file"]):
+        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
+        if not os.path.exists(self.config["path"]["pretrained_mdl_path"]):
             os.system("wget {} - O {}".format("https://www.dropbox.com/s/ewrzpco95n9jdz6/SSAST-Base-Patch-400.pth?dl=1", self.config["path"]["pretrain_weight_file"]))
         
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         self.args = parser.parse_args()
-        setattr(self.arg, "dataset", "audioset")
-        setattr(self.arg, "set", "balanced")
-        setattr(self.arg, "dataset_mean", -4.2677393)
 
-        setattr(self.arg, "dataset_std", 4.5689974)
-        setattr(self.arg, "target_length",  1024)
-        setattr(self.arg, "noise",  False)
-        setattr(self.arg, "task",  "ft_avgtok")
-        setattr(self.arg, "model_size",  "base")
-        setattr(self.arg, "head_lr",  1)
-        setattr(self.arg, "warmup",  True)
-        setattr(self.arg, "bal",  "none")
-        setattr(self.arg, "lr",  5e-5)
-        setattr(self.arg, "epoch",  25)
-        setattr(self.arg, "tr_data",  "~/Code/AudMem/Model_Architecture/data/ssast_input/train.json")
-        setattr(self.arg, "freqm", 48)
-        setattr(self.arg, "timem", 192)
-        setattr(self.arg, "mixup", 0.5)
-        setattr(self.arg, "fstride", 10)
-        setattr(self.arg, "tstride", 10)
-        setattr(self.arg, "fshape", 16)
-        setattr(self.arg, "tshape", 16)
-        setattr(self.arg, "batch_size", 12)
-        setattr(self.arg, "exp_dir", "exp/test01-${dataset}-f${fstride}-${fshape}-t${tstride}-${tshape}-b${batch_size}-lr${lr}-${task}-${model_size}-${pretrain_exp}-${pretrain_model}-${head_lr}x-noise${noise}-3")
+        setattr(self.args, "data_train", self.config["path"]["data_train"])
+        setattr(self.args, "data_val", self.config["path"]["data_val"])
+        setattr(self.args, "data_eval", self.config["path"]["data_eval"])
+        setattr(self.args, "n_class", self.config["model"]["n_class"])
+
+        setattr(self.args, "dataset", self.config["experiment"]["dataset"])
+        setattr(self.args, "set", self.config["experiment"]["set"])
+        setattr(self.args, "dataset_mean", self.config["experiment"]["dataset_mean"])
+        setattr(self.args, "dataset_std", self.config["experiment"]["dataset_std"])
+
+        setattr(self.args, "target_length", self.config["model"]["target_length"])
+        setattr(self.args, "noise",  self.config["model"]["noise"])
+        setattr(self.args, "task",  self.config["model"]["task"])
+        setattr(self.args, "model_size",  self.config["model"]["model_size"])
         
-        setattr(self.arg, "save_model", False)
-        setattr(self.arg, "label-csv", "./data/class_labels_indices.csv")
-        setattr(self.arg, "n_class", 527)
-        setattr(self.arg, "warmup", False)
-        setattr(self.arg, "adaptschedule", False)
-        setattr(self.arg, "num_mel_bins", 128)
-        setattr(self.arg, "lrscheduler_start", 10)
-        setattr(self.arg, "lrscheduler_step", 5)
-        setattr(self.arg, "lrscheduler_decay", 0.5)
-        setattr(self.arg, "wa", True)
-        setattr(self.arg, "wa_start", 6)
-        setattr(self.arg, "wa_end", 25)
+        setattr(self.args, "head_lr",  self.config["hparas"]["head_lr"])
+        setattr(self.args, "warmup",  self.config["hparas"]["warmup"])
+        setattr(self.args, "bal",  self.config["hparas"]["bal"])
+        setattr(self.args, "lr",  self.config["hparas"]["lr"])
+        setattr(self.args, "epoch",  self.config["hparas"]["max_epoch"])
+        setattr(self.args, "tr_data",  self.config["path"]["data_train"])
+        setattr(self.args, "freqm", self.config["hparas"]["freqm"])
+        setattr(self.args, "timem", self.config["hparas"]["timem"])
+        setattr(self.args, "mixup", self.config["hparas"]["mixup"])
+
+        setattr(self.args, "fstride", self.config["model"]["fstride"])
+        setattr(self.args, "tstride", self.config["model"]["tstride"])
+        setattr(self.args, "fshape", self.config["model"]["fshape"])
+        setattr(self.args, "tshape", self.config["model"]["tshape"])
+        setattr(self.args, "batch_size", self.config["experiment"]["batch_size"])
+        
+        setattr(self.args, "save_model", self.config["experiment"]["save_model"])
+        setattr(self.args, "adaptschedule", self.config["hparas"]["adaptschedule"])
+        setattr(self.args, "num_mel_bins", self.config["hparas"]["num_mel_bins"])
+        setattr(self.args, "lrscheduler_start", self.config["hparas"]["lrscheduler_start"])
+        setattr(self.args, "lrscheduler_step", self.config["hparas"]["lrscheduler_step"])
+        setattr(self.args, "lrscheduler_decay", self.config["hparas"]["lrscheduler_decay"])
+        setattr(self.args, "wa", self.config["hparas"]["wa"])
+        setattr(self.args, "wa_start", self.config["hparas"]["wa_start"])
+        setattr(self.args, "wa_end", self.config["hparas"]["wa_end"])
+
+        self.audio_conf = {'num_mel_bins': self.args.num_mel_bins, 'target_length': self.args.target_length, 'freqm': self.args.freqm, 'timem': self.args.timem, 'mixup': self.args.mixup, 'dataset': self.args.dataset,
+                    'mode':'train', 'mean': self.args.dataset_mean, 'std': self.args.dataset_std, 'noise': self.args.noise}
+
+        self.val_audio_conf = {'num_mel_bins': self.args.num_mel_bins, 'target_length': self.args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': self.args.dataset,
+                        'mode': 'evaluation', 'mean': self.args.dataset_mean, 'std': self.args.dataset_std, 'noise': False}
 
 
-        # CUDA_CACHE_DISABLE=1 python -W ignore ../../run.py --dataset ${dataset} \
-        # --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
-        # --label-csv ./data/class_labels_indices.csv --n_class 527 \
-        # --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model False \
-        # --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
-        # --tstride $tstride --fstride $fstride --fshape ${fshape} --tshape ${tshape} --warmup False --task ${task} \
-        # --model_size ${model_size} --adaptschedule False \
-        # --pretrained_mdl_path ${pretrain_path} \
-        # --dataset_mean ${dataset_mean} --dataset_std ${dataset_std} --target_length ${target_length} \
-        # --num_mel_bins 128 --head_lr ${head_lr} --noise ${noise} \
-        # --lrscheduler_start 10 --lrscheduler_step 5 --lrscheduler_decay 0.5 --wa True --wa_start 6 --wa_end 25 \
-        # --loss BCE --metrics mAP
 
-        # self.log_freq = self.config["experiment"]['log_freq']
-        # self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
-        # self.ranking_weight = config["model"]["ranking_weight"]
+        self.log_freq = self.config["experiment"]['log_freq']
+        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
+        self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        # if self.use_ranking_loss:
-        #     img_1, img_2, lab_scores_1, lab_scores_2 = data
+        # input in shape [batch_size, input_tdim, input_fdim]
 
-        #     img_1, img_2 = img_1.to(self.device), img_2.to(self.device)
-        #     lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
 
-        #     return img_1, img_2, lab_scores_1, lab_scores_2
-        # else:
-        #     img, score = data
-        #     img = img.to(self.device)
-        #     score = score.to(self.device).float()
-        #     return img, score
+        if self.use_ranking_loss:
+            raise Exception ("Not implemented yet")
+            img_1, img_2, lab_scores_1, lab_scores_2 = data
+
+            img_1, img_2 = img_1.to(self.device), img_2.to(self.device)
+            lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
+
+            return img_1, img_2, lab_scores_1, lab_scores_2
+        else:
+            fbank, label = data
+            fbank = fbank.to(self.device)
+            label = label.to(self.device).float()
+            return fbank, label
 
     def generate_json_format(self, df, split):
         """ format should be 'data': {'wav': '', 'labels': ''}, ... """
@@ -144,47 +147,45 @@ class Solver(BaseSolver):
         self.generate_json_format(self.valid_labels_df, "valid")
         self.generate_json_format(self.test_labels_df, "test")
 
-        # if self.use_ranking_loss:
-        #     self.train_set = PairEndToEndImgDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-        #     self.valid_set = PairEndToEndImgDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
-        # else:
-        #     self.train_set = AudioDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-        #     self.valid_set = AudioDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+        # if use balanced sampling, note - self-supervised pretraining should not use balance sampling as it implicitly leverages the label information.
+        if self.args.bal == 'bal':
+            print('balanced sampler is being used')
+            samples_weight = np.loadtxt(self.args.data_train[:-5]+'_weight.csv', delimiter=',')
+            sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
 
+            self.train_loader = DataLoader(
+                AST_AudioDataset(self.args.data_train, audio_conf=self.audio_conf),
+                batch_size=self.config["experiment"]["batch_size"], sampler=sampler, num_workers=self.config["experiment"]["num_workers"], pin_memory=False, drop_last=True)
+        else:
+            print('balanced sampler is not used')
+            self.train_loader = DataLoader(
+                AST_AudioDataset(self.args.data_train, audio_conf=self.audio_conf),
+                batch_size=self.config["experiment"]["batch_size"], shuffle=True, num_workers=self.config["experiment"]["num_workers"], pin_memory=False, drop_last=True)
 
-        # self.write_log('train_distri/lab', self.train_labels_df.score.values)
-        # self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
-        #----------------------Weighted Random Sampler-------------------------------
-        
-        # bin_count = 10
-        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
+        self.valid_loader = DataLoader(
+            AST_AudioDataset(self.args.data_val, audio_conf=self.val_audio_conf),
+            batch_size=self.config["experiment"]["batch_size"] * 2, shuffle=False, num_workers=self.config["experiment"]["num_workers"], pin_memory=False)
 
+        print('Now train with {:s} with {:d} training samples, evaluate with {:d} samples'.format(self.args.dataset, len(self.train_loader.dataset), len(self.valid_loader.dataset)))
 
-        # sample_w = []
-        # for score in self.train_set.scores:
-        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-        #     sample_w.append(weighted[bin_idx-1])
-
-        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
-        #----------------------Weighted Random Sampler-------------------------------
-
-        # self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
-        #                     num_workers=self.config["experiment"]["num_workers"], shuffle=True, drop_last=True)
-        # self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
-        #                     num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
-        
-        # data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-        #         .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
-
-        # self.verbose(data_msg)
 
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = ASTModel()
+        self.model = ASTModel(label_dim=self.args.n_class,
+                            fshape=self.args.fshape,
+                            tshape=self.args.tshape,
+                            fstride=self.args.fstride,
+                            tstride=self.args.tstride,
+                            input_fdim=self.args.num_mel_bins,
+                            input_tdim=self.args.target_length,
+                            model_size=self.args.model_size,
+                            pretrain_stage=False,
+                            load_pretrained_mdl_path=self.config["path"]["pretrained_mdl_path"]).to(self.device)
 
+        self.reg_loss_func = nn.MSELoss() # regression loss
+        self.rank_loss_func = nn.BCELoss() # ranking loss
+        
 
         # Optimizer
         self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
@@ -271,8 +272,8 @@ class Solver(BaseSolver):
                 total_loss = 0
 
                 # Fetch data
-                # TODO: change to pair-wise data
                 if self.use_ranking_loss:
+                    raise Exception ("Not implemented yet")
                     img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
                     self.timer.cnt('rd')
                     lab_scores = torch.cat((lab_scores_1, lab_scores_2))
@@ -308,11 +309,11 @@ class Solver(BaseSolver):
                         self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
                         self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
                 else:
-                    img, lab_scores = self.fetch_data(data)
+                    fbanks, lab_scores = self.fetch_data(data)
                     self.timer.cnt('rd')
 
                     # Forward model
-                    pred_scores = self.model(img)
+                    pred_scores = self.model(fbanks, task="ft_avgtok")
                     reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
                     # reg_loss = torch.sqrt(reg_loss)
                     train_reg_prediction.append(pred_scores)
@@ -362,6 +363,7 @@ class Solver(BaseSolver):
         for i, data in enumerate(self.valid_loader):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
             if self.use_ranking_loss:
+                raise Exception ("Not implemented yet")
                 # Fetch data
                 img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
                 lab_scores = torch.cat((lab_scores_1, lab_scores_2))
@@ -386,9 +388,9 @@ class Solver(BaseSolver):
                     total_loss = reg_loss + self.ranking_weight*rank_loss
                     valid_total_loss.append(total_loss.cpu().detach().numpy())
             else:
-                img, lab_scores = self.fetch_data(data)
+                fbanks, lab_scores = self.fetch_data(data)
                 with torch.no_grad():
-                    pred_scores = self.model(img)
+                    pred_scores = self.model(fbanks, task="ft_avgtok")
                     reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
                     # reg_loss = torch.sqrt(reg_loss)
                     valid_reg_prediction.append(pred_scores)

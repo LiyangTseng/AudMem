@@ -25,7 +25,7 @@ if __name__ == "__main__":
                     help='do k-fold validation or not', required=False)  
     parser.add_argument('--kfold_splits', default=10, type=int,
                     help='number of k-fold splits', required=False)
-    parser.add_argument('--fold_index', default=0, type=int,
+    parser.add_argument('--fold_index', default=9, type=int,
                     help='index of 10 fold', required=False)
     parser.add_argument('--seed', default=1234, type=int,
                     help='random seed', required=False)
@@ -79,8 +79,8 @@ if __name__ == "__main__":
     
     solver = Solver(config=config, paras=paras, mode="train")
     solver.load_data()
-    # solver.set_model()
-    # solver.exec()
+    solver.set_model()
+    solver.exec()
 
     
  
