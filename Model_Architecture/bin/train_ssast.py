@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
-from ssast.src.models.ast_models import ASTModel
+from models.ast_models import ASTModel
 from src.dataset import AST_AudioDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -19,61 +19,27 @@ CKPT_STEP = 10000
 class Solver(BaseSolver):
     ''' Solver for training'''
 
+    def parse_yaml(self, config):
+        for key, value in config.items():
+            if isinstance(value, dict):
+                self.parse_yaml(value)
+            else:
+                setattr(self, key, value)
+
+
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
-        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
         if not os.path.exists(self.config["path"]["pretrained_mdl_path"]):
             os.system("wget {} - O {}".format("https://www.dropbox.com/s/ewrzpco95n9jdz6/SSAST-Base-Patch-400.pth?dl=1", self.config["path"]["pretrain_weight_file"]))
         
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        self.args = parser.parse_args()
 
-        setattr(self.args, "data_train", self.config["path"]["data_train"])
-        setattr(self.args, "data_val", self.config["path"]["data_val"])
-        setattr(self.args, "data_eval", self.config["path"]["data_eval"])
-        setattr(self.args, "n_class", self.config["model"]["n_class"])
+        self.parse_yaml(self.config)
 
-        setattr(self.args, "dataset", self.config["experiment"]["dataset"])
-        setattr(self.args, "set", self.config["experiment"]["set"])
-        setattr(self.args, "dataset_mean", self.config["experiment"]["dataset_mean"])
-        setattr(self.args, "dataset_std", self.config["experiment"]["dataset_std"])
+        self.audio_conf = {'num_mel_bins': self.num_mel_bins, 'target_length': self.target_length, 'freqm': self.freqm, 'timem': self.timem, 'mixup': self.mixup, 'dataset': self.dataset,
+                    'mode':'train', 'mean': self.dataset_mean, 'std': self.dataset_std, 'noise': self.noise}
 
-        setattr(self.args, "target_length", self.config["model"]["target_length"])
-        setattr(self.args, "noise",  self.config["model"]["noise"])
-        setattr(self.args, "task",  self.config["model"]["task"])
-        setattr(self.args, "model_size",  self.config["model"]["model_size"])
-        
-        setattr(self.args, "head_lr",  self.config["hparas"]["head_lr"])
-        setattr(self.args, "warmup",  self.config["hparas"]["warmup"])
-        setattr(self.args, "bal",  self.config["hparas"]["bal"])
-        setattr(self.args, "lr",  self.config["hparas"]["lr"])
-        setattr(self.args, "epoch",  self.config["hparas"]["max_epoch"])
-        setattr(self.args, "tr_data",  self.config["path"]["data_train"])
-        setattr(self.args, "freqm", self.config["hparas"]["freqm"])
-        setattr(self.args, "timem", self.config["hparas"]["timem"])
-        setattr(self.args, "mixup", self.config["hparas"]["mixup"])
-
-        setattr(self.args, "fstride", self.config["model"]["fstride"])
-        setattr(self.args, "tstride", self.config["model"]["tstride"])
-        setattr(self.args, "fshape", self.config["model"]["fshape"])
-        setattr(self.args, "tshape", self.config["model"]["tshape"])
-        setattr(self.args, "batch_size", self.config["experiment"]["batch_size"])
-        
-        setattr(self.args, "save_model", self.config["experiment"]["save_model"])
-        setattr(self.args, "adaptschedule", self.config["hparas"]["adaptschedule"])
-        setattr(self.args, "num_mel_bins", self.config["hparas"]["num_mel_bins"])
-        setattr(self.args, "lrscheduler_start", self.config["hparas"]["lrscheduler_start"])
-        setattr(self.args, "lrscheduler_step", self.config["hparas"]["lrscheduler_step"])
-        setattr(self.args, "lrscheduler_decay", self.config["hparas"]["lrscheduler_decay"])
-        setattr(self.args, "wa", self.config["hparas"]["wa"])
-        setattr(self.args, "wa_start", self.config["hparas"]["wa_start"])
-        setattr(self.args, "wa_end", self.config["hparas"]["wa_end"])
-
-        self.audio_conf = {'num_mel_bins': self.args.num_mel_bins, 'target_length': self.args.target_length, 'freqm': self.args.freqm, 'timem': self.args.timem, 'mixup': self.args.mixup, 'dataset': self.args.dataset,
-                    'mode':'train', 'mean': self.args.dataset_mean, 'std': self.args.dataset_std, 'noise': self.args.noise}
-
-        self.val_audio_conf = {'num_mel_bins': self.args.num_mel_bins, 'target_length': self.args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': self.args.dataset,
-                        'mode': 'evaluation', 'mean': self.args.dataset_mean, 'std': self.args.dataset_std, 'noise': False}
+        self.val_audio_conf = {'num_mel_bins': self.num_mel_bins, 'target_length': self.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': self.dataset,
+                        'mode': 'evaluation', 'mean': self.dataset_mean, 'std': self.dataset_std, 'noise': False}
 
 
 
@@ -107,7 +73,10 @@ class Solver(BaseSolver):
         assert split in ['train', 'valid', 'test']
         
         audio_root = os.path.abspath(self.config["path"]["audio_root"])
-        audio_subdir = os.listdir(audio_root)
+        if split != "test":
+            audio_subdir = os.listdir(audio_root)
+        else:
+            audio_subdir = ["original"]
         data_arr = df.to_numpy()
         
         data = {}
@@ -137,51 +106,64 @@ class Solver(BaseSolver):
         for_test = self.labels_df.index.isin(testing_range)
         self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
         
-        self.labels_df = self.labels_df[~for_test]
-        # self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
+        self.labels_df = self.labels_df[~for_test] # extract non-testing indices
+        # shuffling to make validation set
+        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-
+        self.write_log('train_distri/lab', self.train_labels_df.score.values)
+        self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
+        
+        
         # generate json data for this fold
         self.generate_json_format(self.train_labels_df, "train")
         self.generate_json_format(self.valid_labels_df, "valid")
         self.generate_json_format(self.test_labels_df, "test")
 
         # if use balanced sampling, note - self-supervised pretraining should not use balance sampling as it implicitly leverages the label information.
-        if self.args.bal == 'bal':
+        if self.bal == 'bal':
             print('balanced sampler is being used')
-            samples_weight = np.loadtxt(self.args.data_train[:-5]+'_weight.csv', delimiter=',')
+            samples_weight = np.loadtxt(self.data_train[:-5]+'_weight.csv', delimiter=',')
             sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
 
             self.train_loader = DataLoader(
-                AST_AudioDataset(self.args.data_train, audio_conf=self.audio_conf),
+                AST_AudioDataset(self.data_train, audio_conf=self.audio_conf, config=self.config),
                 batch_size=self.config["experiment"]["batch_size"], sampler=sampler, num_workers=self.config["experiment"]["num_workers"], pin_memory=False, drop_last=True)
         else:
             print('balanced sampler is not used')
             self.train_loader = DataLoader(
-                AST_AudioDataset(self.args.data_train, audio_conf=self.audio_conf),
+                AST_AudioDataset(self.data_train, audio_conf=self.audio_conf, config=self.config),
                 batch_size=self.config["experiment"]["batch_size"], shuffle=True, num_workers=self.config["experiment"]["num_workers"], pin_memory=False, drop_last=True)
 
         self.valid_loader = DataLoader(
-            AST_AudioDataset(self.args.data_val, audio_conf=self.val_audio_conf),
+            AST_AudioDataset(self.data_val, audio_conf=self.val_audio_conf, config=self.config),
             batch_size=self.config["experiment"]["batch_size"] * 2, shuffle=False, num_workers=self.config["experiment"]["num_workers"], pin_memory=False)
 
-        print('Now train with {:s} with {:d} training samples, evaluate with {:d} samples'.format(self.args.dataset, len(self.train_loader.dataset), len(self.valid_loader.dataset)))
+        print('Now train with {:s} with {:d} training samples, evaluate with {:d} samples'.format(self.dataset, len(self.train_loader.dataset), len(self.valid_loader.dataset)))
 
 
     def set_model(self):
         ''' Setup e_crnn model and optimizer '''
         # Model
-        self.model = ASTModel(label_dim=self.args.n_class,
-                            fshape=self.args.fshape,
-                            tshape=self.args.tshape,
-                            fstride=self.args.fstride,
-                            tstride=self.args.tstride,
-                            input_fdim=self.args.num_mel_bins,
-                            input_tdim=self.args.target_length,
-                            model_size=self.args.model_size,
+        self.model = ASTModel(label_dim=self.n_class,
+                            fshape=self.fshape,
+                            tshape=self.tshape,
+                            fstride=self.fstride,
+                            tstride=self.tstride,
+                            input_fdim=self.num_mel_bins,
+                            input_tdim=self.target_length,
+                            model_size=self.model_size,
                             pretrain_stage=False,
-                            load_pretrained_mdl_path=self.config["path"]["pretrained_mdl_path"]).to(self.device)
+                            load_pretrained_mdl_path=self.config["path"]["pretrained_mdl_path"],
+                            hidden_layer_dim=self.hidden_layer_dim).to(self.device)
+
+        # fix layers except last layer (mlp_head)
+        for param in self.model.parameters():
+            param.requires_grad = False
+        for param in self.model.mlp_head.parameters():
+            param.requires_grad = True
+        
+        self.verbose("number of trainable parameters: {}".format(sum(p.numel() for p in self.model.parameters() if p.requires_grad)))
 
         self.reg_loss_func = nn.MSELoss() # regression loss
         self.rank_loss_func = nn.BCELoss() # ranking loss
@@ -264,16 +246,17 @@ class Solver(BaseSolver):
             self.model.train()
             train_reg_loss, train_rank_loss, train_total_loss = [], [], [] # record the loss of every batch
             train_reg_prediction, train_rank_prediction = [], []
-            
-            for i, data in enumerate(tqdm(self.train_loader)):
-                # Pre-step : update tf_rate/lr_rate and do zero_grad
-                # tf_rate = self.optimizer.pre_step(self.step)
-                self.optimizer.opt.zero_grad()
-                total_loss = 0
 
-                # Fetch data
-                if self.use_ranking_loss:
-                    raise Exception ("Not implemented yet")
+            if self.use_ranking_loss:
+                raise Exception ("Not implemented yet")
+
+                for i, data in enumerate(tqdm(self.train_loader)):
+                    # Pre-step : update tf_rate/lr_rate and do zero_grad
+                    # tf_rate = self.optimizer.pre_step(self.step)
+                    self.optimizer.opt.zero_grad()
+                    total_loss = 0
+
+                    # Fetch data
                     img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
                     self.timer.cnt('rd')
                     lab_scores = torch.cat((lab_scores_1, lab_scores_2))
@@ -308,7 +291,13 @@ class Solver(BaseSolver):
                         self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
                         self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
                         self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
-                else:
+            else:
+                for i, data in enumerate(tqdm(self.train_loader)):
+                    # Pre-step : update tf_rate/lr_rate and do zero_grad
+                    # tf_rate = self.optimizer.pre_step(self.step)
+                    self.optimizer.opt.zero_grad()
+                    total_loss = 0
+
                     fbanks, lab_scores = self.fetch_data(data)
                     self.timer.cnt('rd')
 
@@ -327,15 +316,12 @@ class Solver(BaseSolver):
                     grad_norm = self.backward(total_loss)
                     self.step += 1
 
-                    if i % self.log_freq == 0:
-                        # self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
-                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
 
             # Logger
             self.progress('Tr stat | Loss - {:.2f} | Grad. Norm - {:.2f} | {}'
                             .format(total_loss.cpu().item(), grad_norm, self.timer.show()))
             self.write_log('train_distri/pred', torch.cat(train_reg_prediction))
-
+            self.write_log('MSE_loss', {'total_loss/train': np.mean(train_total_loss)})
 
             # Validation
             epoch_valid_total_loss = self.validate()
@@ -413,7 +399,7 @@ class Solver(BaseSolver):
             epoch_valid_reg_loss = np.mean(valid_reg_loss)
             self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
             # self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
-            self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
+            self.write_log('MSE_loss', {'total_loss/valid': epoch_valid_total_loss})
 
 
         # Ckpt if performance improves

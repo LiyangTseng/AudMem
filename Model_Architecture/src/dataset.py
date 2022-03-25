@@ -1,4 +1,5 @@
 import os
+import csv
 import numpy as np
 import pandas as pd
 import torch
@@ -610,7 +611,7 @@ class AudioDataset(Dataset):
         self.scores = []
         self.audios = []
         self.imgs = []
-        if self.split == "train":
+        if self.split != "test":
             self.audio_transforms = transforms.Compose([
                         VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
                                 prob=config["augmentation"]["vol"]["prob"]),
@@ -678,15 +679,6 @@ class AudioDataset(Dataset):
         score = self.scores[index]
         return mels, score
 
-import csv
-import json
-import torchaudio
-import numpy as np
-import torch
-import torch.nn.functional
-from torch.utils.data import Dataset
-import random
-
 def make_index_dict(label_csv):
     index_lookup = {}
     with open(label_csv, 'r') as f:
@@ -724,13 +716,43 @@ def preemphasis(signal,coeff=0.97):
 
 class AST_AudioDataset(Dataset):
     """ Modified from SSAST, ref: https://github.com/YuanGongND/ssast """
-    def __init__(self, dataset_json_file, audio_conf):
+    def __init__(self, dataset_json_file, audio_conf, config):
         """
         Dataset that manages audio recordings
         :param audio_conf: Dictionary containing the audio loading and preprocessing settings
         :param dataset_json_file
         """
         self.datapath = dataset_json_file
+        self.split = self.datapath.split('/')[-1].split('.')[0]
+
+        if self.split != "test":
+            self.sr = config["hparas"]["sample_rate"]
+            self.audio_transforms = transforms.Compose([
+                        VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
+                                prob=config["augmentation"]["vol"]["prob"]),
+                        BandDrop(filt_files=config["augmentation"]["banddrop"]["ir_files"],\
+                                data_root=config["augmentation"]["banddrop"]["data_root"], \
+                                prob=config["augmentation"]["banddrop"]["prob"]),
+                        Reverb(ir_files=[],\
+                                ir_fmt=config["augmentation"]["reverb"]["ir_fmt"],\
+                                data_root=config["augmentation"]["reverb"]["data_root"], \
+                                prob=config["augmentation"]["reverb"]["prob"]),
+                        SimpleAdditive(noises_dir=config["augmentation"]["add_noise"]["path"], \
+                                        snr_levels=config["augmentation"]["add_noise"]["snr_options"], \
+                                        prob=config["augmentation"]["add_noise"]["prob"]),
+                        Fade(sample_rate=self.sr ,\
+                            prob=config["augmentation"]["fade"]["prob"], \
+                            fade_in_second=config["augmentation"]["fade"]["fade_in_sec"], \
+                            fade_out_second=config["augmentation"]["fade"]["fade_out_sec"], \
+                            fade_shape=config["augmentation"]["fade"]["fade_shape"]),
+
+                        TimeStretch(rates=config["augmentation"]["time_stretch"]["speed_range"], \
+                                    probability=config["augmentation"]["time_stretch"]["prob"]),
+                    ])
+        else:
+            self.audio_transforms = transforms.Compose([])
+
+
         with open(dataset_json_file, 'r') as fp:
             data_json = json.load(fp)
 
@@ -764,6 +786,9 @@ class AST_AudioDataset(Dataset):
         # mixup
         if filename2 == None:
             waveform, sr = torchaudio.load(filename)
+            waveform = self.audio_transforms(waveform)  
+            if isinstance(waveform, np.ndarray):
+                waveform = torch.from_numpy(waveform).float().unsqueeze(0)
             waveform = waveform - waveform.mean()
         # mixup
         else:

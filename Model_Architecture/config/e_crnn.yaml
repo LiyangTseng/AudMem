@@ -97,7 +97,8 @@ hparas:                                   # Experiment hyper-parameters
     grad_clip: 'inf'
     optimizer:
         type: 'Adam'
-        lr: 0.000005
+        lr: 0.0000005
+        lr_step: 10
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 

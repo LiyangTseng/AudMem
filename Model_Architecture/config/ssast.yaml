@@ -44,10 +44,13 @@ model:
     n_class: 1
     fshape: 16
     tshape: 16
+    # In the fine-tuning and inference steps, we split the patch
+    # with an overlap of 6 in the same fashion as the original AST, source: https://arxiv.org/pdf/2110.09784v2.pdf
     fstride: 16
     tstride: 16
     input_fdim: 128
     model_size: "base"
+    hidden_layer_dim: 200
 
     target_length: 500 # 5 second clips
     noise: False
@@ -63,7 +66,7 @@ hparas:                                   # Experiment hyper-parameters
     sample_rate: 16000
     valid_step: 1000
     curriculum: 0
-    max_epoch: 25
+    max_epoch: 1000
     max_step: 15001
     tf_start: 1.0
     tf_end: 1.0

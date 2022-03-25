@@ -48,7 +48,7 @@ class Solver(BaseSolver):
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
         self.labels_df = self.labels_df[~for_test]
-        # self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
+        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
         if self.use_ranking_loss:
@@ -63,22 +63,22 @@ class Solver(BaseSolver):
         self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
         #----------------------Weighted Random Sampler-------------------------------
         
-        # bin_count = 10
-        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
+        bin_count = 10
+        hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
+        weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
 
 
-        # sample_w = []
-        # for score in self.train_set.scores:
-        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-        #     sample_w.append(weighted[bin_idx-1])
+        sample_w = []
+        for score in self.train_set.scores:
+            # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
+            bin_idx = np.fmin(np.digitize(score, bins), bin_count)
+            sample_w.append(weighted[bin_idx-1])
 
-        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
+        sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
         #----------------------Weighted Random Sampler-------------------------------
 
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=True, drop_last=True)
+                            num_workers=self.config["experiment"]["num_workers"], drop_last=True, sampler=sampler)
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
         
@@ -104,8 +104,11 @@ class Solver(BaseSolver):
         
 
         # Optimizer
-        self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
-        self.verbose(self.optimizer.create_msg())
+        # self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config["hparas"]["optimizer"]["lr"])
+        # define scheduler
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config["hparas"]["optimizer"]["lr_step"], gamma=0.4)
 
         # Automatically load pre-trained model if self.paras.load is given
         self.load_ckpt(cont=True)
@@ -125,6 +128,7 @@ class Solver(BaseSolver):
             self.verbose('Error : grad norm is NaN @ step '+str(self.step))
         else:
             self.optimizer.step()
+            # self.scheduler.step(loss)
         self.timer.cnt('bw')
         return grad_norm
 
@@ -157,7 +161,8 @@ class Solver(BaseSolver):
         ckpt_path = os.path.join(self.ckpdir, f_name)
         full_dict = {
             "model": self.model.state_dict(),
-            "optimizer": self.optimizer.get_opt_state_dict(),
+            # "optimizer": self.optimizer.get_opt_state_dict(),
+            "optimizer": self.optimizer.state_dict(),
             "global_step": self.step,
             "global_epoch": self.epoch,
             metric: float(score)
@@ -184,7 +189,8 @@ class Solver(BaseSolver):
             for i, data in enumerate(tqdm(self.train_loader)):
                 # Pre-step : update tf_rate/lr_rate and do zero_grad
                 # tf_rate = self.optimizer.pre_step(self.step)
-                self.optimizer.opt.zero_grad()
+                # self.optimizer.opt.zero_grad()
+                self.optimizer.zero_grad()
                 total_loss = 0
 
                 # Fetch data
@@ -314,7 +320,6 @@ class Solver(BaseSolver):
                     total_loss = reg_loss
                     valid_total_loss.append(total_loss.cpu().detach().numpy())
 
-
         if self.use_ranking_loss:
             epoch_valid_total_loss = np.mean(valid_total_loss)
             epoch_valid_reg_loss = np.mean(valid_reg_loss)
@@ -329,6 +334,8 @@ class Solver(BaseSolver):
             self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
             # self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
             self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
+
+        self.scheduler.step(epoch_valid_total_loss)
 
 
         # Ckpt if performance improves

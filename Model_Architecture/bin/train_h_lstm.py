@@ -133,7 +133,7 @@ class Solver(BaseSolver):
         full_dict = {
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.get_opt_state_dict(),
-            # "global_step": self.step,
+            "global_step": self.step,
             "global_epoch": self.epoch,
             metric: float(score)
         }
@@ -269,9 +269,6 @@ class Solver(BaseSolver):
             self.save_checkpoint('{}_best.pth'.format(
                 self.paras.model), 'total_loss', epoch_valid_total_loss)
 
-        # Regular ckpt
-        self.save_checkpoint('epoch_{}.pth'.format(
-            self.epoch), 'total_loss', epoch_valid_total_loss)
 
 
         # Resume training

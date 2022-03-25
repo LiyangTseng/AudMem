@@ -230,7 +230,7 @@ class CRNN(nn.Module):
         ks = [3, 3, 3, 3, 3]
         ps = [1, 1, 1, 1, 1]
         ss = [1, 1, 1, 1, 1]
-        nm = [16, 32, 64, 128]
+        nm = [32, 64, 128, 256]
         # ks = [3, 3, 3, 3, 3, 3, 2]
         # ps = [1, 1, 1, 1, 1, 1, 0]
         # ss = [1, 1, 1, 1, 1, 1, 1]
@@ -273,7 +273,7 @@ class CRNN(nn.Module):
 
         self.cnn = cnn
         self.rnn = nn.Sequential(
-            BidirectionalLSTM(128, nh, nh),
+            BidirectionalLSTM(256, nh, nh),
             BidirectionalLSTM(nh, nh, nclass))
 
     def create_msg(self):

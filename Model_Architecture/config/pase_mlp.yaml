@@ -18,7 +18,7 @@ model:
     dnn_use_laynorm_inp: 'True'
     dnn_use_batchnorm_inp: 'False'
     dnn_act: 'relu,relu'
-    ranking_weight: 0.5
+    ranking_weight: 0.7
 
 dataset: 
     dataset_list: []
@@ -43,8 +43,8 @@ hparas:    # Experiment hyper-parameters
     optimizer:
         type: 'Adam'
         lr: 0.00001
-    scheduler:
-        type: "LambdaLR"
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 path:
     encoder_ckpt: "weights/e_pase/22-01-23_12:47/FE_best.ckpt"
     # after fine-tuned

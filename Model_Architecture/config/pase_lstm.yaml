@@ -10,6 +10,7 @@ experiment:
     encoder_mode: "fine-tune" # "frozen", "fine-tune", "from-scratch" 
 
 model:
+    use_ranking_loss: False
     input_dim: 500
     num_layers: '4'
     bias: 'True'

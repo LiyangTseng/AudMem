@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch.nn as nn
 from src.solver import BaseSolver
-from src.dataset import PairMemoWavDataset
+from src.dataset import PairMemoWavDataset, MemoWavDataset
 from models.pase_model import wf_builder
 from models.memorability_model import LSTM
 from tqdm import tqdm
@@ -22,11 +22,9 @@ class Solver(BaseSolver):
 
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
+        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
         self.ranking_weight = config["model"]["ranking_weight"]
 
-        # Seeds initialization
-        np.random.seed(self.paras.seed)
-        torch.manual_seed(self.paras.seed)
 
         with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
             self.fe_cfg = json.load(fe_cfg_f)
@@ -53,21 +51,39 @@ class Solver(BaseSolver):
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
 
-        self.train_set = PairMemoWavDataset(self.train_labels_df,
-                                    self.config["path"]["data_root"][0],
-                                    self.config["path"]["data_cfg"][0], 
-                                    'train',
-                                    sr=SAMPLING_RATE,
-                                    preload_wav=self.config["dataset"]["preload_wav"],
-                                    same_sr=True)
+        if self.use_ranking_loss:
+            self.train_set = PairMemoWavDataset(self.train_labels_df,
+                                        self.config["path"]["data_root"][0],
+                                        self.config["path"]["data_cfg"][0], 
+                                        'train',
+                                        sr=SAMPLING_RATE,
+                                        preload_wav=self.config["dataset"]["preload_wav"],
+                                        same_sr=True)
 
-        self.valid_set = PairMemoWavDataset(self.valid_labels_df,
-                                    self.config["path"]["data_root"][0],
-                                    self.config["path"]["data_cfg"][0], 
-                                    'valid',
-                                    sr=SAMPLING_RATE,
-                                    preload_wav=self.config["dataset"]["preload_wav"],
-                                    same_sr=True)
+            self.valid_set = PairMemoWavDataset(self.valid_labels_df,
+                                        self.config["path"]["data_root"][0],
+                                        self.config["path"]["data_cfg"][0], 
+                                        'valid',
+                                        sr=SAMPLING_RATE,
+                                        preload_wav=self.config["dataset"]["preload_wav"],
+                                        same_sr=True)
+
+        else:
+            self.train_set = MemoWavDataset(self.train_labels_df,
+                                        self.config["path"]["data_root"][0],
+                                        self.config["path"]["data_cfg"][0], 
+                                        'train',
+                                        sr=SAMPLING_RATE,
+                                        preload_wav=self.config["dataset"]["preload_wav"],
+                                        same_sr=True)
+
+            self.valid_set = MemoWavDataset(self.valid_labels_df,
+                                        self.config["path"]["data_root"][0],
+                                        self.config["path"]["data_cfg"][0], 
+                                        'valid',
+                                        sr=SAMPLING_RATE,
+                                        preload_wav=self.config["dataset"]["preload_wav"],
+                                        same_sr=True)
 
         self.bpe = (self.train_set.total_wav_dur // self.config["dataset"]["chunk_size"]) // self.config["experiment"]["batch_size"]
         self.verbose("Train data length: {}".format(self.train_set.total_wav_dur/16000/3600.0))
@@ -84,14 +100,21 @@ class Solver(BaseSolver):
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        wavs_1, wavs_2, scores_1, scores_2 = data
-        
-        wavs_1 = wavs_1.view(wavs_1.size(0), 1, -1).to(self.device)
-        wavs_2 = wavs_2.view(wavs_2.size(0), 1, -1).to(self.device)
-        scores_1 = scores_1.to(self.device).float()
-        scores_2 = scores_2.to(self.device).float()
-        
-        return wavs_1, wavs_2, scores_1, scores_2
+        if self.use_ranking_loss:
+            wavs_1, wavs_2, scores_1, scores_2 = data
+            
+            wavs_1 = wavs_1.view(wavs_1.size(0), 1, -1).to(self.device)
+            wavs_2 = wavs_2.view(wavs_2.size(0), 1, -1).to(self.device)
+            scores_1 = scores_1.to(self.device).float()
+            scores_2 = scores_2.to(self.device).float()
+            
+            return wavs_1, wavs_2, scores_1, scores_2
+        else:
+            wav, score = data
+            wav = wav.to(self.device)
+            score = score.to(self.device).float()
+            return wav, score
+
 
 
     def set_model(self):
@@ -216,43 +239,64 @@ class Solver(BaseSolver):
             for i, data in enumerate(tqdm(self.train_loader)):
                 self.optimizer.zero_grad()
 
-                wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
-                self.timer.cnt('rd')
+                if self.use_ranking_loss:
 
-                # inference
-                features_1 = self.encoder(wavs_1, self.device)
-                pred_scores_1, _ = self.downstream_model(features_1)
+                    wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                    lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+                    self.timer.cnt('rd')
 
-                features_2 = self.encoder(wavs_2, self.device)
-                pred_scores_2, _ = self.downstream_model(features_2)
+                    # inference
+                    features_1 = self.encoder(wavs_1, self.device)
+                    pred_scores_1, _ = self.downstream_model(features_1)
 
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                    features_2 = self.encoder(wavs_2, self.device)
+                    pred_scores_2, _ = self.downstream_model(features_2)
 
-                train_reg_prediction.append(pred_scores)
-                
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                train_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
-                # ref: https://www.cnblogs.com/little-horse/p/10468311.html
-                train_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = torch.unsqueeze((lab_scores_1>lab_scores_2), 1).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                train_rank_loss.append(rank_loss.cpu().detach().numpy())
+                    train_reg_prediction.append(pred_scores)
+                    
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                train_total_loss.append(total_loss.cpu().detach().numpy())
-                
-                self.timer.cnt('fw')
-                grad_norm = self.backward(total_loss)
-                self.step += 1
+                    # ref: https://www.cnblogs.com/little-horse/p/10468311.html
+                    train_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = torch.unsqueeze((lab_scores_1>lab_scores_2), 1).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    train_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-                if i % self.log_freq == 0:
-                    self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
-        
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    train_total_loss.append(total_loss.cpu().detach().numpy())
+                    
+                    self.timer.cnt('fw')
+                    grad_norm = self.backward(total_loss)
+                    self.step += 1
+
+                    if i % self.log_freq == 0:
+                        self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
+                else:
+                    wavs, lab_scores = self.fetch_data(data)
+                    self.timer.cnt('rd')
+
+                    # inference
+                    features = self.encoder(wavs, self.device)
+                    pred_scores, _ = self.downstream_model(features)
+
+                    train_reg_prediction.append(pred_scores)
+                    
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
+
+                    self.timer.cnt('fw')
+                    grad_norm = self.backward(reg_loss)
+                    self.step += 1
+
+                    if i % self.log_freq == 0:
+                        self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
 
             
 
@@ -282,53 +326,81 @@ class Solver(BaseSolver):
         self.encoder.eval()
         self.downstream_model.eval()
         
+        if self.use_ranking_loss:
+            with torch.no_grad():
+                valid_reg_loss, valid_rank_loss, valid_total_loss = [], [], [] # record the loss of every batch
+                valid_reg_prediction, valid_rank_prediction = [], []
+
+                for i, data in enumerate(self.valid_loader):
+                    self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
+                    # Fetch data
+                    wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                    lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+
+                    # inference
+                    features_1 = self.encoder(wavs_1, self.device)
+                    pred_scores_1, _ = self.downstream_model(features_1)
+
+                    features_2 = self.encoder(wavs_2, self.device)
+                    pred_scores_2, _ = self.downstream_model(features_2)
+
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+
+                    valid_reg_prediction.append(pred_scores)
+                    
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
+
+                    # ref: https://www.cnblogs.com/little-horse/p/10468311.html
+                    valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = torch.unsqueeze((lab_scores_1>lab_scores_2), 1).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    valid_rank_loss.append(rank_loss.cpu().detach().numpy())
+
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
         
-        with torch.no_grad():
-            valid_reg_loss, valid_rank_loss, valid_total_loss = [], [], [] # record the loss of every batch
-            valid_reg_prediction, valid_rank_prediction = [], []
+        else:
+            with torch.no_grad():
+                valid_reg_loss, valid_total_loss = [], []
+                valid_reg_prediction = []
 
-            for i, data in enumerate(self.valid_loader):
-                self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
-                # Fetch data
-                wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+                for i, data in enumerate(self.valid_loader):
+                    self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
+                    # Fetch data
+                    wavs, lab_scores = self.fetch_data(data)
 
-                # inference
-                features_1 = self.encoder(wavs_1, self.device)
-                pred_scores_1, _ = self.downstream_model(features_1)
+                    # inference
+                    features = self.encoder(wavs, self.device)
+                    pred_scores, _ = self.downstream_model(features)
 
-                features_2 = self.encoder(wavs_2, self.device)
-                pred_scores_2, _ = self.downstream_model(features_2)
+                    valid_reg_prediction.append(pred_scores)
+                    
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
 
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                    total_loss = reg_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
 
-                valid_reg_prediction.append(pred_scores)
-                
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                valid_reg_loss.append(reg_loss.cpu().detach().numpy())
+        if self.use_ranking_loss:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            epoch_valid_reg_loss = np.mean(valid_reg_loss)
+            epoch_valid_rank_loss = np.mean(valid_rank_loss)
 
-                # ref: https://www.cnblogs.com/little-horse/p/10468311.html
-                valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = torch.unsqueeze((lab_scores_1>lab_scores_2), 1).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                valid_rank_loss.append(rank_loss.cpu().detach().numpy())
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
+            self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
+            self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                valid_total_loss.append(total_loss.cpu().detach().numpy())
-                
-                
+        else:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            epoch_valid_reg_loss = np.mean(valid_reg_loss)
 
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            # self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
+            self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
 
-        epoch_valid_total_loss = np.mean(valid_total_loss)
-        epoch_valid_reg_loss = np.mean(valid_reg_loss)
-        epoch_valid_rank_loss = np.mean(valid_rank_loss)
-
-        self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
-        self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
-        self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
-        self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
-                
         # Ckpt if performance improves
         
         if epoch_valid_total_loss < self.best_valid_loss:

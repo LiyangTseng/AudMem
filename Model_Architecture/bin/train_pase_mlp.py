@@ -24,10 +24,6 @@ class Solver(BaseSolver):
         super().__init__(config, paras, mode)
         self.ranking_weight = config["model"]["ranking_weight"]
 
-        # Seeds initialization
-        np.random.seed(self.paras.seed)
-        torch.manual_seed(self.paras.seed)
-
         with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
             self.fe_cfg = json.load(fe_cfg_f)
 

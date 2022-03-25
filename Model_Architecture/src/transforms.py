@@ -1095,8 +1095,8 @@ class BandDrop(object):
         if random.random() < self.prob:
             # sample a filter
             if isinstance(wav, torch.Tensor):
-                wav = wav.astype(np.float32).reshape(-1)
                 wav = wav.data.numpy().reshape(-1)
+            wav = wav.astype(np.float32).reshape(-1)
 
 
             filt_file = self.sample_filt()
