@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import init
 import numpy as np
 
 ''' train features to approximate memorability score (regression) '''
@@ -186,130 +187,22 @@ class E_CRNN(nn.Module):
         out = self.convBlock1(inp)
         # (N, C, H, W) = (16, 4, 32, 32)
         out = self.convBlock2(out)
-        # (N, C, H, W) = (16, 8, 16, 16)
-        out = self.convBlock3(out)
+        # (N, C, H, W) = (16, 4, 16, 16)
+        # out = self.convBlock3(out)
         # (N, C, H, W) = (16, 16, 8, 8)
-        out = out.contiguous().view(out.size()[0], out.size()[-1], -1)
-        # [N, 8, 128]
+        
+        out = out.contiguous().view(out.size()[0], out.size()[2], -1)
+        # [N, 16, 64]
         out, _ = self.GruLayer(out)
-        # [N, 8, 32]
+        # [N, 16, 32]
         out = out.contiguous().view(out.size()[0],  -1)
-        # [N, 256]
+        # [N, 512]
 
         out = self.GruLayerF(out)
         out = self.fcBlock1(out)
         out = self.fcBlock2(out)
         out = self.output(out)
         return out
-
-class BidirectionalLSTM(nn.Module):
-    """ source: https://github.com/meijieru/crnn.pytorch/blob/master/models/crnn.py """
-    def __init__(self, nIn, nHidden, nOut):
-        super(BidirectionalLSTM, self).__init__()
-
-        self.rnn = nn.LSTM(nIn, nHidden, bidirectional=True)
-        self.embedding = nn.Linear(nHidden * 2, nOut)
-
-    def forward(self, input):
-        recurrent, _ = self.rnn(input)
-        T, b, h = recurrent.size()
-        t_rec = recurrent.view(T * b, h)
-
-        output = self.embedding(t_rec)  # [T * b, nOut]
-        output = output.view(T, b, -1)
-
-        return output
-
-
-class CRNN(nn.Module):
-
-    def __init__(self, imgH, nc, nclass, nh, n_rnn=2, leakyRelu=False):
-        super(CRNN, self).__init__()
-        assert imgH % 16 == 0, 'imgH has to be a multiple of 16'
-
-        ks = [3, 3, 3, 3, 3]
-        ps = [1, 1, 1, 1, 1]
-        ss = [1, 1, 1, 1, 1]
-        nm = [32, 64, 128, 256]
-        # ks = [3, 3, 3, 3, 3, 3, 2]
-        # ps = [1, 1, 1, 1, 1, 1, 0]
-        # ss = [1, 1, 1, 1, 1, 1, 1]
-        # nm = [64, 128, 256, 256, 512, 512, 512]
-
-        cnn = nn.Sequential()
-
-        def convRelu(i, batchNormalization=False):
-            nIn = nc if i == 0 else nm[i - 1]
-            nOut = nm[i]
-            layer = nn.Sequential()
-            layer.add_module('conv{0}'.format(i),
-                            nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i]))
-            
-            if batchNormalization:
-                layer.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(nOut))
-            if leakyRelu:
-                layer.add_module('relu{0}'.format(i),
-                                nn.LeakyReLU(0.2, inplace=True))
-            else:
-                layer.add_module('relu{0}'.format(i), nn.ReLU(True))
-            return layer
-
-        # N, C, H, W
-
-        # N, 1, 16, 64
-        self.Conv1 = convRelu(0)
-        # N, 6, 16, 64
-        # N, 8, 8, 32
-        self.Conv2 = convRelu(1)
-        # N, 16, 8, 32
-        self.MaxPool2 = nn.MaxPool2d(2, 2)
-        # N, 16, 4, 16
-        self.Conv3 = convRelu(2, True)
-        # N, 16, 4, 16
-        self.Conv4 = convRelu(3)
-        # N, 32, 4, 16
-        self.MaxPool1 = nn.MaxPool2d((2, 3), (2, 1), (0, 1))
-        self.MaxPool2 = nn.MaxPool2d(2, 2)
-
-        self.cnn = cnn
-        self.rnn = nn.Sequential(
-            BidirectionalLSTM(256, nh, nh),
-            BidirectionalLSTM(nh, nh, nclass))
-
-    def create_msg(self):
-        # Messages for user
-        msg = []
-        msg.append('Model spec.| CRNN: use CRNN model for melspectrogram inputs(img)')
-        return msg
-
-    def forward(self, input):
-        # conv features
-        # conv = self.cnn(input)
-
-        conv = input
-        conv = self.Conv1(conv)
-        conv = self.MaxPool1(conv)
-        conv = self.Conv2(conv)
-        conv = self.MaxPool1(conv)
-        conv = self.Conv3(conv)
-        conv = self.MaxPool2(conv)
-        conv = self.Conv4(conv)
-        conv = self.MaxPool2(conv)
-        
-        
-
-
-        b, c, h, w = conv.size()
-        assert h == 1, "the height of conv must be 1"
-        conv = conv.squeeze(2)
-        # TODO: check if this is correct
-        conv = conv.permute(2, 0, 1)  # [w, b, c]
-
-        # rnn features
-        # output = self.rnn(conv)
-        output = self.rnn(conv)[-1]
-
-        return output
 
 class E_Transformer(nn.Module):
     '''
@@ -328,8 +221,8 @@ class E_Transformer(nn.Module):
                                                     dim_feedforward=self.dim_feedforward,
                                                     dropout=self.dropout)
 
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
-        self.transformer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
+        self.transforer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
+        self.transforer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
                                                   nn.Dropout(0.6))
 
         self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
@@ -350,20 +243,80 @@ class E_Transformer(nn.Module):
 
     def forward(self, inp):
 
+        # pad zero to seq_len (need to be divisible by n_head)
+        # inp = F.pad(input=inp, pad=(0,  self.d_model - inp.size(-1), 0, 0), mode='constant', value=0)
 
         # (batch_size, 1(gray scale), embed_dim(n_mels), seq_len)
         out = inp.squeeze(1)
         # (batch_size, embed_dim(n_mels), seq_len)
         out = torch.transpose(out, 1, 2) # swap seq_len and embed_dim
         # (batch_size, seq_len, embed_dim(n_mels))
-        out = self.transformer_encoder(out)
+        out = self.transforer_encoder(out)
 
-        out = self.transformer_encoder_f(out)
+        out = self.transforer_encoder_f(out)
         out = out.contiguous().view(out.size()[0], -1)
         out = self.fcBlock1(out)
         out = self.fcBlock2(out)
         out = self.output(out)
         return out
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        conv_layers = []
+
+        # First Convolution Block with Relu and Batch Norm. Use Kaiming Initialization
+        self.conv1 = nn.Conv2d(2, 8, kernel_size=(5, 5), stride=(2, 2), padding=(2, 2))
+        self.relu1 = nn.ReLU()
+        self.bn1 = nn.BatchNorm2d(8)
+        init.kaiming_normal_(self.conv1.weight, a=0.1)
+        self.conv1.bias.data.zero_()
+        conv_layers += [self.conv1, self.relu1, self.bn1]
+
+        # Second Convolution Block
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu2 = nn.ReLU()
+        self.bn2 = nn.BatchNorm2d(16)
+        init.kaiming_normal_(self.conv2.weight, a=0.1)
+        self.conv2.bias.data.zero_()
+        conv_layers += [self.conv2, self.relu2, self.bn2]
+
+        # Second Convolution Block
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu3 = nn.ReLU()
+        self.bn3 = nn.BatchNorm2d(32)
+        init.kaiming_normal_(self.conv3.weight, a=0.1)
+        self.conv3.bias.data.zero_()
+        conv_layers += [self.conv3, self.relu3, self.bn3]
+
+        # Second Convolution Block
+        self.conv4 = nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu4 = nn.ReLU()
+        self.bn4 = nn.BatchNorm2d(64)
+        init.kaiming_normal_(self.conv4.weight, a=0.1)
+        self.conv4.bias.data.zero_()
+        conv_layers += [self.conv4, self.relu4, self.bn4]
+
+        # Linear Classifier
+        self.ap = nn.AdaptiveAvgPool2d(output_size=1)
+        self.lin = nn.Linear(in_features=64, out_features=1)
+
+        # Wrap the Convolutional Blocks
+        self.conv = nn.Sequential(*conv_layers)
+
+    def forward(self, x):
+        # Run the convolutional blocks
+        x = self.conv(x)
+
+        # Adaptive pool and flatten for input to linear layer
+        x = self.ap(x)
+        x = x.view(x.shape[0], -1)
+
+        # Linear layer
+        x = self.lin(x)
+
+        # Final output
+        return x
 
 
 ''' modified from https://github.com/santi-pdp/pase/blob/master/emorec/neural_networks.py '''  

@@ -16,6 +16,6 @@ def calculate_views_memorability_relation(memorability_df_path, views_df_path):
     return stats.spearmanr(score_order, views_order)
 
 if __name__ == "__main__":
-    memorability_df_path = "../data/labels/track_memorability_scores_beta.csv"
-    views_df_path = "../data/track_popularity.csv"
+    memorability_df_path = "data/labels/track_memorability_scores_beta.csv"
+    views_df_path = "data/track_popularity.csv"
     print(calculate_views_memorability_relation(memorability_df_path, views_df_path))

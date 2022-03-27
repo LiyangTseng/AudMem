@@ -5,7 +5,7 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, pase_mlp, pase_lstm, e_transformer, ssast", default="ssast")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_cnn, pase_mlp, pase_lstm, e_transformer, ssast", default="e_cnn")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
@@ -46,6 +46,8 @@ if __name__ == "__main__":
         from bin.test_h_mlp import Solver
     elif paras.model == "e_crnn":
         from bin.test_e_crnn import Solver
+    elif paras.model == "e_cnn":
+        from bin.test_e_cnn import Solver
     elif paras.model == "e_transformer":
         from bin.test_e_transformer import Solver
     elif paras.model == "ssast":

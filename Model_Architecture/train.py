@@ -6,7 +6,7 @@ import argparse
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_transformer, e_pase, e_pasep, pase_mlp, pase_lstm, probing, ssast", default="ssast")
+    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_cnn, e_transformer, e_pase, e_pasep, pase_mlp, pase_lstm, probing, ssast", default="e_cnn")
     parser.add_argument("--patience", default=100, type=int, help="early stop patience")
     parser.add_argument('--name', default=None, type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU training.')
@@ -59,6 +59,8 @@ if __name__ == "__main__":
         from bin.train_h_mlp import Solver
     elif paras.model == "e_crnn":
         from bin.train_e_crnn import Solver
+    elif paras.model == "e_cnn":
+        from bin.train_e_cnn import Solver
     elif paras.model == "e_transformer":
         from bin.train_e_transformer import Solver
     elif paras.model == "e_pase":

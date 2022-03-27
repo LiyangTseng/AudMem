@@ -1,0 +1,114 @@
+experiment:
+    batch_size: 4
+    num_workers: 15
+    log_freq: 50
+    
+augmentation:
+    vol:
+        gain_range: [0.5, 1.5]
+        prob: 0.3
+
+    banddrop:
+        ir_files: []
+        data_root: "data/filters"
+        prob: 0.4
+
+    reverb:
+        ir_fmt: "wav"
+        data_root: "data/simulated_rirs_16k/largeroom/Room001"
+        prob: 0.4
+
+    add_noise:
+        snr_options: [5, 10, 20, 40, 60, 80, 100]
+        path: "data/"
+        prob: 0.4
+
+    fade:
+        fade_shape: "linear"
+        fade_in_sec: 1
+        fade_out_sec: 1
+        prob: 0.4
+
+    time_stretch:
+        speed_range: [0.9, 1,1]
+        prob: 0.3
+
+
+model:
+    use_ranking_loss: False
+    image_size: [16, 64]
+    nc: 1
+    nclass: 1
+    nh: 100
+    n_rnn: 2
+    leakyRelu: False
+
+
+    conv_kernel_size: 3
+    stride: 1
+    padding: 1
+
+    conv_1: 
+        in_channels: 1
+        out_channels: 4
+        pool_kernel: 2
+
+    conv_2: 
+        in_channels: 4
+        out_channels: 8
+        pool_kernel: 2
+
+    conv_3: 
+        in_channels: 8
+        out_channels: 16
+        pool_kernel: 2
+
+    gru: 
+        layer_num: 1
+        input_size: 128 # conv_3[out_channel]*image_size//conv_1[pool_kernel]//conv_2[pool_kernel]/conv_3[pool_kernel]
+        hidden_size: 32
+        bidirectional: False
+
+    fc_1:
+        input_size: 256 # gru[hidden_size]*conv_3[out_channel]//conv_2[pool_kernel]/conv_3[pool_kernel]
+        output_size: 128
+
+    fc_2:
+        input_size: 128
+        output_size: 64
+
+    output:
+        input_size: 64
+        output_size: 1
+
+
+
+    ranking_weight: 0.4
+
+hparas:                                   # Experiment hyper-parameters
+    sample_rate: 44100
+    duration: 1000
+    channel: 2
+    shift_pct: 0.2
+
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 1000
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.001
+        lr_step: 10
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+
+path:
+    audio_root: "data/raw_audios"
+    # noise_path: [data/pink_noise_3m.wav]
+    
+    img_dir: "data/mels_img"
+    label_file: "data/labels/track_memorability_scores_beta.csv"
