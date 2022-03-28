@@ -7,7 +7,7 @@ function join_by {
 }
 
 folds=(0 1 2 3 4 5 6 7 8 9)
-seeds=(1000 1234)
+seeds=(1234)
 model="e_cnn"
 
 if [ ! -f "result/${model}/model_results.csv" ]; then
@@ -17,10 +17,10 @@ fi
 for seed in ${seeds[@]}; do
     exp_results=($seed)
     for fold in "${folds[@]}"; do
-        echo "fold: $fold trainig..."
-        python train.py --model $model --name "fold_${fold}" --do_kfold True --kfold_splits 10 --fold_index $fold --seed $seed
-        echo "fold: $fold testing..."
-        python test.py --model $model --do_kfold True  --fold_index $fold --load "weights/${model}/fold_${fold}/${model}_best.pth" --outdir "result/${model}/fold_${fold}"
+        # echo "fold: $fold trainig..."
+        # python train.py --model $model --name "fold_${fold}" --do_kfold True --kfold_splits 10 --fold_index $fold --seed $seed
+        # echo "fold: $fold testing..."
+        # python test.py --model $model --do_kfold True  --fold_index $fold --load "weights/${model}/fold_${fold}/${model}_best.pth" --outdir "result/${model}/fold_${fold}"
 
         # read ouptut file store fold results to array
         exec < "result/${model}/fold_${fold}/details.txt"
@@ -35,5 +35,5 @@ for seed in ${seeds[@]}; do
         done
     done
     # save all fold results to file
-    join_by , "${exp_results[@]}" >> "result/${model}/model_results.csv"
+    echo $(join_by , "${exp_results[@]}") >> "result/${model}/model_results.csv"
 done
