@@ -1092,8 +1092,12 @@ class SoundDataset(Dataset):
                 # dur_aud = AudioUtil.pad_trunc(rechan, self.duration)
                 # shift_aud = AudioUtil.time_shift(dur_aud, self.shift_pct)
                 sgram = AudioUtil.spectro_gram(rechan, n_mels=64, n_fft=1024, hop_len=None)
-                aug_sgram = AudioUtil.spectro_augment(sgram, max_mask_pct=0.1, n_freq_masks=2, n_time_masks=2)
-                self.imgs.append(aug_sgram)
+                if self.split != "test":
+                    aug_sgram = AudioUtil.spectro_augment(sgram, max_mask_pct=0.1, n_freq_masks=2, n_time_masks=2)
+                    self.imgs.append(aug_sgram)
+                else:
+                    self.imgs.append(sgram)
+
 
     def __len__(self):
         return len(self.scores)

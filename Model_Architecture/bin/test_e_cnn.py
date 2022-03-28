@@ -17,10 +17,9 @@ class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model)
-        os.makedirs(output_dir, exist_ok=True)
-        self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(output_dir, "details.txt")
+        
+        self.memo_output_path = os.path.join(self.outdir, "predicted_memorability_scores.csv")
+        self.corr_output_path = os.path.join(self.outdir, "details.txt")
         
         self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")        
         os.makedirs(self.interp_dir, exist_ok=True)
@@ -35,7 +34,6 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for testing '''
-        # self.test_set = EndToEndImgDataset(config=self.config, mode="test")
         self.labels_df = pd.read_csv(self.config["path"]["label_file"])
         
         fold_size = int(len(self.labels_df) / self.paras.kfold_splits)

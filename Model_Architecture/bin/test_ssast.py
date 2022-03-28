@@ -26,11 +26,10 @@ class Solver(BaseSolver):
 
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model)
-        os.makedirs(output_dir, exist_ok=True)
-        self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(output_dir, "details.txt")
-        
+
+        self.memo_output_path = os.path.join(self.outdir, "predicted_memorability_scores.csv")
+        self.corr_output_path = os.path.join(self.outdir, "details.txt")
+    
         self.parse_yaml(self.config)
 
         self.test_audio_conf = {'num_mel_bins': self.num_mel_bins, 'target_length': self.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': self.dataset,
