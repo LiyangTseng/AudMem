@@ -11,6 +11,7 @@ from PIL import Image
 import json
 from itertools import combinations
 from src.transforms import *
+from src.util import _prepare_weights
 import sys
 
 class HandCraftedDataset(Dataset):
@@ -1066,6 +1067,7 @@ class SoundDataset(Dataset):
         self.track_names = list(self.labels_df.track)
         self.scores = []
         self.imgs = []
+        self.weights = []
         self.filename_to_score = dict(zip(self.track_names, self.labels_df.score))
         self.audio_root = config["path"]["audio_root"]
         self.config = config
@@ -1075,11 +1077,23 @@ class SoundDataset(Dataset):
         self.sr = self.config["hparas"]["sample_rate"]
         self.channel = self.config["hparas"]["channel"]
         self.shift_pct = self.config["hparas"]["shift_pct"]
+
         
         if self.split != "test":
             self.audio_dirs = os.listdir(self.audio_root)
         else: # original
             self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
+        if self.split == "train":
+            self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
+                                                    reweight="inverse", 
+                                                    max_target=1, 
+                                                    lds=True,
+                                                    lds_ks=self.config["hparas"]["lds_ks"], 
+                                                    lds_sigma=self.config["hparas"]["lds_sigma"],
+                                                    bin_size=self.config["hparas"]["bin_size"])
+        else:
+            self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+
 
         for audio_dir in tqdm(self.audio_dirs):
             for track_name in self.track_names:
@@ -1097,7 +1111,7 @@ class SoundDataset(Dataset):
                     self.imgs.append(aug_sgram)
                 else:
                     self.imgs.append(sgram)
-
+                self.weights.append(self.weights_distri[self.track_names.index(track_name)])
 
     def __len__(self):
         return len(self.scores)
@@ -1105,8 +1119,9 @@ class SoundDataset(Dataset):
     def __getitem__(self, index):
         img = self.imgs[index]
         score = self.scores[index]
+        weight = self.weights[index]
 
-        return img, score
+        return img, score, weight
 
 if __name__ == "__main__":
     pass

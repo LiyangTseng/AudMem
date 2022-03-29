@@ -36,6 +36,8 @@ augmentation:
 
 model:
     use_ranking_loss: False
+    use_lds: True
+    use_fds: True
     image_size: [16, 64]
     nc: 1
     nclass: 1
@@ -106,6 +108,11 @@ hparas:                                   # Experiment hyper-parameters
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 
+    # lds_ks: 0.02
+    # lds_sigma: 0.005
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
 path:
     audio_root: "data/raw_audios"
     # noise_path: [data/pink_noise_3m.wav]

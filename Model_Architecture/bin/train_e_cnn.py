@@ -21,6 +21,8 @@ class Solver(BaseSolver):
         super().__init__(config, paras, mode)
         self.log_freq = self.config["experiment"]['log_freq']
         self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
+        self.use_lds = self.config["model"]["use_lds"]
+        self.use_fds = self.config["model"]["use_fds"]
         self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
@@ -35,10 +37,12 @@ class Solver(BaseSolver):
 
             return img_1, img_2, lab_scores_1, lab_scores_2
         else:
-            img, score = data
+            img, score, weight = data
             img = img.to(self.device)
             score = score.to(self.device).float()
-            return img, score
+            weight = weight.to(self.device).float()
+            return img, score, weight
+
 
     def load_data(self):
         ''' Load data for training/validation '''
@@ -92,7 +96,7 @@ class Solver(BaseSolver):
         # self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
         self.model = CNN().to(self.device)
         # Losses
-        self.reg_loss_func = nn.L1Loss() # regression loss
+        self.reg_loss_func = nn.L1Loss(reduction="none") # regression loss
         self.rank_loss_func = nn.BCELoss() # ranking loss
         
 
@@ -227,12 +231,15 @@ class Solver(BaseSolver):
                         self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
                         self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
                 else:
-                    img, lab_scores = self.fetch_data(data)
+                    img, lab_scores, weights = self.fetch_data(data)
                     self.timer.cnt('rd')
 
                     # Forward model
                     pred_scores = self.model(img)
+                    
                     reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    reg_loss *= weights.unsqueeze(1).expand_as(reg_loss)
+                    reg_loss = torch.mean(reg_loss)
                     # reg_loss = torch.sqrt(reg_loss)
                     train_reg_prediction.append(pred_scores)
                     train_reg_loss.append(reg_loss.cpu().detach().numpy())
@@ -242,6 +249,7 @@ class Solver(BaseSolver):
                     self.timer.cnt('fw')
 
                     # Backprop
+                    # TODO: check if backward take MEAN or SUM of the loss
                     grad_norm = self.backward(total_loss)
                     self.step += 1
 
@@ -301,10 +309,13 @@ class Solver(BaseSolver):
                     total_loss = reg_loss + self.ranking_weight*rank_loss
                     valid_total_loss.append(total_loss.cpu().detach().numpy())
             else:
-                img, lab_scores = self.fetch_data(data)
+                img, lab_scores, weights = self.fetch_data(data)
                 with torch.no_grad():
                     pred_scores = self.model(img)
                     reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    reg_loss *= weights.unsqueeze(1).expand_as(reg_loss)
+                    reg_loss = torch.mean(reg_loss)
+
                     # reg_loss = torch.sqrt(reg_loss)
                     valid_reg_prediction.append(pred_scores)
                     valid_reg_loss.append(reg_loss.cpu().detach().numpy())

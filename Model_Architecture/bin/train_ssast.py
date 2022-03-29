@@ -2,7 +2,6 @@ import os
 import math
 import json
 import torch
-import argparse
 import torch.nn as nn
 import numpy as np
 import pandas as pd
