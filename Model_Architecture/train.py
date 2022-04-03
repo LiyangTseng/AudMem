@@ -5,8 +5,10 @@ import argparse
 
 if __name__ == "__main__":
     
+    models = ["h_lstm", "h_mlp", "e_crnn", "e_cnn", "e_transformer", "e_pase", "e_pasep", "pase_mlp", "pase_lstm", "probing", "ssast"]
+
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("--model", help="h_lstm, h_mlp, e_crnn, e_cnn, e_transformer, e_pase, e_pasep, pase_mlp, pase_lstm, probing, ssast", default="e_cnn")
+    parser.add_argument("--model", help=",".join(models), default="e_cnn")
     parser.add_argument("--patience", default=100, type=int, help="early stop patience")
     parser.add_argument('--name', default=None, type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU training.')
@@ -21,8 +23,8 @@ if __name__ == "__main__":
                     help='customized learning rate', required=False)
     parser.add_argument('--features', default="all",
                     help='chords/rhythm/timbre', required=False)  
-    parser.add_argument('--do_kfold', default=True,
-                    help='do k-fold validation or not', required=False)  
+    parser.add_argument('--no_kfold', action='store_true',
+                    help='do k-fold validation or not')  
     parser.add_argument('--kfold_splits', default=10, type=int,
                     help='number of k-fold splits', required=False)
     parser.add_argument('--fold_index', default=9, type=int,
@@ -53,28 +55,9 @@ if __name__ == "__main__":
     else:
         raise Exception("Not Implement Error")
 
-    if paras.model == "h_lstm":
-        from bin.train_h_lstm import Solver
-    elif paras.model == "h_mlp":
-        from bin.train_h_mlp import Solver
-    elif paras.model == "e_crnn":
-        from bin.train_e_crnn import Solver
-    elif paras.model == "e_cnn":
-        from bin.train_e_cnn import Solver
-    elif paras.model == "e_transformer":
-        from bin.train_e_transformer import Solver
-    elif paras.model == "e_pase":
-        from bin.train_e_pase import Solver
-    elif paras.model == "e_pasep":
-        from bin.train_e_pasep import Solver
-    elif paras.model == "pase_mlp":
-        from bin.train_pase_mlp import Solver        
-    elif paras.model == "pase_lstm":
-        from bin.train_pase_lstm import Solver     
-    elif paras.model == "ssast":
-        from bin.train_ssast import Solver
-    elif paras.model == "probing":
-        from bin.train_probing import Solver
+    # ref: https://stackoverflow.com/questions/6677424/how-do-i-import-variable-packages-in-python-like-using-variable-variables-i
+    if paras.model in models:
+        Solver = getattr(__import__("bin.train_{}".format(paras.model), fromlist=["Solver"]), "Solver")
     else:
         raise Exception("Not Implement Error")
 
