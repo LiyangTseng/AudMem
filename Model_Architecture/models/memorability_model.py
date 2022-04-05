@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 import numpy as np
+from src.util import FDS
+
 
 ''' train features to approximate memorability score (regression) '''
 
@@ -27,26 +29,20 @@ class H_MLP(nn.Module):
         # Messages for user
         msg = []
         msg.append('Model spec.| H_MLP: average pooling on time axis of sequential features, concate all features to MLP')
-        # TODO: add one regarding attention
-        # if self.encoder.vgg:
-        #     msg.append('           | VCC Extractor w/ time downsampling rate = 4 in encoder enabled.')
-        # if self.enable_ctc:
-        #     msg.append('           | CTC training on encoder enabled ( lambda = {}).'.format(self.ctc_weight))
-        # if self.enable_att:
-        #     msg.append('           | {} attention decoder enabled ( lambda = {}).'.format(self.attention.mode,1-self.ctc_weight))
         return msg
 
     def forward(self, features):
         
         x = self.Linear_1(features)
-        x = self.Dropout(x)
+        x = self.BatchNorm(x)
         x = self.Relu(x)
-        x = self.Linear_2(x)
         x = self.Dropout(x)
+        x = self.Linear_2(x)
+        # x = self.Dropout(x)
         x = self.Relu(x)
         # x = self.BatchNorm(x)
         x = self.Linear_3(x)
-        x = self.Dropout(x)
+        # x = self.Dropout(x)
         # predictions = self.Relu_2(x)
         predictions = self.Sigmoid(x)
         return predictions
@@ -303,6 +299,12 @@ class CNN(nn.Module):
 
         # Wrap the Convolutional Blocks
         self.conv = nn.Sequential(*conv_layers)
+        # TODO: add this to config
+        fds = False
+        if fds:
+            self.FDS = FDS(
+
+            )
 
     def forward(self, x):
         # Run the convolutional blocks

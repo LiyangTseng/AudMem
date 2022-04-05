@@ -8,8 +8,9 @@ from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
 from models.memorability_model import H_MLP
-from src.dataset import PairHandCraftedDataset
+from src.dataset import PairHandCraftedDataset, HandCraftedDataset
 from src.util import human_format, get_grad_norm
+from utils.calculate_handcrafted_features_stats import get_features_stats
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
 CKPT_STEP = 10000
@@ -20,23 +21,32 @@ class Solver(BaseSolver):
     def __init__(self, config, paras, mode):
         super().__init__(config, paras, mode)
         self.log_freq = self.config["experiment"]['log_freq']
+        self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
         self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
     def fetch_data(self, data):
         ''' Move data to device '''
 
-        feat_1, feat_2, lab_scores_1, lab_scores_2 = data
+        if self.use_ranking_loss:
+            feat_1, feat_2, lab_scores_1, lab_scores_2 = data
 
-        seq_feat_1, non_seq_feat_1 = feat_1
-        seq_feat_2, non_seq_feat_2 = feat_2
-        feat_1 = torch.cat((seq_feat_1, non_seq_feat_1), dim=1)
-        feat_2 = torch.cat((seq_feat_2, non_seq_feat_2), dim=1)
+            seq_feat_1, non_seq_feat_1 = feat_1
+            seq_feat_2, non_seq_feat_2 = feat_2
+            feat_1 = torch.cat((seq_feat_1, non_seq_feat_1), dim=1)
+            feat_2 = torch.cat((seq_feat_2, non_seq_feat_2), dim=1)
 
-        feat_1, feat_2 = feat_1.to(self.device), feat_2.to(self.device)
-        lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
+            feat_1, feat_2 = feat_1.to(self.device), feat_2.to(self.device)
+            lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
 
-        return feat_1, feat_2, lab_scores_1, lab_scores_2
+            return feat_1, feat_2, lab_scores_1, lab_scores_2
+        else:
+            feat, lab_scores = data
+            seq_feat, non_seq_feat = feat
+            feat = torch.cat((seq_feat, non_seq_feat), dim=1)
+            feat = feat.to(self.device)
+            lab_scores = lab_scores.to(self.device).float()
+            return feat, lab_scores
 
     def load_data(self):
         ''' Load data for training/validation '''
@@ -47,32 +57,40 @@ class Solver(BaseSolver):
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
         self.labels_df = self.labels_df[~for_test]
+        stats_dict = get_features_stats(label_df=self.labels_df, 
+                                        features_dir=self.config["path"]["features_dir"], 
+                                        for_test=False,
+                                        features_dict = self.config["features"])
+
         self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
         self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-
-        self.train_set = PairHandCraftedDataset(labels_df=self.train_labels_df, config=self.config, pooling=True, split="train")
-        self.valid_set = PairHandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, pooling=True, split="valid")
+        if self.use_ranking_loss:
+            self.train_set = PairHandCraftedDataset(labels_df=self.train_labels_df, config=self.config, pooling=True, split="train")
+            self.valid_set = PairHandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, pooling=True, split="valid")
+        else:
+            self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="train")
+            self.valid_set = HandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="valid")
         self.write_log('train_distri/lab', self.train_labels_df.score.values)
         self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
         #----------------------Weighted Random Sampler-------------------------------
         
-        bin_count = 10
-        hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
+        # bin_count = 10
+        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
+        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
 
 
-        sample_w = []
-        for score in self.train_set.scores:
-            # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-            bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-            sample_w.append(weighted[bin_idx-1])
+        # sample_w = []
+        # for score in self.train_set.scores:
+        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
+        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
+        #     sample_w.append(weighted[bin_idx-1])
 
-        sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
+        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
         #----------------------Weighted Random Sampler-------------------------------
 
 
-        self.train_loader = DataLoader(dataset=self.train_set, sampler=sampler, batch_size=self.config["experiment"]["batch_size"],
+        self.train_loader = DataLoader(dataset=self.train_set, shuffle=True, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"])
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
@@ -94,8 +112,11 @@ class Solver(BaseSolver):
         
 
         # Optimizer
-        self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
-        self.verbose(self.optimizer.create_msg())
+        # self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
+        # self.verbose(self.optimizer.create_msg())
+
+        # self.optimizer = getattr(torch.optim, self.config["hparas"]["optimizer"]["type"])() torch.optim.Adam(self.model.parameters(), lr=self.config["hparas"]["optimizer"]["lr"])
+        self.optimizer = getattr(torch.optim, self.config["hparas"]["optimizer"]["type"])(self.model.parameters(), lr=self.config["hparas"]["optimizer"]["lr"])
 
         # Automatically load pre-trained model if self.paras.load is given
         self.load_ckpt(cont=False)
@@ -149,8 +170,9 @@ class Solver(BaseSolver):
         ckpt_path = os.path.join(self.ckpdir, f_name)
         full_dict = {
             "model": self.model.state_dict(),
-            "optimizer": self.optimizer.get_opt_state_dict(),
-            # "global_step": self.step,
+            # "optimizer": self.optimizer.get_opt_state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "global_step": self.step,
             "global_epoch": self.epoch,
             metric: float(score)
         }
@@ -172,54 +194,74 @@ class Solver(BaseSolver):
             self.model.train()
             train_reg_loss, train_rank_loss, train_total_loss = [], [], [] # record the loss of every batch
             train_reg_prediction, train_rank_prediction = [], []
-            
             for i, data in enumerate(tqdm(self.train_loader)):
                 # Pre-step : update tf_rate/lr_rate and do zero_grad
                 # tf_rate = self.optimizer.pre_step(self.step)
-                self.optimizer.opt.zero_grad()
+                # self.optimizer.opt.zero_grad()
+                self.optimizer.zero_grad()
+                total_loss = 0
+                if self.use_ranking_loss:
+                    # Fetch data
+                    feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                    self.timer.cnt('rd')
+                    lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
-                # Fetch data
-                feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                self.timer.cnt('rd')
-                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
+                    # Forward model
+                    pred_scores_1 = self.model(feat_1)
+                    pred_scores_2 = self.model(feat_2)
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
-                # Forward model
-                pred_scores_1 = self.model(feat_1)
-                pred_scores_2 = self.model(feat_2)
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    train_reg_prediction.append(pred_scores)
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    
+                    # ref: https://www.cnblogs.com/little-horse/p/10468311.html
+                    train_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    train_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                # reg_loss = torch.sqrt(reg_loss)
-                train_reg_prediction.append(pred_scores)
-                train_reg_loss.append(reg_loss.cpu().detach().numpy())
-                
-                # ref: https://www.cnblogs.com/little-horse/p/10468311.html
-                train_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                train_rank_loss.append(rank_loss.cpu().detach().numpy())
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    train_total_loss.append(total_loss.cpu().detach().numpy())
+                    self.timer.cnt('fw')
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                train_total_loss.append(total_loss.cpu().detach().numpy())
-                self.timer.cnt('fw')
+                    # Backprop
+                    grad_norm = self.backward(total_loss)
+                    self.step += 1
 
-                # Backprop
-                grad_norm = self.backward(total_loss)
-                self.step += 1
+                    if i % self.log_freq == 0:
+                        self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
+                        self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
+                else:
+                    feat, lab_scores = self.fetch_data(data)
+                    self.timer.cnt('rd')
 
-                if i % self.log_freq == 0:
-                    self.log.add_scalars('train_loss', {'reg_loss/train': np.mean(train_reg_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'rank_loss/train': np.mean(train_rank_loss)}, self.step)
-                    self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
+                    # Forward model
+                    pred_scores = self.model(feat)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    train_reg_prediction.append(pred_scores)
+                    train_reg_loss.append(reg_loss.cpu().detach().numpy())
+
+                    total_loss = reg_loss
+                    train_total_loss.append(total_loss.cpu().detach().numpy())
+                    self.timer.cnt('fw')
+
+                    # Backprop
+                    grad_norm = self.backward(total_loss)
+                    self.step += 1
+                    
 
 
             # Logger
             self.progress('Tr stat | Loss - {:.2f} | Grad. Norm - {:.2f} | {}'
                             .format(total_loss.cpu().item(), grad_norm, self.timer.show()))
             self.write_log('train_distri/pred', torch.cat(train_reg_prediction))
-
+            self.write_log('MSE_loss', {'total_loss/train': np.mean(train_total_loss)})
 
             # Validation
             epoch_valid_total_loss = self.validate()
@@ -235,7 +277,7 @@ class Solver(BaseSolver):
             # https://github.com/pytorch/pytorch/issues/13246#issuecomment-529185354
             torch.cuda.empty_cache()
             self.timer.set()
-
+                
         self.log.close()
 
     def validate(self):
@@ -246,50 +288,62 @@ class Solver(BaseSolver):
 
         for i, data in enumerate(self.valid_loader):
             self.progress('Valid step - {}/{}'.format(i+1, len(self.valid_loader)))
-            # Fetch data
-            feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-            lab_scores = torch.cat((lab_scores_1, lab_scores_2))
+            if self.use_ranking_loss:
+                # Fetch data
+                feat_1, feat_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
+                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
-            # Forward model
-            with torch.no_grad():
-                pred_scores_1 = self.model(feat_1)
-                pred_scores_2 = self.model(feat_2)
-                pred_scores = torch.cat((pred_scores_1, pred_scores_2))
+                # Forward model
+                with torch.no_grad():
+                    pred_scores_1 = self.model(feat_1)
+                    pred_scores_2 = self.model(feat_2)
+                    pred_scores = torch.cat((pred_scores_1, pred_scores_2))
 
-                valid_reg_prediction.append(pred_scores)
-                reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
-                # reg_loss = torch.sqrt(reg_loss)
-                valid_reg_loss.append(reg_loss.cpu().detach().numpy())
+                    valid_reg_prediction.append(pred_scores)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
 
-                valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
-                pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
-                lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
-                rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
-                valid_rank_loss.append(rank_loss.cpu().detach().numpy())
+                    valid_rank_prediction.append(pred_scores_1 > pred_scores_2)
+                    pred_binary_rank = nn.Sigmoid()(pred_scores_1 - pred_scores_2)
+                    lab_binary_rank = (pred_scores_1>pred_scores_2).float().to(self.device)
+                    rank_loss = self.rank_loss_func(pred_binary_rank, lab_binary_rank)
+                    valid_rank_loss.append(rank_loss.cpu().detach().numpy())
 
-                total_loss = reg_loss + self.ranking_weight*rank_loss
-                valid_total_loss.append(total_loss.cpu().detach().numpy())
+                    total_loss = reg_loss + self.ranking_weight*rank_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
+            else:
+                feat, lab_scores = self.fetch_data(data)
+                with torch.no_grad():
+                    pred_scores = self.model(feat)
+                    reg_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    # reg_loss = torch.sqrt(reg_loss)
+                    valid_reg_prediction.append(pred_scores)
+                    valid_reg_loss.append(reg_loss.cpu().detach().numpy())
 
+                    total_loss = reg_loss
+                    valid_total_loss.append(total_loss.cpu().detach().numpy())
 
-        epoch_valid_total_loss = np.mean(valid_total_loss)
-        epoch_valid_reg_loss = np.mean(valid_reg_loss)
-        epoch_valid_rank_loss = np.mean(valid_rank_loss)
-        self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
-        self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
-        self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
-        self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
-        
+        if self.use_ranking_loss:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            epoch_valid_reg_loss = np.mean(valid_reg_loss)
+            epoch_valid_rank_loss = np.mean(valid_rank_loss)
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            self.write_log('valid_loss', {'reg_loss/valid': epoch_valid_reg_loss})
+            self.write_log('valid_loss', {'rank_loss/valid': epoch_valid_rank_loss})
+            self.write_log('valid_loss', {'total_loss/valid': epoch_valid_total_loss})
+        else:
+            epoch_valid_total_loss = np.mean(valid_total_loss)
+            epoch_valid_reg_loss = np.mean(valid_reg_loss)
+            self.write_log('valid_distri/pred', torch.cat(valid_reg_prediction))
+            self.write_log('MSE_loss', {'total_loss/valid': epoch_valid_total_loss})
+
         # Ckpt if performance improves
         
         if epoch_valid_total_loss < self.best_valid_loss:
             self.best_valid_loss = epoch_valid_total_loss
             self.save_checkpoint('{}_best.pth'.format(
                 self.paras.model), 'total_loss', epoch_valid_total_loss)
-
-        # Regular ckpt
-        self.save_checkpoint('epoch_{}.pth'.format(
-            self.epoch), 'total_loss', epoch_valid_total_loss)
-
 
         # Resume training
         self.model.train()

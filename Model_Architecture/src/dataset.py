@@ -15,8 +15,8 @@ from src.util import _prepare_weights
 import sys
 
 class HandCraftedDataset(Dataset):
-    ''' Hand crafted audio features to predict memorability (classification) '''
-    def __init__(self, labels_df, config, pooling=False, split="train"):
+    ''' Hand crafted audio features to predict memorability (regression) '''
+    def __init__(self, labels_df, config, stats_dict, pooling=False, split="train"):
         super().__init__()
         assert split in ["train", "valid", "test"], "invalid split"
         self.labels_df = labels_df
@@ -39,7 +39,7 @@ class HandCraftedDataset(Dataset):
         self.features_dict = config["features"]
 
         self.features_options = [[] for _ in range(len(self.labels_df))]
-
+        # TODO: feature scaling on the fly using the distribution of whole spilt
         for track_name in tqdm(self.track_names):
             for augment_type in self.augmented_type_list:
                 
@@ -47,24 +47,30 @@ class HandCraftedDataset(Dataset):
                 non_sequential_features_list = []
                 
                 for feature_type in self.features_dict:
-                    for subfeatures in self.features_dict[feature_type]:
-                        feature_file_path = os.path.join(self.features_dir, augment_type, feature_type, subfeatures,
-                             "{}_{}".format(subfeatures, track_name.replace("wav", "npy")))   
-                        f = np.load(feature_file_path)
-                        f = np.float32(f)
+                    for feature_name in self.features_dict[feature_type]:
+                        feature_file_path = os.path.join(self.features_dir, augment_type, feature_type, feature_name,
+                             "{}_{}".format(feature_name, track_name.replace("wav", "npy")))   
+                        f = np.float32(np.load(feature_file_path))
                         if feature_type == "emotions":
                             # features not sequential
                             non_sequential_features_list.append(f)
                         else:
                             # features are sequential 
+                            # normalize with respect to the whole spilt
+                            mean = np.expand_dims(stats_dict[feature_name]['mean'], axis=1)
+                            std = np.expand_dims(stats_dict[feature_name]['std'], axis=1)
+                            f = (f - mean) / std
+
                             if self.pooling:
                                 # temporal mean pooling to compress 2d features to 1d
                                 sequeutial_features_list.append(f.mean(axis=1))
-                                sequential_features = np.concatenate(sequeutial_features_list, axis=0)
                             else:
                                 sequeutial_features_list.append(f)
-                                sequential_features = np.concatenate(sequeutial_features_list, axis=0)
-                                sequential_features = np.transpose(sequential_features)   
+                if self.pooling:
+                    sequential_features = np.concatenate(sequeutial_features_list, axis=0)
+                else:
+                    sequential_features = np.concatenate(sequeutial_features_list, axis=0)
+                    sequential_features = np.transpose(sequential_features)   
 
                 sequential_features = torch.from_numpy(sequential_features)
                 non_sequential_features = torch.from_numpy(np.stack(non_sequential_features_list))
@@ -75,7 +81,7 @@ class HandCraftedDataset(Dataset):
                     )        
 
     def __len__(self):
-        return len(self.labels_df)*len(self.augmented_type_list)   
+        return len(self.labels_df)
 
     def __getitem__(self, index):
         features_options = self.features_options[index]
@@ -86,7 +92,7 @@ class HandCraftedDataset(Dataset):
 
 
 class PairHandCraftedDataset(HandCraftedDataset):
-    ''' Hand crafted audio features to predict memorability (classification) '''
+    ''' Hand crafted audio features to predict memorability (regression) '''
     def __init__(self, labels_df, config, pooling=False, split="train"):
         super().__init__(labels_df=labels_df, config=config, pooling=pooling, split=split)
         assert split in ["train", "valid"], "Split must be either train or valid"

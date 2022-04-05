@@ -1,8 +1,8 @@
 # non end-to-end configuration
 features:
     chords: ["chroma", "tonnetz"]
-    # rhythms: ["tempogram"]
-    # timbre: ["mfcc", "mfcc_delta", "mfcc_delta2"]
+    rhythms: ["tempogram"]
+    timbre: ["mfcc", "mfcc_delta", "mfcc_delta2"]
     emotions: ["static_arousal", "static_valence"]
     
 experiment:
@@ -13,13 +13,14 @@ experiment:
 model:
     seq_len: 157 # under 16kHz sampling rate
     # ==== make sure size is consistent with the one from dataloader ====
-    sequential_input_size: 18
+    sequential_input_size: 462
     # sequential_input_size: 32
     non_sequential_input_size: 2
     # ===================================================================
     hidden_size: 100
     ranking_weight: 0.7
     dropout_rate: 0.5
+    use_ranking_loss: False
 
 hparas:                                   # Experiment hyper-parameters
     valid_step: 1000

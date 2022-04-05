@@ -7,6 +7,7 @@ from scipy import stats
 from src.solver import BaseSolver
 from models.memorability_model import H_MLP
 from src.dataset import HandCraftedDataset
+from utils.calculate_handcrafted_features_stats import get_features_stats
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -21,7 +22,7 @@ class Solver(BaseSolver):
         self.memo_output_path = os.path.join(self.outdir, "predicted_memorability_scores.csv")
         self.corr_output_path = os.path.join(self.outdir, "details.txt")
         
-        self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")        
+        self.interp_dir = os.path.join(self.outdir, "interpretability")        
         os.makedirs(self.interp_dir, exist_ok=True)
         
 
@@ -43,8 +44,12 @@ class Solver(BaseSolver):
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
         for_test = self.labels_df.index.isin(testing_range)
         self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
+        stats_dict = get_features_stats(label_df=self.test_labels_df, 
+                                        features_dir=self.config["path"]["features_dir"], 
+                                        for_test=True,
+                                        features_dict = self.config["features"])
 
-        self.test_set = HandCraftedDataset(labels_df=self.test_labels_df, config=self.config, pooling=True, split="test")
+        self.test_set = HandCraftedDataset(labels_df=self.test_labels_df, config=self.config, stats_dict=stats_dict, pooling=True, split="test")
         
         self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
@@ -55,7 +60,7 @@ class Solver(BaseSolver):
         self.verbose(data_msg)
 
     def set_model(self):
-        ''' Setup ASR model '''
+        ''' Setup h_mlp model '''
         # Model
         self.model = H_MLP(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
@@ -86,8 +91,8 @@ class Solver(BaseSolver):
         reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
         # reg_loss = torch.sqrt(reg_loss)
         with open(self.corr_output_path, 'w') as f:
-            f.write(str(correlation))
-            f.write("regression loss: {}".format(str(reg_loss)))
+            f.write(str(correlation) + "\n")
+            f.write("MSE loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         
