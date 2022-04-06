@@ -59,15 +59,25 @@ class H_LSTM(nn.Module):
         self.num_layers = model_config["layer_num"]
         self.bidirectional = model_config["bidirectional"]
         
-        self.Batch_Norm_1 = nn.BatchNorm1d(model_config["seq_len"])
-        self.LSTM = nn.ModuleList()
-        
-        for i in range(self.num_layers):
-            input_size = model_config["sequential_input_size"] if i == 0 else intermediate_hidden_size*(1+int(self.bidirectional))
-            intermediate_hidden_size = self.hidden_size
-            self.LSTM.append(nn.LSTM(input_size=input_size, hidden_size=intermediate_hidden_size, batch_first=True, bidirectional=True))
+        self.Layer_Norm = nn.LayerNorm(2*model_config["hidden_size"])
+        self.Dropout = nn.Dropout(p=model_config["dropout_rate"])
 
-        self.Batch_Norm_2 = nn.BatchNorm1d(2*model_config["hidden_size"]+model_config["non_sequential_input_size"])
+        self.LSTM = nn.ModuleList()
+        for i in range(self.num_layers):
+            input_size = model_config["sequential_input_size"] if i == 0 else self.hidden_size*(1+int(self.bidirectional))
+            self.LSTM.append(nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, bidirectional=True))
+        
+        # module_list = []
+        # for i in range(self.num_layers):
+        #     input_size = model_config["sequential_input_size"] if i == 0 else self.hidden_size*(1+int(self.bidirectional))
+        #     module_list.append(nn.Sequential(
+        #         nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, bidirectional=True),
+        #         nn.LayerNorm(2*model_config["hidden_size"]),
+        #         nn.Dropout(p=model_config["dropout_rate"])
+        #     ))
+        # self.LSTM = nn.ModuleList(module_list)
+
+        self.Batch_Norm = nn.BatchNorm1d(2*model_config["hidden_size"]+model_config["non_sequential_input_size"])
         # input shape: (batch_size, seq, input_size)
         self.Linear = nn.Linear(self.hidden_size*(1+int(self.bidirectional))+model_config["non_sequential_input_size"], 1)
 
@@ -92,13 +102,6 @@ class H_LSTM(nn.Module):
         # Messages for user
         msg = []
         msg.append('Model spec.| H_LSTM: apply LSTM to sequential features, involve non sequential features in output layer ')
-        # TODO: add one regarding attention
-        # if self.encoder.vgg:
-        #     msg.append('           | VCC Extractor w/ time downsampling rate = 4 in encoder enabled.')
-        # if self.enable_ctc:
-        #     msg.append('           | CTC training on encoder enabled ( lambda = {}).'.format(self.ctc_weight))
-        # if self.enable_att:
-        #     msg.append('           | {} attention decoder enabled ( lambda = {}).'.format(self.attention.mode,1-self.ctc_weight))
         return msg
 
     def forward(self, sequential_features, non_sequential_features):
@@ -108,11 +111,13 @@ class H_LSTM(nn.Module):
             # in shape: (batch_size, seq_len, input_size)
             hidden_states, _ = layer(inputs)
             # out shape: (batch_size, seq_length, hidden_size*bidirectional)
+            hidden_states = self.Layer_Norm(hidden_states)
+            hidden_states = self.Dropout(hidden_states)
     
         # only use the last timestep for linear input
         out = hidden_states[:, -1, :]
         out = torch.cat((out, non_sequential_features), 1)
-        out = self.Batch_Norm_2(out)
+        out = self.Batch_Norm(out)
         out = self.Linear(out)
 
         predictions = self.ReLU(out)

@@ -115,7 +115,6 @@ class Solver(BaseSolver):
         # self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
         # self.verbose(self.optimizer.create_msg())
 
-        # self.optimizer = getattr(torch.optim, self.config["hparas"]["optimizer"]["type"])() torch.optim.Adam(self.model.parameters(), lr=self.config["hparas"]["optimizer"]["lr"])
         self.optimizer = getattr(torch.optim, self.config["hparas"]["optimizer"]["type"])(self.model.parameters(), lr=self.config["hparas"]["optimizer"]["lr"])
 
         # Automatically load pre-trained model if self.paras.load is given
