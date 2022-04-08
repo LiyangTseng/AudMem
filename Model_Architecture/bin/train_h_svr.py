@@ -3,6 +3,7 @@ import torch
 import pickle
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from src.solver import BaseSolver
 from sklearn.svm import SVR
 from src.dataset import PairHandCraftedDataset, HandCraftedDataset
@@ -34,17 +35,32 @@ class Solver(BaseSolver):
 
         self.train_labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
         self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="train")
+
+
+        """no augmentation"""
+        # self.labels = self.train_set.scores
+        # self.features = []
+        # for feature_option in self.train_set.features_options:
+        #     # TODO: add data augmentation
+        #     seq_feat, non_seq_feat = feature_option[0]
+        #     feat = torch.cat((seq_feat, non_seq_feat), dim=0)
+
+        #     self.features.append(feat.numpy())
         
+        """augmentation"""
+        self.labels = []    
         self.features = []
-        # concate seqential and unseqential data
-        for feature_option in self.train_set.features_options:
-            # TODO: add data augmentation
-            seq_feat, non_seq_feat = feature_option[0]
-            feat = torch.cat((seq_feat, non_seq_feat), dim=0)
+        for i  in tqdm(range(len(self.train_set.features_options))):
+            feature_option = self.train_set.features_options[i]
+            for feats in feature_option:
+                # concate seqential and unseqential data
+                seq_feat, non_seq_feat = feats
+                feat = torch.cat((seq_feat, non_seq_feat), dim=0)
 
-            self.features.append(feat.numpy())
+                self.features.append(feat.numpy())
+                self.labels.append(self.train_set.scores[i])
+        print("len(self.features): ", len(self.features))
 
-        self.labels = self.train_set.scores
         
     def set_model(self):
         ''' Setup h_mlp model and optimizer '''

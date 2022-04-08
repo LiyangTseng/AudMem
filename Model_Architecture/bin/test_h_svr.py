@@ -47,8 +47,7 @@ class Solver(BaseSolver):
         self.labels = self.test_set.scores
 
     def set_model(self):
-        # with open(self.paras.load , 'rb') as fid:
-        with open("weights/h_svr/22-04-08_14:34/h_svr.pkl" , 'rb') as fid:
+        with open(self.paras.load , 'rb') as fid:
             self.model = pickle.load(fid)  
         self.verbose("weight loaded from {}".format(self.paras.load))
 

@@ -7,7 +7,8 @@ function join_by {
 }
 
 folds=(0 1 2 3 4 5 6 7 8 9)
-seeds=(1111 1000 2345 1234)
+# seeds=(1111 1000 2345 1234)
+seeds=(1111)
 model="h_svr"
 mkdir -p "results/$model"
 correlation_results_file="results/${model}/correlation_results.csv"
@@ -29,8 +30,11 @@ for seed in ${seeds[@]}; do
         echo "fold: $fold trainig..."
         python train.py --model $model --name "fold_${fold}" --kfold_splits 10 --fold_index $fold --seed $seed
         echo "fold: $fold testing..."
-        python test.py --model $model --fold_index $fold --load "weights/${model}/fold_${fold}/${model}_best.pth" --outdir "results/${model}/fold_${fold}"
-
+        if [ $model == "h_svr" ]; then
+            python test.py --model $model --fold_index $fold --load "weights/${model}/fold_${fold}/${model}.pkl" --outdir "results/${model}/fold_${fold}"
+        else
+            python test.py --model $model --fold_index $fold --load "weights/${model}/fold_${fold}/${model}_best.pth" --outdir "results/${model}/fold_${fold}"
+        fi
         # read ouptut file store fold results to array
         exec < "results/${model}/fold_${fold}/details.txt"
         while read line; do
