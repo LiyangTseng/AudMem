@@ -8,7 +8,8 @@ function join_by {
 
 folds=(0 1 2 3 4 5 6 7 8 9)
 seeds=(1111 1000 2345 1234)
-model="h_mlp"
+model="h_svr"
+mkdir -p "results/$model"
 correlation_results_file="results/${model}/correlation_results.csv"
 loss_results_file="results/${model}/loss_results.csv"
 

@@ -4,10 +4,10 @@ import yaml
 import argparse
 if __name__ == "__main__":
     
-    models = ["h_lstm", "h_mlp", "e_crnn", "e_cnn", "pase_mlp", "pase_lstm", "e_transformer", "ssast", "random_guess", "mean"]
+    models = ["h_lstm", "h_mlp", "h_svr", "e_crnn", "e_cnn", "pase_mlp", "pase_lstm", "e_transformer", "ssast", "random_guess", "mean"]
 
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help=",".join(models), default="random_guess")
+    parser.add_argument("--model", help=",".join(models), default="h_svr")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
