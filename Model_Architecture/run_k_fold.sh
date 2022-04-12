@@ -7,9 +7,8 @@ function join_by {
 }
 
 folds=(0 1 2 3 4 5 6 7 8 9)
-# seeds=(1111 1000 2345 1234)
-seeds=(1111)
-model="h_svr"
+seeds=(1111 1000 2345 1234)
+model="h_lstm"
 mkdir -p "results/$model"
 correlation_results_file="results/${model}/correlation_results.csv"
 loss_results_file="results/${model}/loss_results.csv"
@@ -27,16 +26,17 @@ for seed in ${seeds[@]}; do
     correlation_results=($seed)
     loss_results=($seed)
     for fold in "${folds[@]}"; do
+        exp_name="seed_${seed}_fold_${fold}"
         echo "fold: $fold trainig..."
-        python train.py --model $model --name "fold_${fold}" --kfold_splits 10 --fold_index $fold --seed $seed
+        python train.py --model $model --name $exp_name --kfold_splits 10 --fold_index $fold --seed $seed
         echo "fold: $fold testing..."
         if [ $model == "h_svr" ]; then
-            python test.py --model $model --fold_index $fold --load "weights/${model}/fold_${fold}/${model}.pkl" --outdir "results/${model}/fold_${fold}"
+            python test.py --model $model --fold_index $fold --load "weights/${model}/${exp_name}/${model}.pkl" --outdir "results/${model}/${exp_name}"
         else
-            python test.py --model $model --fold_index $fold --load "weights/${model}/fold_${fold}/${model}_best.pth" --outdir "results/${model}/fold_${fold}"
+            python test.py --model $model --fold_index $fold --load "weights/${model}/${exp_name}/${model}_best.pth" --outdir "results/${model}/${exp_name}"
         fi
         # read ouptut file store fold results to array
-        exec < "results/${model}/fold_${fold}/details.txt"
+        exec < "results/${model}/${exp_name}/details.txt"
         while read line; do
             if [[ $line == *"correlation"* ]]; then
                 # extact the content inside the parathese
@@ -59,3 +59,5 @@ for seed in ${seeds[@]}; do
     echo $(join_by , "${correlation_results[@]}") >> $correlation_results_file
     echo $(join_by , "${loss_results[@]}") >> $loss_results_file
 done
+
+
