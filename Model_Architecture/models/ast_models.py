@@ -169,14 +169,13 @@ class ASTModel(nn.Module):
             self.v = audio_model.module.v
             self.original_embedding_dim = self.v.pos_embed.shape[2] # 768
             self.cls_token_num = audio_model.module.cls_token_num
-
             # mlp head for fine-tuning
             if hidden_layer_dim != 0:
                 self.mlp_head = nn.Sequential(nn.LayerNorm(self.original_embedding_dim),
                                             nn.Linear(self.original_embedding_dim, hidden_layer_dim),
-                                            nn.Dropout(0.5),
+                                            # nn.Dropout(0.5),
                                             nn.Linear(hidden_layer_dim, hidden_layer_dim),
-                                            nn.Dropout(0.5),
+                                            # nn.Dropout(0.5),
                                             nn.ReLU(),
                                             nn.Linear(hidden_layer_dim, label_dim),)
             else:

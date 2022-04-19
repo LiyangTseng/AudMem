@@ -46,11 +46,11 @@ model:
     tshape: 16
     # In the fine-tuning and inference steps, we split the patch
     # with an overlap of 6 in the same fashion as the original AST, source: https://arxiv.org/pdf/2110.09784v2.pdf
-    fstride: 16
-    tstride: 16
+    fstride: 10
+    tstride: 10
     input_fdim: 128
     model_size: "base"
-    hidden_layer_dim: 200
+    hidden_layer_dim: 256
 
     target_length: 500 # 5 second clips
     noise: False

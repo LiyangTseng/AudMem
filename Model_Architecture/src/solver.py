@@ -58,7 +58,7 @@ class BaseSolver():
             random.seed(self.paras.seed)
             np.random.seed(self.paras.seed)
             torch.manual_seed(self.paras.seed)
-            # for cuda
+            # for cuda, ref: https://github.com/pytorch/pytorch/issues/7068
             torch.cuda.manual_seed_all(self.paras.seed)
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False

@@ -11,7 +11,7 @@ experiment:
     log_freq: 50
 
 model:
-    kernel: "linear" # "rbf"
+    kernel: "rbf" # "rbf", "linear"
 
     use_lds: True
     use_fds: True

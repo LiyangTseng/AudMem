@@ -21,8 +21,10 @@ if __name__ == "__main__":
                     help='Load pre-trained model (for training only)', required=False)
     parser.add_argument('--lr_rate', default=None,
                     help='customized learning rate', required=False)
-    parser.add_argument('--features', default="all",
-                    help='chords/rhythm/timbre', required=False)  
+    parser.add_argument('--svr_kernel', default=None,
+                    help='customized svr kernel', required=False)
+    parser.add_argument('--features', default="harmony",
+                    help='all/harmony/rhythm/timbre/harmony-rhythm/harmony-timbre/rhythm-timbre', required=False)  
     parser.add_argument('--no_kfold', action='store_true',
                     help='do k-fold validation or not')  
     parser.add_argument('--kfold_splits', default=10, type=int,
@@ -43,15 +45,29 @@ if __name__ == "__main__":
  
     if paras.lr_rate != None:
         config["hparas"]["optimizer"]["lr"] = paras.lr_rate
+    if paras.svr_kernel != None:
+        config["model"]["kernel"] = paras.svr_kernel
 
     if paras.features == "all":
         pass
-    elif paras.features == "chords-timbre":
-        config["features"] = {'chords': ['chroma'], 'timbre': ['mfcc'], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 32
-    elif paras.features == "chords":
-        config["features"] = {'chords': ['chroma'], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 12
+    elif paras.features == "harmony":
+        config["features"] = {'chords': ['chroma', 'tonnetz'], 'emotions': ['static_arousal', 'static_valence'] }
+        config["model"]["sequential_input_size"] = 18
+    elif paras.features == "timbre":
+        config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 60
+    elif paras.features == "rhythm":
+        config["features"] = {'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 384
+    elif paras.features == "harmony-timbre":
+        config["features"] = {'chords': ['chroma', 'tonnetz'], 'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 78
+    elif paras.features == "harmony-rhythm":
+        config["features"] = {'chords': ['chroma', 'tonnetz'], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 402
+    elif paras.features == "timbre-rhythm":
+        config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+        config["model"]["sequential_input_size"] = 442
     else:
         raise Exception("Not Implement Error")
 

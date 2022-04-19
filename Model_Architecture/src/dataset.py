@@ -16,7 +16,7 @@ import sys
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (regression) '''
-    def __init__(self, labels_df, config, stats_dict, pooling=False, split="train"):
+    def __init__(self, labels_df, config, stats_dict, pooling=False, split="train", use_lds=False):
         super().__init__()
         assert split in ["train", "valid", "test"], "invalid split"
         self.labels_df = labels_df
@@ -27,19 +27,32 @@ class HandCraftedDataset(Dataset):
         if self.split != "test":
             # self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[:]
+            if use_lds:
+                print("calculating smoothed labels...")
+                self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
+                                                    reweight="inverse", 
+                                                    max_target=1, 
+                                                    lds=True,
+                                                    lds_ks=config["hparas"]["lds_ks"], 
+                                                    lds_sigma=config["hparas"]["lds_sigma"],
+                                                    bin_size=config["hparas"]["bin_size"])
+            else:
+                self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
         else:
             self.augmented_type_list = sorted(os.listdir(self.features_dir))[-1:]
+            self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+
         self.pooling = pooling
 
         self.track_names = list(self.labels_df.track)
         self.scores = list(self.labels_df.score)
+        self.weights = []
         self.filename_to_score = dict(zip(self.track_names, self.scores))
 
 
         self.features_dict = config["features"]
 
         self.features_options = [[] for _ in range(len(self.labels_df))]
-        # TODO: feature scaling on the fly using the distribution of whole spilt
         for track_name in tqdm(self.track_names):
             for augment_type in self.augmented_type_list:
                 
@@ -73,12 +86,16 @@ class HandCraftedDataset(Dataset):
                     sequential_features = np.transpose(sequential_features)   
 
                 sequential_features = torch.from_numpy(sequential_features)
-                non_sequential_features = torch.from_numpy(np.stack(non_sequential_features_list))
+                non_sequential_features = torch.from_numpy(np.stack(non_sequential_features_list)) if len(non_sequential_features_list) > 0 else None
                 
                 
                 self.features_options[self.track_names.index(track_name)].append(
                         [sequential_features, non_sequential_features]
-                    )        
+                    )  
+
+            self.weights.append(self.weights_distri[self.track_names.index(track_name)])  
+
+        assert len(self.scores) == len(self.weights) == len(self.features_options), "length not match"   
 
     def __len__(self):
         return len(self.labels_df)
@@ -87,8 +104,9 @@ class HandCraftedDataset(Dataset):
         features_options = self.features_options[index]
         features = features_options[np.random.randint(0, len(features_options))]
         score = self.scores[index]
+        weight = self.weights[index]
 
-        return features, score
+        return features, score, weight
 
 
 class PairHandCraftedDataset(HandCraftedDataset):
@@ -1068,7 +1086,7 @@ class AudioUtil():
     return aug_spec
 
 class SoundDataset(Dataset):
-    def __init__(self, labels_df, config, split):
+    def __init__(self, labels_df, config, split, use_lds=False):
         self.labels_df = labels_df
         self.track_names = list(self.labels_df.track)
         self.scores = []
@@ -1089,7 +1107,7 @@ class SoundDataset(Dataset):
             self.audio_dirs = os.listdir(self.audio_root)
         else: # original
             self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
-        if self.split == "train":
+        if self.split == "train" and use_lds:
             self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
                                                     reweight="inverse", 
                                                     max_target=1, 
