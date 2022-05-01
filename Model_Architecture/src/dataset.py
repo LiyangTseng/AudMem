@@ -982,108 +982,6 @@ class ReconstructionDataset(Dataset):
             raise Exception("index out of range")
         return hidden_states, mels
 # CNN
-def getData(mode):
-    if mode == 'train':
-        data = pd.read_csv('./music-regression/train.csv')
-        audio_name = data.track
-        score = data.score
-        return np.squeeze(audio_name.values), np.squeeze(score.values)
-    else:
-        data = pd.read_csv('./music-regression/test.csv')
-        audio_name = data.track
-        return np.squeeze(audio_name.values)
-
-class AudioUtil():
-  def open(audio_file):
-    sig, sr = torchaudio.load(audio_file)
-    return (sig, sr)
-
-  def rechannel(aud, new_channel):
-    sig, sr = aud
-
-    if (sig.shape[0] == new_channel):
-      # Nothing to do
-      return aud
-
-    if (new_channel == 1):
-      # Convert from stereo to mono by selecting only the first channel
-      resig = sig[:1, :]
-    else:
-      # Convert from mono to stereo by duplicating the first channel
-      resig = torch.cat([sig, sig])
-
-    return ((resig, sr))
-
-  def resample(aud, newsr):
-    sig, sr = aud
-
-    if (sr == newsr):
-      # Nothing to do
-      return aud
-
-    num_channels = sig.shape[0]
-    # Resample first channel
-    resig = torchaudio.transforms.Resample(sr, newsr)(sig[:1,:])
-    if (num_channels > 1):
-      # Resample the second channel and merge both channels
-      retwo = torchaudio.transforms.Resample(sr, newsr)(sig[1:,:])
-      resig = torch.cat([resig, retwo])
-
-    return ((resig, newsr))
-
-  def pad_trunc(aud, max_ms):
-    sig, sr = aud
-    num_rows, sig_len = sig.shape
-    max_len = sr//1000 * max_ms
-
-    if (sig_len > max_len):
-      # Truncate the signal to the given length
-      sig = sig[:,:max_len]
-
-    elif (sig_len < max_len):
-      # Length of padding to add at the beginning and end of the signal
-      pad_begin_len = random.randint(0, max_len - sig_len)
-      pad_end_len = max_len - sig_len - pad_begin_len
-
-      # Pad with 0s
-      pad_begin = torch.zeros((num_rows, pad_begin_len))
-      pad_end = torch.zeros((num_rows, pad_end_len))
-
-      sig = torch.cat((pad_begin, sig, pad_end), 1)
-      
-    return (sig, sr)
-
-  def time_shift(aud, shift_limit):
-    sig,sr = aud
-    _, sig_len = sig.shape
-    shift_amt = int(random.random() * shift_limit * sig_len)
-    return (sig.roll(shift_amt), sr)
-
-  def spectro_gram(aud, n_mels=64, n_fft=1024, hop_len=None):
-    sig,sr = aud
-    top_db = 80
-
-    # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
-    spec = torchaudio.transforms.MelSpectrogram(sr, n_fft=n_fft, hop_length=hop_len, n_mels=n_mels)(sig)
-
-    # Convert to decibels
-    spec = torchaudio.transforms.AmplitudeToDB(top_db=top_db)(spec)
-    return (spec)
-
-  def spectro_augment(spec, max_mask_pct=0.1, n_freq_masks=1, n_time_masks=1):
-    _, n_mels, n_steps = spec.shape
-    mask_value = spec.mean()
-    aug_spec = spec
-
-    freq_mask_param = max_mask_pct * n_mels
-    for _ in range(n_freq_masks):
-      aug_spec = torchaudio.transforms.FrequencyMasking(freq_mask_param)(aug_spec, mask_value)
-
-    time_mask_param = max_mask_pct * n_steps
-    for _ in range(n_time_masks):
-      aug_spec = torchaudio.transforms.TimeMasking(time_mask_param)(aug_spec, mask_value)
-
-    return aug_spec
 
 class SoundDataset(Dataset):
     def __init__(self, labels_df, config, split, use_lds=False):
@@ -1097,44 +995,95 @@ class SoundDataset(Dataset):
         self.config = config
         self.split = split
 
-        self.duration = self.config["hparas"]["duration"]
         self.sr = self.config["hparas"]["sample_rate"]
         self.channel = self.config["hparas"]["channel"]
-        self.shift_pct = self.config["hparas"]["shift_pct"]
 
-        
+        top_db = 80
+        n_fft = 1024
+        n_mels = 64
+        n_steps = 431
+        hop_length = None
+        max_mask_pct = 0.1
+        freq_mask_param = max_mask_pct * n_mels
+        time_mask_param = max_mask_pct * n_steps
+
         if self.split != "test":
             self.audio_dirs = os.listdir(self.audio_root)
-        else: # original
-            self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
-        if self.split == "train" and use_lds:
-            self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
+            if use_lds:
+                self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
                                                     reweight="inverse", 
                                                     max_target=1, 
                                                     lds=True,
                                                     lds_ks=self.config["hparas"]["lds_ks"], 
                                                     lds_sigma=self.config["hparas"]["lds_sigma"],
                                                     bin_size=self.config["hparas"]["bin_size"])
-        else:
-            self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+            else:
+                self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+            self.audio_transforms = transforms.Compose([
+                                VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
+                        prob=config["augmentation"]["vol"]["prob"]),
+                BandDrop(filt_files=config["augmentation"]["banddrop"]["ir_files"],\
+                        data_root=config["augmentation"]["banddrop"]["data_root"], \
+                        prob=config["augmentation"]["banddrop"]["prob"]),
+                Reverb(ir_files=[],\
+                        ir_fmt=config["augmentation"]["reverb"]["ir_fmt"],\
+                        data_root=config["augmentation"]["reverb"]["data_root"], \
+                        prob=config["augmentation"]["reverb"]["prob"]),
+                SimpleAdditive(noises_dir=config["augmentation"]["add_noise"]["path"], \
+                                snr_levels=config["augmentation"]["add_noise"]["snr_options"], \
+                                prob=config["augmentation"]["add_noise"]["prob"]),
+                Fade(sample_rate=self.sr ,\
+                    prob=config["augmentation"]["fade"]["prob"], \
+                    fade_in_second=config["augmentation"]["fade"]["fade_in_sec"], \
+                    fade_out_second=config["augmentation"]["fade"]["fade_out_sec"], \
+                    fade_shape=config["augmentation"]["fade"]["fade_shape"]),
 
+            ])
+
+            self.spec_transforms = transforms.Compose([
+                # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
+                torchaudio.transforms.MelSpectrogram(self.sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels),
+                # Convert to decibels
+                torchaudio.transforms.AmplitudeToDB(top_db=top_db),
+                FrequencyMasking(freq_mask_param, prob=1.0, mean_masking=True),
+                TimeMasking(time_mask_param, prob=1.0, mean_masking=True),
+                ToTensor()
+            ])
+
+        else: 
+            self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
+            self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+            self.audio_transforms = None
+            self.spec_transforms = transforms.Compose([
+                                # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
+                torchaudio.transforms.MelSpectrogram(self.sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels),
+                # Convert to decibels
+                torchaudio.transforms.AmplitudeToDB(top_db=top_db),
+            ])
 
         for audio_dir in tqdm(self.audio_dirs):
             for track_name in self.track_names:
                 self.scores.append(torch.tensor(self.filename_to_score[track_name]))
                 audio_path = os.path.join(self.audio_root, audio_dir, track_name)
-                aud = AudioUtil.open(audio_path)
-                reaud = AudioUtil.resample(aud, self.sr)
-                rechan = AudioUtil.rechannel(reaud, self.channel)
+                wav, sr = torchaudio.load(audio_path)
+                wav = torchaudio.transforms.Resample(sr, self.sr)(wav)
 
-                # dur_aud = AudioUtil.pad_trunc(rechan, self.duration)
-                # shift_aud = AudioUtil.time_shift(dur_aud, self.shift_pct)
-                sgram = AudioUtil.spectro_gram(rechan, n_mels=64, n_fft=1024, hop_len=None)
-                if self.split != "test":
-                    aug_sgram = AudioUtil.spectro_augment(sgram, max_mask_pct=0.1, n_freq_masks=2, n_time_masks=2)
-                    self.imgs.append(aug_sgram)
-                else:
-                    self.imgs.append(sgram)
+                """
+                # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
+                spec = torchaudio.transforms.MelSpectrogram(self.sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)(wav)
+                # Convert to decibels
+                spec = torchaudio.transforms.AmplitudeToDB(top_db=top_db)(spec)
+                """
+                
+                if self.audio_transforms is not None:
+                    wav = self.audio_transforms(wav)
+
+                spec = self.spec_transforms(torch.tensor(wav))
+                if len(spec.shape) == 2:
+                    # make sure channel has its own dimension
+                    spec = spec.unsqueeze(0)
+                assert len(spec.shape) == 3, "spec shape is not {}, shape should be [channel, n_mels, time]".format(spec.shape)
+                self.imgs.append(spec)
                 self.weights.append(self.weights_distri[self.track_names.index(track_name)])
 
     def __len__(self):

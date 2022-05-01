@@ -2326,19 +2326,44 @@ class Fade(Transform):
         
 class FrequencyMasking(Transform):
     """ apply freqency masking """
-    def __init__(self, freq_mask_param, prob):
+    def __init__(self, freq_mask_param, prob, mean_masking=False):
         self.freq_mask_param = freq_mask_param
         self.prob = prob
         self.transform = torchaudio.transforms.FrequencyMasking(freq_mask_param)
+        self.mean_masking = mean_masking
 
-    def __call__(self, wav):
+    def __call__(self, spec):
         if np.random.rand() < self.prob:
-            if not isinstance(wav, torch.Tensor):
-                wav = torch.from_numpy(wav)
-            masked = self.transform(wav)
+            if not isinstance(spec, torch.Tensor):
+                spec = torch.from_numpy(spec)
+            if self.mean_masking:
+                masked = self.transform(spec, spec.mean())
+            else:
+                masked = self.transform(spec)
             return masked.numpy().squeeze()
         else:
-            return wav
+            return spec
+
+class TimeMasking(Transform):
+    """ apply time masking """
+    def __init__(self, time_mask_param, prob, mean_masking=False):
+        self.time_mask_param = time_mask_param
+        self.prob = prob
+        self.transform = torchaudio.transforms.TimeMasking(time_mask_param)
+        self.mean_masking = mean_masking
+
+    def __call__(self, spec):
+        if np.random.rand() < self.prob:
+            if not isinstance(spec, torch.Tensor):
+                spec = torch.from_numpy(spec)
+            if self.mean_masking:
+                masked = self.transform(spec, spec.mean())
+            else:
+                masked = self.transform(spec)
+            return masked.numpy().squeeze()
+        else:
+            return spec
+
 class Melspectrogram(Transform):
     ''' generate melspectrogram from audio '''
     def __init__(self, sample_rate, **kwargs):

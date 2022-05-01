@@ -7,14 +7,14 @@ if __name__ == "__main__":
     models = ["h_lstm", "h_mlp", "h_svr", "e_crnn", "e_cnn", "pase_mlp", "pase_lstm", "e_transformer", "ssast", "random_guess", "mean"]
 
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help=",".join(models), default="h_lstm")
+    parser.add_argument("--model", help=",".join(models), default="e_cnn")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
     parser.add_argument('--no-msg', action='store_true', help='Hide all messages.')
     parser.add_argument('--outdir', default='default_output', type=str,
                     help='Prediction output path.', required=False)
-    parser.add_argument('--load', default="weights/e_cnn/fold_0/e_cnn_best.pth", type=str,
+    parser.add_argument('--load', default="weights/e_cnn/seed_1234_fold_0/e_cnn_best.pth", type=str,
                     help='ckpt path of pre-trained model', required=False)
     parser.add_argument('--svr_kernel', default=None,
                     help='customized svr kernel', required=False)
@@ -38,35 +38,36 @@ if __name__ == "__main__":
 
     if paras.model not in ["random_guess", "mean"]:
         config = yaml.load(open("config/{}.yaml".format(paras.model), 'r'), Loader=yaml.FullLoader)
+       
+        if paras.svr_kernel != None:
+            config["model"]["kernel"] = paras.svr_kernel
+            
+        if paras.features == "all":
+            pass
+        elif paras.features == "harmony":
+            config["features"] = {'chords': ['chroma', 'tonnetz'], 'emotions': ['static_arousal', 'static_valence'] }
+            config["model"]["sequential_input_size"] = 18
+        elif paras.features == "timbre":
+            config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
+            config["model"]["sequential_input_size"] = 60
+        elif paras.features == "rhythm":
+            config["features"] = {'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+            config["model"]["sequential_input_size"] = 384
+        elif paras.features == "harmony-timbre":
+            config["features"] = {'chords': ['chroma', 'tonnetz'], 'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
+            config["model"]["sequential_input_size"] = 78
+        elif paras.features == "harmony-rhythm":
+            config["features"] = {'chords': ['chroma', 'tonnetz'], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+            config["model"]["sequential_input_size"] = 402
+        elif paras.features == "timbre-rhythm":
+            config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
+            config["model"]["sequential_input_size"] = 442
+        else:
+            raise Exception("Not Implement Error")
+
     else:
         config = None
 
-    if paras.svr_kernel != None:
-        config["model"]["kernel"] = paras.svr_kernel
-
-        
-    if paras.features == "all":
-        pass
-    elif paras.features == "harmony":
-        config["features"] = {'chords': ['chroma', 'tonnetz'], 'emotions': ['static_arousal', 'static_valence'] }
-        config["model"]["sequential_input_size"] = 18
-    elif paras.features == "timbre":
-        config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 60
-    elif paras.features == "rhythm":
-        config["features"] = {'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 384
-    elif paras.features == "harmony-timbre":
-        config["features"] = {'chords': ['chroma', 'tonnetz'], 'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 78
-    elif paras.features == "harmony-rhythm":
-        config["features"] = {'chords': ['chroma', 'tonnetz'], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 402
-    elif paras.features == "timbre-rhythm":
-        config["features"] = {'timbre': ["mfcc", "mfcc_delta", "mfcc_delta2"], 'rhythms': ["tempogram"], 'emotions': ['static_arousal', 'static_valence']}
-        config["model"]["sequential_input_size"] = 442
-    else:
-        raise Exception("Not Implement Error")
 
     # ref: https://stackoverflow.com/questions/6677424/how-do-i-import-variable-packages-in-python-like-using-variable-variables-i
     if paras.model in models:
