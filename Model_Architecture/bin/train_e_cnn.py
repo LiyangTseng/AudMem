@@ -8,7 +8,7 @@ from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
 from models.memorability_model import CNN
-from src.dataset import SoundDataset
+from src.dataset import SoundDataset, AudioDataset
 from src.util import human_format, get_grad_norm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
@@ -58,8 +58,8 @@ class Solver(BaseSolver):
         if self.use_ranking_loss:
             raise Exception ("Not implemented yet")
         else:
-            self.train_set = SoundDataset(labels_df=self.train_labels_df, config=self.config, split="train")
-            self.valid_set = SoundDataset(labels_df=self.valid_labels_df, config=self.config, split="valid")
+            self.train_set = SoundDataset(labels_df=self.train_labels_df, config=self.config, split="train", use_lds=self.use_lds)
+            self.valid_set = SoundDataset(labels_df=self.valid_labels_df, config=self.config, split="valid", use_lds=self.use_lds)
 
 
         self.write_log('train_distri/lab', self.train_labels_df.score.values)
@@ -96,9 +96,11 @@ class Solver(BaseSolver):
         # self.model = E_CRNN(model_config=self.config["model"]).to(self.device)
         self.model = CNN().to(self.device)
         # Losses
-        self.reg_loss_func = nn.L1Loss(reduction="none") # regression loss
+        # self.reg_loss_func = nn.L1Loss(reduction="none") # regression loss
+        self.reg_loss_func = nn.MSELoss(reduction="none") # regression loss
         self.rank_loss_func = nn.BCELoss() # ranking loss
         
+        assert self.reg_loss_func.reduction == "none", "reduction need to be none for weighted loss"
 
         # Optimizer
         # self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
@@ -193,7 +195,6 @@ class Solver(BaseSolver):
                 total_loss = 0
 
                 # Fetch data
-                # TODO: change to pair-wise data
                 if self.use_ranking_loss:
                     raise Exception ("Not implemented")
                     img_1, img_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)

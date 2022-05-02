@@ -55,7 +55,10 @@ class Solver(BaseSolver):
             for feats in feature_option:
                 # concate seqential and unseqential data
                 seq_feat, non_seq_feat = feats
-                feat = torch.cat((seq_feat, non_seq_feat), dim=0)
+                if non_seq_feat is not None:
+                    feat = torch.cat((seq_feat, non_seq_feat), dim=0)
+                else:
+                    feat = seq_feat
 
                 self.features.append(feat.numpy())
                 self.labels.append(self.train_set.scores[i])

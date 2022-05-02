@@ -28,7 +28,7 @@ class Solver(BaseSolver):
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        (seq_feat, non_seq_feat), lab_scores = data
+        (seq_feat, non_seq_feat), lab_scores, weight = data
         feat = torch.cat((seq_feat, non_seq_feat), 1)
         feat = feat.to(self.device)
 

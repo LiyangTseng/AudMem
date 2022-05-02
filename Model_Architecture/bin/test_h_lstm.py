@@ -26,10 +26,10 @@ class Solver(BaseSolver):
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        (seq_feat, non_seq_feat), lab_scores = data
-        seq_feat, non_seq_feat = seq_feat.to(self.device), non_seq_feat.to(self.device)
+        (seq_feats, non_seq_feats), lab_scores, weights = data
+        seq_feats, non_seq_feats = seq_feats.to(self.device), non_seq_feats.to(self.device)
 
-        return seq_feat, non_seq_feat
+        return seq_feats, non_seq_feats
 
     def load_data(self):
         ''' Load data for testing '''

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from src.solver import BaseSolver
 from src.optim import Optimizer
@@ -22,6 +23,8 @@ class Solver(BaseSolver):
         super().__init__(config, paras, mode)
         self.log_freq = self.config["experiment"]['log_freq']
         self.use_ranking_loss = self.config["model"]["use_ranking_loss"]
+        self.use_lds = self.config["model"]["use_lds"]
+        self.use_fds = self.config["model"]["use_fds"]
         self.ranking_weight = config["model"]["ranking_weight"]
         self.best_valid_loss = float('inf')
 
@@ -40,11 +43,12 @@ class Solver(BaseSolver):
             lab_scores_1, lab_scores_2 = lab_scores_1.to(self.device).float(), lab_scores_2.to(self.device).float()
             return seq_feat_1, non_seq_feat_1, lab_scores_1, seq_feat_2, non_seq_feat_2, lab_scores_2
         else:
-            feat, lab_scores = data
+            feat, lab_scores, weights = data
             seq_feat, non_seq_feat = feat
             seq_feat, non_seq_feat = seq_feat.to(self.device), non_seq_feat.to(self.device)
             lab_scores = lab_scores.to(self.device).float()
-            return seq_feat, non_seq_feat, lab_scores
+            weights = weights.to(self.device).float()
+            return seq_feat, non_seq_feat, lab_scores, weights
 
     def load_data(self):
         ''' Load data for training/validation '''
@@ -67,10 +71,31 @@ class Solver(BaseSolver):
             self.train_set = PairHandCraftedDataset(labels_df=self.train_labels_df, config=self.config, pooling=False, split="train")
             self.valid_set = PairHandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, pooling=False, split="valid")
         else:
-            self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=False, split="train")
-            self.valid_set = HandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, stats_dict=stats_dict , pooling=False, split="valid")
+            self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=False, split="train", use_lds=self.use_lds)
+            self.valid_set = HandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, stats_dict=stats_dict , pooling=False, split="valid", use_lds=self.use_lds)
+
         self.write_log('train_distri/lab', self.train_labels_df.score.values)
         self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
+        
+        self.verbose("generating weights for labels")
+        # plot loss weight vs score
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.scatter(self.train_labels_df.score.values, self.train_set.weights)
+        plt.xlabel('score')
+        plt.ylabel('loss weight')
+        plt.title('train loss weight vs score')
+        self.log.add_figure('loss_weight_vs_score/train', fig)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.scatter(self.valid_labels_df.score.values, self.valid_set.weights)
+        plt.xlabel('score')
+        plt.ylabel('loss weight')
+        plt.title('valid loss weight vs score')
+        # add this figure to tensorboard
+        self.log.add_figure('loss_weight_vs_score/valid', fig)
+        plt.close()
 
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=True)
@@ -89,9 +114,10 @@ class Solver(BaseSolver):
         self.verbose(self.model.create_msg())
 
         # Losses
-        self.reg_loss_func = nn.MSELoss() # regression loss
+        self.reg_loss_func = nn.MSELoss(reduction="none") # regression loss
         self.rank_loss_func = nn.BCELoss() # ranking loss
         
+        assert self.reg_loss_func.reduction == "none", "reduction need to be none for weighted loss"        
 
         # Optimizer
         # self.optimizer = Optimizer(self.model.parameters(), **self.config['hparas'])
@@ -218,12 +244,15 @@ class Solver(BaseSolver):
                         self.log.add_scalars('train_loss', {'total_loss/train': np.mean(train_total_loss)}, self.step)
     
                 else:
-                    seq_feat, non_seq_feat, lab_scores = self.fetch_data(data)
+                    seq_feats, non_seq_feats, lab_scores, weights = self.fetch_data(data)
                     self.timer.cnt('rd')
 
                     # Forward model
-                    pred_scores = self.model(seq_feat, non_seq_feat)
+                    pred_scores = self.model(seq_feats, non_seq_feats)
                     total_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    total_loss *= weights.unsqueeze(1).expand_as(total_loss)
+                    total_loss = torch.mean(total_loss)
+                    
                     train_reg_prediction.append(pred_scores)
                     train_total_loss.append(total_loss.cpu().detach().numpy())
                     self.timer.cnt('fw')
@@ -287,10 +316,13 @@ class Solver(BaseSolver):
                     valid_total_loss.append(total_loss.cpu().detach().numpy())
 
             else:
-                seq_feat, non_seq_feat, lab_scores = self.fetch_data(data)
+                seq_feats, non_seq_feats, lab_scores, weights = self.fetch_data(data)
                 with torch.no_grad():
-                    pred_scores = self.model(seq_feat, non_seq_feat)
+                    pred_scores = self.model(seq_feats, non_seq_feats)
                     total_loss = self.reg_loss_func(pred_scores, torch.unsqueeze(lab_scores, 1))
+                    total_loss *= weights.unsqueeze(1).expand_as(total_loss)
+                    total_loss = torch.mean(total_loss)
+                    
                     valid_reg_prediction.append(pred_scores)
                     valid_total_loss.append(total_loss.cpu().detach().numpy())
 

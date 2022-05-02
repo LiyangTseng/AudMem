@@ -22,6 +22,13 @@ model:
     dropout_rate: 0.5
     use_ranking_loss: False
 
+    use_lds: True
+    use_fds: True
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
+    bucket_num: 20
+
 hparas:                                   # Experiment hyper-parameters
     valid_step: 1000
     curriculum: 0
@@ -40,6 +47,10 @@ hparas:                                   # Experiment hyper-parameters
     freq_loss_type: 'l1'                         # 'l1'/'mse'
     differential_loss: False
     emphasize_linear_low: False
+
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
 
 path:
     features_dir: "data/features"

@@ -71,6 +71,7 @@ class Solver(BaseSolver):
             writer.writerow(["track", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 mels_img, lab_scores = self.fetch_data(data)
+                # mels_img shape: (batch_size=1, channel=1, n_mels=64, time_steps=431)
                 pred_score = self.model(mels_img).cpu().detach().item()
                 self.pred_scores.append(pred_score)
                 writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
@@ -105,6 +106,7 @@ class Solver(BaseSolver):
         for idx in sorted_score_idx[:N]:
             self.verbose("generating lime explanation {}/{}".format(cnt+1, N))
             mels_img, _ = self.fetch_data(self.test_set[idx])
+            # mels_img shape: (channel=1, n_mels=64, time_steps=431)
             self.save_explanatory_video(mels_img, idx)
             cnt += 1
 
@@ -123,11 +125,13 @@ class Solver(BaseSolver):
         frame_ticks = [i*time_steps/5 for i in range(5)]
         def wrapped_net(x):
             if x.shape[-1] == 3:
-                x = x[:, :, :, :2]
-            return self.model(torch.tensor(x).permute(0,3,1,2).float().to(self.device)).cpu().detach().numpy()
+                x = x[:, :, :, 0] # make it one-channel
+            x = torch.tensor(x).unsqueeze(0).to(self.device).float()
+            return self.model(x).cpu().detach().numpy()
 
-        tmp = np.array(spec_input.squeeze()[0].double().cpu())
-        original_spec = np.stack((tmp,tmp,tmp), axis=-1)
+        # tmp = np.array(spec_input.squeeze()[0].double().cpu())
+        # original_spec = np.stack((tmp,tmp,tmp), axis=-1)
+        original_spec = spec_input.squeeze().double().cpu()
         # normalize to 0-1
         original_spec = (original_spec - original_spec.min()) / (original_spec.max() - original_spec.min())
         exp = self.explainer.explain_instance(image=original_spec, classifier_fn=wrapped_net, batch_size=1)
