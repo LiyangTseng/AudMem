@@ -100,13 +100,18 @@ def extract_timbre_features(dict_data):
     for augment_type in tqdm(augment_types, desc="extracting harmony features"):
         for YT_id in tqdm(YT_ids, desc="augment type: " + augment_type, leave=False):
             for segment_idx in segment_idx_list:
-                audio_dir = YT_id + "_" + augment_type + "_" + str(segment_idx) + ".wav"
+                audio_dir = YT_id + "_" + augment_type + "_" + str(segment_idx)
                 for source in source_components:
                     audio_file_path = os.path.join(spleeter_output_dir, audio_dir, source+".wav")
-                    y, sr = librosa.load(audio_file_path, sr=SR)
-                    db = librosa.amplitude_to_db(y)
-                    exec("{}_intensities.append(db.mean())".format(source))
-                    exec("{}_intensities_std.append(db.std())".format(source))
+                    if os.path.exists(audio_file_path):
+                        y, sr = librosa.load(audio_file_path, sr=SR)
+                        db = librosa.amplitude_to_db(y)
+                        exec("{}_intensities_mean.append(db.mean())".format(source))
+                        exec("{}_intensities_std.append(db.std())".format(source))
+                    else:
+                        exec("{}_intensities_mean.append(-1000)".format(source))
+                        exec("{}_intensities_std.append(-1000)".format(source))
+
 
     dict_data["vocals_db_mean"] = vocals_intensities_mean
     dict_data["vocals_db_std"] = vocals_intensities_std
@@ -136,23 +141,42 @@ def extract_emotion_features(dict_data):
     
     return dict_data
 
+def get_labels(dict_data):
+    """ get labels from csv file with labels """
+    labels_file = "data/labels/track_memorability_scores_beta.csv"
+    YT_id_to_label = {}
+    with open(labels_file, "r") as f:
+        next(f)
+        for line in f:
+            file_name, label = line.strip().split(",")
+            YT_id = file_name.split(".")[0][-11:]
+            YT_id_to_label[YT_id] = float(label)
+    
+    labels = []
+
+    for augment_type in tqdm(augment_types, desc="copying labels"):
+        for YT_id in tqdm(YT_ids, desc="augment type: " + augment_type, leave=False):
+            for segment_idx in segment_idx_list:
+                labels.append(YT_id_to_label[YT_id])
+
+    dict_data["label"] = labels
+    return dict_data
+
 if __name__ == "__main__":
     
+    # features_df = pd.read_csv("data/features.csv")
+    # features_dict = features_df.to_dict(orient="list")
     
-    
-    
+    features_dict = {}
 
-    features_df = pd.read_csv("data/features.csv")
-    features_dict = features_df.to_dict(orient="list")
-    
-    # features_dict = {}
-
-    # features_dict = extract_harmony_features(features_dict)
-    # features_dict = extract_tempo_features(features_dict)
+    features_dict = extract_harmony_features(features_dict)
+    features_dict = extract_tempo_features(features_dict)
+    features_dict = extract_timbre_features(features_dict)
     features_dict = extract_emotion_features(features_dict)
+    features_dict = get_labels(features_dict)
 
     features_df = pd.DataFrame(data=features_dict)
     print(features_df.head())
-    # features_df.to_csv("data/features.csv", index=False)
+    features_df.to_csv("data/data.csv", index=False)
 
         
