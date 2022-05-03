@@ -46,3 +46,4 @@ path:
     features_dir: "data/features"
 
     label_file: "data/labels/track_memorability_scores_beta.csv"
+    data_file: "data/data.csv"

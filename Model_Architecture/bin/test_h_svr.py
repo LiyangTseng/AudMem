@@ -23,28 +23,28 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for testing '''
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+
+
+        # find unique YT_ids
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
-        stats_dict = get_features_stats(label_df=self.test_labels_df, 
-                                        features_dir=self.config["path"]["features_dir"], 
-                                        for_test=True,
-                                        features_dict = self.config["features"])
+        test_yt_ids = [YT_ids[idx] for idx in testing_range]
 
-        self.test_set = HandCraftedDataset(labels_df=self.test_labels_df, config=self.config, stats_dict=stats_dict, pooling=True, split="test")
+        self.test_df = self.data_df[self.data_df['YT_id'].isin(test_yt_ids)]
+        self.test_df = self.test_df.reset_index(drop=True)
+
+        self.test_labels = self.test_df.iloc[:, -1].values
+        self.test_features = self.test_df.iloc[:, 3:-1].values
+        # noramlize features
+        test_features_mean = np.mean(self.test_features, axis=0)
+        test_features_std = np.std(self.test_features, axis=0)
+        self.test_features = (self.test_features - test_features_mean) / test_features_std
         
-        self.features = []
-        # concate seqential and unseqential data
-        for feature_option in self.test_set.features_options:
-            seq_feat, non_seq_feat = feature_option[0]
-            feat = torch.cat((seq_feat, non_seq_feat), dim=0)
-
-            self.features.append(feat.numpy())
-
-        self.labels = self.test_set.scores
 
     def set_model(self):
         with open(self.paras.load , 'rb') as fid:
@@ -54,21 +54,28 @@ class Solver(BaseSolver):
     def exec(self):
         ''' Testing Memorabiliy Regression/Ranking System '''
 
-        pred_scores = self.model.predict(self.features)
+        pred_scores = self.model.predict(self.test_features)
 
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "pred_score", "lab_score"])
-            for idx in range(len(self.labels)):
-                # pred_score = self.model(feat).cpu().detach().item()
-                # pred_score = 0.6560147067
-                writer.writerow([self.test_labels_df.track.values[idx], pred_scores[idx], self.labels[idx]])
+            writer.writerow(["YT_id", "segment_idx", "augment_type", "pred_score", "lab_score"])
+            for idx in range(len(self.test_df)):
+                writer.writerow([self.test_df.YT_id.values[idx],
+                                self.test_df.segment_idx.values[idx],
+                                self.test_df.augment_type.values[idx],
+                                pred_scores[idx],
+                                 self.test_labels[idx]])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
+            
+        # average prediction score for same YT_id and different segment_idx
+        # prediction_df = prediction_df.groupby(["YT_id"]).mean()
+        prediction_df = prediction_df.groupby(["YT_id"]).max()
+
+        correlation = stats.spearmanr(prediction_df.pred_score.values, prediction_df.lab_score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(prediction_df.lab_score.values).unsqueeze(0))
 
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation) + "\n")

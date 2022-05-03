@@ -22,47 +22,27 @@ class Solver(BaseSolver):
     def load_data(self):
         ''' Load data for training/validation '''
         
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # indexing except testing indices
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
-        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.labels_df = self.labels_df[~for_test]
-        stats_dict = get_features_stats(label_df=self.labels_df, 
-                                        features_dir=self.config["path"]["features_dir"], 
-                                        for_test=False,
-                                        features_dict = self.config["features"])
-
-        self.train_labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
-        self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="train")
-
-
-        """no augmentation"""
-        # self.labels = self.train_set.scores
-        # self.features = []
-        # for feature_option in self.train_set.features_options:
-        #     # TODO: add data augmentation
-        #     seq_feat, non_seq_feat = feature_option[0]
-        #     feat = torch.cat((seq_feat, non_seq_feat), dim=0)
-
-        #     self.features.append(feat.numpy())
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        # NOTE: for now do not use augmentation, need to wait for spleeter completed
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         
-        """augmentation"""
-        self.labels = []    
-        self.features = []
-        for i  in tqdm(range(len(self.train_set.features_options))):
-            feature_option = self.train_set.features_options[i]
-            for feats in feature_option:
-                # concate seqential and unseqential data
-                seq_feat, non_seq_feat = feats
-                if non_seq_feat is not None:
-                    feat = torch.cat((seq_feat, non_seq_feat), dim=0)
-                else:
-                    feat = seq_feat
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
+        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
+        train_yt_ids = [YT_ids[idx] for idx in range(len(YT_ids)) if idx not in testing_range]
 
-                self.features.append(feat.numpy())
-                self.labels.append(self.train_set.scores[i])
-        print("len(self.features): ", len(self.features))
+        self.train_df = self.data_df[self.data_df['YT_id'].isin(train_yt_ids)]
+        self.train_df = self.train_df.reset_index(drop=True)
+        
+        self.train_labels = self.train_df.iloc[:, -1].values
+        self.train_features = self.train_df.iloc[:, 3:-1].values
+        # noramlize features
+        train_features_mean = np.mean(self.train_features, axis=0)
+        train_features_std = np.std(self.train_features, axis=0)
+        self.train_features = (self.train_features - train_features_mean) / train_features_std
+        
+
+        self.verbose("Loaded data for training/validation")
 
         
     def set_model(self):
@@ -78,7 +58,7 @@ class Solver(BaseSolver):
 
     def exec(self):
         # normalization already done in dataset
-        self.model.fit(self.features, self.labels)
+        self.model.fit(self.train_features, self.train_labels)
         self.save_checkpoint()
 
         
