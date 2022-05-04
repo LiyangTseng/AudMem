@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import librosa
+import pickle
 
 full_audio_dir = "/media/lab812/53D8AD2D1917B29C/AudMem/dataset/AudMem/original_audios"
 YT_ids = [file_name[:11] for file_name in os.listdir(full_audio_dir)]
@@ -13,13 +14,14 @@ augment_types = ["original", "-5_semitones", "-4_semitones", "-3_semitones",
                             "-2_semitones", "-1_semitones", "1_semitones", "2_semitones", "3_semitones", 
                             "4_semitones", "5_semitones"]
 audio_segments_dir = "data/1_second_clips"
-chroma_dir = "data/1_second_features/chroma"
+
 stretch_factor_path = "data/stretch_factors.csv"
 SR = 16000
 
 
 def extract_harmony_features(dict_data):
     """ extract haromonic and timbre features from segmented_clips """
+    chroma_dir = "data/1_second_features/chroma"
     os.makedirs(chroma_dir, exist_ok=True)
 
     ids, segment_list, augment_list, chroma_means, chroma_stds = [], [], [], [], []
@@ -92,26 +94,38 @@ def extract_tempo_features(dict_data):
 
 def extract_timbre_features(dict_data):
     """ extract timbre features from segmented_clips """
+    timbre_dir = "data/1_second_features/timbre"
+    os.makedirs(timbre_dir, exist_ok=True)
     spleeter_output_dir = "/media/lab812/53D8AD2D1917B29C/AudMem/dataset/sources_separated"
+    # downsampling to 32 per second to align with chroma's time resolution
+    n=32
+    downsampling_factor = int(SR/n)
+
     source_components = ["vocals", "drums", "bass", "other"]
     vocals_intensities_mean, drums_intensities_mean, bass_intensities_mean, other_intensities_mean = [], [], [], []
     vocals_intensities_std, drums_intensities_std, bass_intensities_std, other_intensities_std = [], [], [], []
     # calculate energe of separated tracks 
-    for augment_type in tqdm(augment_types, desc="extracting harmony features"):
+    for augment_type in tqdm(augment_types, desc="extracting timbre features"):
         for YT_id in tqdm(YT_ids, desc="augment type: " + augment_type, leave=False):
             for segment_idx in segment_idx_list:
-                audio_dir = YT_id + "_" + augment_type + "_" + str(segment_idx)
+                audio_name = YT_id + "_" + augment_type + "_" + str(segment_idx)
+
+                timbre_features = {}
                 for source in source_components:
-                    audio_file_path = os.path.join(spleeter_output_dir, audio_dir, source+".wav")
+                    audio_file_path = os.path.join(spleeter_output_dir, audio_name, source+".wav")
                     if os.path.exists(audio_file_path):
                         y, sr = librosa.load(audio_file_path, sr=SR)
                         db = librosa.amplitude_to_db(y)
+                        timbre_features[source] = np.mean(db.reshape(-1, downsampling_factor), axis=1)
                         exec("{}_intensities_mean.append(db.mean())".format(source))
                         exec("{}_intensities_std.append(db.std())".format(source))
                     else:
-                        exec("{}_intensities_mean.append(-1000)".format(source))
-                        exec("{}_intensities_std.append(-1000)".format(source))
-
+                        raise Exception("audio file not found: {}".format(audio_file_path))
+                        # exec("{}_intensities_mean.append(-1000)".format(source))
+                        # exec("{}_intensities_std.append(-1000)".format(source))
+                
+                with open(os.path.join(timbre_dir, audio_name + ".pickle"), "wb") as f:
+                    pickle.dump(timbre_features, f)
 
     dict_data["vocals_db_mean"] = vocals_intensities_mean
     dict_data["vocals_db_std"] = vocals_intensities_std
@@ -176,7 +190,6 @@ if __name__ == "__main__":
     features_dict = get_labels(features_dict)
 
     features_df = pd.DataFrame(data=features_dict)
-    print(features_df.head())
     features_df.to_csv("data/data.csv", index=False)
 
         

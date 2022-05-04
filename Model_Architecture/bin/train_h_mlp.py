@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from src.solver import BaseSolver
 from src.optim import Optimizer
 from models.memorability_model import H_MLP
-from src.dataset import PairHandCraftedDataset, HandCraftedDataset
+from src.dataset import PairHandCraftedDataset, HandCraftedDataset, Tabular_Features_Dataset
 from src.util import human_format, get_grad_norm
 from utils.calculate_handcrafted_features_stats import get_features_stats
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler, TensorDataset
 
 CKPT_STEP = 10000
 
@@ -45,44 +45,45 @@ class Solver(BaseSolver):
             return feat_1, feat_2, lab_scores_1, lab_scores_2
         else:
             feats, lab_scores, weights = data
-            seq_feats, non_seq_feats = feats
-            feats = torch.cat((seq_feats, non_seq_feats), dim=1)
-            feats = feats.to(self.device)
+            # seq_feats, non_seq_feats = feats
+            # feats = torch.cat((seq_feats, non_seq_feats), dim=1)
+            feats = feats.to(self.device).float()
             lab_scores = lab_scores.to(self.device).float()
             weights = weights.to(self.device).float()
             return feats, lab_scores, weights
 
+
     def load_data(self):
         ''' Load data for training/validation '''
         
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # indexing except testing indices
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        # NOTE: for now do not use augmentation, need to wait for spleeter completed
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.labels_df = self.labels_df[~for_test]
-        stats_dict = get_features_stats(label_df=self.labels_df, 
-                                        features_dir=self.config["path"]["features_dir"], 
-                                        for_test=False,
-                                        features_dict = self.config["features"])
+        train_yt_ids = [YT_ids[idx] for idx in range(len(YT_ids)) if idx not in testing_range]
 
-        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
-        self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
-        self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-        if self.use_ranking_loss:
-            self.train_set = PairHandCraftedDataset(labels_df=self.train_labels_df, config=self.config, pooling=True, split="train")
-            self.valid_set = PairHandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, pooling=True, split="valid")
-        else:
-            self.train_set = HandCraftedDataset(labels_df=self.train_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="train", use_lds=self.use_lds)
-            self.valid_set = HandCraftedDataset(labels_df=self.valid_labels_df, config=self.config, stats_dict=stats_dict , pooling=True, split="valid", use_lds=self.use_lds)
-        self.write_log('train_label_distri/lab', self.train_labels_df.score.values)
-        self.write_log('valid_label_distri/lab', self.valid_labels_df.score.values)
+        self.non_test_df = self.data_df[self.data_df['YT_id'].isin(train_yt_ids)].reset_index(drop=True)
+        segment_nums = 9
+        self.valid_df = self.non_test_df[:fold_size*segment_nums].reset_index(drop=True)
+        self.train_df = self.non_test_df[fold_size*segment_nums:].reset_index(drop=True)
+
+
+        self.train_set = Tabular_Features_Dataset(df=self.train_df, config=self.config, use_lds=self.use_lds)
+        self.valid_set = Tabular_Features_Dataset(df=self.valid_df, config=self.config, use_lds=self.use_lds)
+        
+        """ display on tensorboard """
+        self.write_log('train_label_distri/lab', self.train_df["label"].unique())
+        self.write_log('valid_label_distri/lab', self.valid_df["label"].unique())
         
         self.verbose("generating weights for labels")
         # plot loss weight vs score
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        plt.scatter(self.train_labels_df.score.values, self.train_set.weights)
+        # plt.scatter(self.train_labels_df.score.values, self.train_set.weights)
+        plt.scatter(self.train_set.labels, self.train_set.weights_distri)
         plt.xlabel('score')
         plt.ylabel('loss weight')
         plt.title('train loss weight vs score')
@@ -90,7 +91,7 @@ class Solver(BaseSolver):
         
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        plt.scatter(self.valid_labels_df.score.values, self.valid_set.weights)
+        plt.scatter(self.valid_set.labels, self.valid_set.weights_distri)
         plt.xlabel('score')
         plt.ylabel('loss weight')
         plt.title('valid loss weight vs score')
@@ -98,36 +99,22 @@ class Solver(BaseSolver):
         self.log.add_figure('loss_weight_vs_score/valid', fig)
         plt.close()
 
+        self.train_loader = DataLoader(dataset=self.train_set, 
+                                        batch_size=self.config["experiment"]["batch_size"],
+                                        num_workers=self.config["experiment"]["num_workers"],
+                                        shuffle=True,
+                                        )
+        self.valid_loader = DataLoader(dataset=self.valid_set,
+                                        batch_size=self.config["experiment"]["batch_size"],
+                                        num_workers=self.config["experiment"]["num_workers"], 
+                                        shuffle=False
+                                        )
         
-        
-
-
-        #----------------------Weighted Random Sampler-------------------------------
-        
-        # bin_count = 10
-        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
-
-
-        # sample_w = []
-        # for score in self.train_set.scores:
-        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-        #     sample_w.append(weighted[bin_idx-1])
-
-        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
-        #----------------------Weighted Random Sampler-------------------------------
-
-
-        self.train_loader = DataLoader(dataset=self.train_set, shuffle=True, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"])
-        self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=False)
-        
-        data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t| use LDS: {}\t'
-                .format(self.train_set.features_dict, self.train_set[0][0][0].shape, self.train_set[0][0][1].shape, self.use_lds))
+        data_msg = ('I/O spec.  | feature shape = {}\t| use LDS: {}\t'
+                .format(self.train_set[0][0].shape, self.use_lds))
 
         self.verbose(data_msg)
+
 
     def set_model(self):
         ''' Setup h_mlp model and optimizer '''

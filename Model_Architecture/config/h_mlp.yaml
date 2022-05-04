@@ -16,6 +16,7 @@ model:
     sequential_input_size: 462
     # sequential_input_size: 32
     non_sequential_input_size: 2
+    feature_size: 35
     # ===================================================================
     hidden_size: 100
     ranking_weight: 0.7
@@ -40,7 +41,7 @@ hparas:                                   # Experiment hyper-parameters
     grad_clip: 'inf'
     optimizer:
         type: 'Adam'
-        lr: 0.0001
+        lr: 0.00005
     lr_scheduler:
         type: 'reduce_lr_on_plateau'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
         # type:                    # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
@@ -53,6 +54,7 @@ hparas:                                   # Experiment hyper-parameters
     bin_size: 0.05
 
 path:
+    data_file: "data/data.csv"
     features_dir: "data/features"
 
     label_file: "data/labels/track_memorability_scores_beta.csv"

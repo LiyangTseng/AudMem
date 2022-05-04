@@ -8,8 +8,8 @@ if __name__ == "__main__":
     models = ["h_lstm", "h_mlp", "h_svr", "e_crnn", "e_cnn", "e_transformer", "e_pase", "e_pasep", "pase_mlp", "pase_lstm", "probing", "ssast"]
 
     parser = argparse.ArgumentParser(description='train config')
-    parser.add_argument("--model", help=",".join(models), default="h_svr")
-    parser.add_argument("--patience", default=100, type=int, help="early stop patience")
+    parser.add_argument("--model", help=",".join(models), default="h_lstm")
+    parser.add_argument("--patience", default=10, type=int, help="early stop patience")
     parser.add_argument('--name', default=None, type=str, help='Name for logging.')
     parser.add_argument('--cpu', action='store_true', help='Disable GPU training.')
     parser.add_argument('--logdir', default='tensorboard/', type=str,
@@ -23,7 +23,7 @@ if __name__ == "__main__":
                     help='customized learning rate', required=False)
     parser.add_argument('--svr_kernel', default=None,
                     help='customized svr kernel', required=False)
-    parser.add_argument('--features', default="harmony",
+    parser.add_argument('--features', default="all",
                     help='all/harmony/rhythm/timbre/harmony-rhythm/harmony-timbre/rhythm-timbre', required=False)  
     parser.add_argument('--no_kfold', action='store_true',
                     help='do k-fold validation or not')  

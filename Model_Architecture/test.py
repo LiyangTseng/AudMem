@@ -7,7 +7,7 @@ if __name__ == "__main__":
     models = ["h_lstm", "h_mlp", "h_svr", "e_crnn", "e_cnn", "pase_mlp", "pase_lstm", "e_transformer", "ssast", "random_guess", "mean"]
 
     parser = argparse.ArgumentParser(description='test config')
-    parser.add_argument("--model", help=",".join(models), default="e_cnn")
+    parser.add_argument("--model", help=",".join(models), default="h_lstm")
     parser.add_argument('--cpu', action='store_true', help='Disable GPU inferencing.')
     parser.add_argument('--ckpdir', default='weights/', type=str,
                     help='Checkpoint path.', required=False)
@@ -18,7 +18,7 @@ if __name__ == "__main__":
                     help='ckpt path of pre-trained model', required=False)
     parser.add_argument('--svr_kernel', default=None,
                     help='customized svr kernel', required=False)
-    parser.add_argument('--features', default="harmony",
+    parser.add_argument('--features', default="all",
                     help='all/harmony/rhythm/timbre/harmony-rhythm/harmony-timbre/rhythm-timbre', required=False)  
     parser.add_argument('--no_kfold', action='store_true',
                     help='do k-fold validation or not')  

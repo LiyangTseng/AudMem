@@ -10,13 +10,14 @@ experiment:
     num_workers: 15
     log_freq: 50
 model:
-    seq_len: 157 # under 16kHz sampling rate
+    
+    seq_len: 32 # under 16kHz sampling rate
     # ==== make sure size is consistent with the one from dataloader ====
-    sequential_input_size: 462
+    sequential_input_size: 16
     # sequential_input_size: 12
-    non_sequential_input_size: 2
+    non_sequential_input_size: 3
     # ===================================================================
-    hidden_size: 256
+    hidden_size: 64
     layer_num: 4
     bidirectional: True
     ranking_weight: 0.5
@@ -31,7 +32,8 @@ model:
     bucket_num: 20
 
 
-hparas:                                   # Experiment hyper-parameters
+hparas:              
+    sr: 16000                     # Experiment hyper-parameters
     valid_step: 1000
     curriculum: 0
     max_epoch: 1000
@@ -42,7 +44,7 @@ hparas:                                   # Experiment hyper-parameters
     grad_clip: 'inf'
     optimizer:
         type: 'Adam'
-        lr: 0.001
+        lr: 0.0005
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
     # freq_loss_type: 'l1'                         # 'l1'/'mse'
@@ -54,5 +56,10 @@ hparas:                                   # Experiment hyper-parameters
     bin_size: 0.05
 
 path:
+    data_file: "data/data.csv"
+    chroma_dir: "data/1_second_features/chroma/"
+    timbre_dir: "data/1_second_features/timbre/"
+    source_separated_dir: "/media/lab812/53D8AD2D1917B29C/AudMem/dataset/sources_separated/"
+
     features_dir: "data/features"
     label_file: "data/labels/track_memorability_scores_beta.csv"

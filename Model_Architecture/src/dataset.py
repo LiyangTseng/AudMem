@@ -8,11 +8,109 @@ import torchaudio
 from tqdm import tqdm
 from torchvision import transforms
 from PIL import Image
+import pickle
 import json
 from itertools import combinations
 from src.transforms import *
 from src.util import _prepare_weights
 import sys
+
+from utils.extract_segments_features import YT_ids
+
+class Tabular_Features_Dataset(Dataset):
+    """ All features are pooling across time (including mean and std) """
+    def __init__(self, df, config, use_lds=False):
+        self.labels = df.iloc[:, -1].values
+        self.features = df.iloc[:, 3:-1].values
+        # noramlize features
+        features_mean = np.mean(self.features, axis=0)
+        features_std = np.std(self.features, axis=0)
+        self.features = (self.features - features_mean) / features_std
+
+        assert len(self.features) == len(self.labels), "features and labels should have same length"
+
+        if use_lds:
+            print("calculating smoothed labels...")
+            self.weights_distri = _prepare_weights(labels=self.labels, 
+                                                reweight="inverse", 
+                                                max_target=1, 
+                                                lds=True,
+                                                lds_ks=config["hparas"]["lds_ks"], 
+                                                lds_sigma=config["hparas"]["lds_sigma"],
+                                                bin_size=config["hparas"]["bin_size"])
+        else:
+            self.weights_distri = np.ones(len(self.labels)).astype(np.float32)
+
+    def __len__(self):
+        return len(self.features)
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.features[idx]), torch.tensor(self.labels[idx]), self.weights_distri[idx]
+
+class Tabular_and_Sequential_Dataset(Dataset):
+    """ harmony and timbre and sequential, emotion and tempo(bpm) are not """
+    def __init__(self, df, config, use_lds=False):
+        self.labels = df.iloc[:, -1].values
+        # extract non sequential features from csv file
+        self.non_sequential_features = df[["bpm", "static_valence", "static_arousal"]].values
+        non_sequential_features_mean = np.mean(self.non_sequential_features, axis=0)
+        non_sequential_features_std = np.std(self.non_sequential_features, axis=0)
+        self.non_sequential_features = (self.non_sequential_features - non_sequential_features_mean) / non_sequential_features_std
+        
+        # extract sequential features from .npy or .pickle files
+        self.sequential_features = []
+        for i in tqdm(range(len(df)), desc="extracting sequential features..."):
+            # read harmony features
+            chroma_file_name = df.YT_id[i] + '_' + df.augment_type[i] + '_' + str(df.segment_idx[i]) + ".npy"
+            chroma_file_path = os.path.join(config["path"]["chroma_dir"], chroma_file_name)
+            chroma = np.load(chroma_file_path)
+            
+            # read timbre features
+            timbre_file_name = df.YT_id[i] + '_' + df.augment_type[i] + '_' + str(df.segment_idx[i]) + ".pickle"
+            timbre_file_path = os.path.join(config["path"]["timbre_dir"], timbre_file_name)
+            with open(timbre_file_path, 'rb') as f:
+                timbre = pickle.load(f)
+
+
+            timbre_features = np.array([timbre["vocals"], timbre["drums"], timbre["bass"], timbre["other"]])
+            sequential_feature = np.concatenate([chroma, timbre_features], axis=0) 
+            # feature_size 16 x time_steps 32
+            sequential_feature = np.transpose(sequential_feature)
+            # time_steps 32 x feature_size 16 
+            self.sequential_features.append(sequential_feature)
+
+        self.sequential_features = np.array(self.sequential_features)
+        # TODO: check the axis of normalization is meaningful
+        self.sequential_features_mean = np.mean(self.sequential_features, axis=0)
+        self.sequential_features_std = np.std(self.sequential_features, axis=0)
+        self.sequential_features = (self.sequential_features - self.sequential_features_mean) / self.sequential_features_std
+        # self.features = df.iloc[:, 3:-1].values
+        # # noramlize features
+        # features_mean = np.mean(self.features, axis=0)
+        # features_std = np.std(self.features, axis=0)
+        # self.features = (self.features - features_mean) / features_std
+
+        assert len(self.sequential_features) == len(self.non_sequential_features) == len(self.labels), "features and labels should have same length"
+
+        if use_lds:
+            print("calculating smoothed labels...")
+            self.weights_distri = _prepare_weights(labels=self.labels, 
+                                                reweight="inverse", 
+                                                max_target=1, 
+                                                lds=True,
+                                                lds_ks=config["hparas"]["lds_ks"], 
+                                                lds_sigma=config["hparas"]["lds_sigma"],
+                                                bin_size=config["hparas"]["bin_size"])
+        else:
+            self.weights_distri = np.ones(len(self.labels)).astype(np.float32)
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        # (32x16), (3)
+        return torch.tensor(self.sequential_features[idx]), torch.tensor(self.non_sequential_features[idx]), \
+                    torch.tensor(self.labels[idx]), self.weights_distri[idx]
 
 class HandCraftedDataset(Dataset):
     ''' Hand crafted audio features to predict memorability (regression) '''
