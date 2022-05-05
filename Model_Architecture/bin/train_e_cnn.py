@@ -46,47 +46,31 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for training/validation '''
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # indexing except testing indices
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        # self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.labels_df = self.labels_df[~for_test]
-        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
-        self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
-        self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-        if self.use_ranking_loss:
-            raise Exception ("Not implemented yet")
-        else:
-            self.train_set = SoundDataset(labels_df=self.train_labels_df, config=self.config, split="train", use_lds=self.use_lds)
-            self.valid_set = SoundDataset(labels_df=self.valid_labels_df, config=self.config, split="valid", use_lds=self.use_lds)
+        train_yt_ids = [YT_ids[idx] for idx in range(len(YT_ids)) if idx not in testing_range]
 
+        self.non_test_df = self.data_df[self.data_df['YT_id'].isin(train_yt_ids)].reset_index(drop=True)
+        segment_nums = 9
+        self.valid_df = self.non_test_df[:fold_size*segment_nums].reset_index(drop=True)
+        self.train_df = self.non_test_df[fold_size*segment_nums:].reset_index(drop=True)
 
-        self.write_log('train_distri/lab', self.train_labels_df.score.values)
-        self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
-        #----------------------Weighted Random Sampler-------------------------------
         
-        # bin_count = 10
-        # hist, bins = np.histogram(self.train_set.scores, bins=bin_count)
-        # weighted = 1./hist            # set the weight to the reciprocal of the total data amount in each class
-
-
-        # sample_w = []
-        # for score in self.train_set.scores:
-        #     # get bin of that score, ref: https://stackoverflow.com/questions/40880624/binning-in-numpy
-        #     bin_idx = np.fmin(np.digitize(score, bins), bin_count)
-        #     sample_w.append(weighted[bin_idx-1])
-
-        # sampler = WeightedRandomSampler(sample_w,len(self.train_set.scores))
-        #----------------------Weighted Random Sampler-------------------------------
+        self.train_set = SoundDataset(df=self.train_df, config=self.config, split="train", use_lds=self.use_lds)
+        self.valid_set = SoundDataset(df=self.valid_df, config=self.config, split="valid", use_lds=self.use_lds)
+        self.write_log('train_distri/lab', self.train_df["label"].unique())
+        self.write_log('valid_distri/lab', self.valid_df["label"].unique())
 
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], drop_last=True, shuffle=True)
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False, drop_last=True)
         
-        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = ({},{})\t'
-                .format("melspectrogram", self.config["model"]["image_size"][0], self.config["model"]["image_size"][1]))
+        data_msg = ('I/O spec.  | visual feature = {}\t| image shape = {}\t'
+                .format("melspectrogram", self.train_set.specs[0].shape))
 
         self.verbose(data_msg)
 

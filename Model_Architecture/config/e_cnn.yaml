@@ -1,6 +1,6 @@
 experiment:
     batch_size: 4
-    num_workers: 15
+    num_workers: 20
     log_freq: 50
     
 augmentation:
@@ -88,7 +88,7 @@ model:
     ranking_weight: 0.4
 
 hparas:                                   # Experiment hyper-parameters
-    sample_rate: 44100
+    sample_rate: 16000
     duration: 1000
     channel: 2
     shift_pct: 0.2
@@ -114,8 +114,9 @@ hparas:                                   # Experiment hyper-parameters
     lds_sigma: 2
     bin_size: 0.05
 path:
-    audio_root: "data/raw_audios"
-    # noise_path: [data/pink_noise_3m.wav]
+    audio_root: "data/1_second_clips"
+    data_file: "data/data.csv"
+
     
     img_dir: "data/mels_img"
     label_file: "data/labels/track_memorability_scores_beta.csv"

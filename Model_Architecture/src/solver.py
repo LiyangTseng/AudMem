@@ -111,7 +111,7 @@ class BaseSolver():
                         if type(v) is float:
                             metric, score = k,v
                     self.model.eval()
-                    self.verbose('Evaluation target = {} (recorded {} = {:.2f} %)'.format(self.paras.load,metric,score))
+                    self.verbose('Evaluation target = {} (recorded {} = {:.2f})'.format(self.paras.load,metric,score))
                 else:
                     self.model.eval()
 

@@ -1082,13 +1082,13 @@ class ReconstructionDataset(Dataset):
 # CNN
 
 class SoundDataset(Dataset):
-    def __init__(self, labels_df, config, split, use_lds=False):
-        self.labels_df = labels_df
-        self.track_names = list(self.labels_df.track)
-        self.scores = []
-        self.imgs = []
+    def __init__(self, df, config, split, use_lds=False):
+        use_lds = False
+        self.df = df
+        self.labels = df.iloc[:, -1].values
+
+        self.specs = []
         self.weights = []
-        self.filename_to_score = dict(zip(self.track_names, self.labels_df.score))
         self.audio_root = config["path"]["audio_root"]
         self.config = config
         self.split = split
@@ -1099,7 +1099,8 @@ class SoundDataset(Dataset):
         top_db = 80
         n_fft = 1024
         n_mels = 64
-        n_steps = 431
+        # n_steps = 431
+        n_steps = 32
         hop_length = None
         max_mask_pct = 0.1
         freq_mask_param = max_mask_pct * n_mels
@@ -1108,7 +1109,7 @@ class SoundDataset(Dataset):
         if self.split != "test":
             self.audio_dirs = os.listdir(self.audio_root)
             if use_lds:
-                self.weights_distri = _prepare_weights(labels=self.labels_df.score, 
+                self.weights_distri = _prepare_weights(labels=self.labels, 
                                                     reweight="inverse", 
                                                     max_target=1, 
                                                     lds=True,
@@ -1116,9 +1117,9 @@ class SoundDataset(Dataset):
                                                     lds_sigma=self.config["hparas"]["lds_sigma"],
                                                     bin_size=self.config["hparas"]["bin_size"])
             else:
-                self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+                self.weights_distri = np.ones(len(self.labels)).astype(np.float32)
             self.audio_transforms = transforms.Compose([
-                                VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
+                VolChange(gain_range=config["augmentation"]["vol"]["gain_range"], \
                         prob=config["augmentation"]["vol"]["prob"]),
                 BandDrop(filt_files=config["augmentation"]["banddrop"]["ir_files"],\
                         data_root=config["augmentation"]["banddrop"]["data_root"], \
@@ -1150,7 +1151,7 @@ class SoundDataset(Dataset):
 
         else: 
             self.audio_dirs = sorted(os.listdir(self.audio_root))[-1:]
-            self.weights_distri = np.ones(len(self.labels_df.score)).astype(np.float32)
+            self.weights_distri = np.ones(len(self.labels)).astype(np.float32)
             self.audio_transforms = None
             self.spec_transforms = transforms.Compose([
                                 # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
@@ -1159,40 +1160,35 @@ class SoundDataset(Dataset):
                 torchaudio.transforms.AmplitudeToDB(top_db=top_db),
             ])
 
-        for audio_dir in tqdm(self.audio_dirs):
-            for track_name in self.track_names:
-                self.scores.append(torch.tensor(self.filename_to_score[track_name]))
-                audio_path = os.path.join(self.audio_root, audio_dir, track_name)
-                wav, sr = torchaudio.load(audio_path)
-                wav = torchaudio.transforms.Resample(sr, self.sr)(wav)
 
-                """
-                # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
-                spec = torchaudio.transforms.MelSpectrogram(self.sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)(wav)
-                # Convert to decibels
-                spec = torchaudio.transforms.AmplitudeToDB(top_db=top_db)(spec)
-                """
-                
-                if self.audio_transforms is not None:
-                    wav = self.audio_transforms(wav)
+        for i in tqdm(range(len(df))):
+            audio_file_name = df.YT_id[i] + '_' + df.augment_type[i] + '_' + str(df.segment_idx[i]) + ".wav"
+            audio_path = os.path.join(self.audio_root, audio_file_name)
+            wav, sr = torchaudio.load(audio_path)
+            wav = torchaudio.transforms.Resample(sr, self.sr)(wav)
 
-                spec = self.spec_transforms(torch.tensor(wav))
-                if len(spec.shape) == 2:
-                    # make sure channel has its own dimension
-                    spec = spec.unsqueeze(0)
-                assert len(spec.shape) == 3, "spec shape is not {}, shape should be [channel, n_mels, time]".format(spec.shape)
-                self.imgs.append(spec)
-                self.weights.append(self.weights_distri[self.track_names.index(track_name)])
+            if self.audio_transforms is not None:
+                wav = self.audio_transforms(wav)
+
+            spec = self.spec_transforms(torch.tensor(wav))
+            if len(spec.shape) == 2:
+                # make sure channel has its own dimension
+                spec = spec.unsqueeze(0)
+            assert len(spec.shape) == 3, "spec shape is not {}, shape should be [channel, n_mels, time]".format(spec.shape)
+            # (channel=1, n_mels=64, time=32) for sr=16000, n_fft=1024, hop_length=512
+            assert spec.shape[-1] == n_steps, "time step and n_steps mistmatch, time step is {}, n_steps is {}".format(spec.shape[-1], n_steps)
+            self.specs.append(spec)
 
     def __len__(self):
-        return len(self.scores)
+        return len(self.labels)
 
     def __getitem__(self, index):
-        img = self.imgs[index]
-        score = self.scores[index]
-        weight = self.weights[index]
+        spec = self.specs[index]
+        label = self.labels[index]
+        # weight = self.weights[index]
+        weight = self.weights_distri[index]
 
-        return img, score, weight
+        return spec, label, weight
 
 if __name__ == "__main__":
     pass

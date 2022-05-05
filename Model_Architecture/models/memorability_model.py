@@ -15,7 +15,8 @@ class H_MLP(nn.Module):
     def __init__(self, model_config):
 
         super(H_MLP, self).__init__()
-        self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
+        # self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
+        self.input_size = model_config["feature_size"]
         self.Linear_1 = nn.Linear(self.input_size, model_config["hidden_size"])
         self.Linear_2 = nn.Linear(model_config["hidden_size"],32)
         self.Relu = nn.ReLU()
@@ -24,6 +25,11 @@ class H_MLP(nn.Module):
         self.Sigmoid = nn.Sigmoid()
         self.Relu_2 = nn.ReLU()
         self.Dropout = nn.Dropout(p=model_config["dropout_rate"])
+
+        # if model_config["use_fds"]:
+        #     self.FDS = FDS(feature_dim=model_config["hidden_size"],
+        #                     bucket_num=model_config["bucket_num"],
+        #                     )
 
     def create_msg(self):
         # Messages for user
@@ -267,7 +273,7 @@ class CNN(nn.Module):
         conv_layers = []
 
         # First Convolution Block with Relu and Batch Norm. Use Kaiming Initialization
-        self.conv1 = nn.Conv2d(2, 8, kernel_size=(5, 5), stride=(2, 2), padding=(2, 2))
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=(5, 5), stride=(2, 2), padding=(2, 2))
         self.relu1 = nn.ReLU()
         self.bn1 = nn.BatchNorm2d(8)
         init.kaiming_normal_(self.conv1.weight, a=0.1)

@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
 from models.memorability_model import CNN
-from src.dataset import SoundDataset
+from src.dataset import SoundDataset, Tabular_and_Sequential_Dataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -42,13 +42,15 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for testing '''
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
-        self.test_set = SoundDataset(labels_df=self.test_labels_df, config=self.config, split="test")
+        test_yt_ids = [YT_ids[idx] for idx in testing_range]
+        self.test_df = self.data_df[self.data_df['YT_id'].isin(test_yt_ids)].reset_index(drop=True)
+        self.test_set = SoundDataset(df=self.test_df, split="test", config=self.config)
         self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
@@ -68,25 +70,29 @@ class Solver(BaseSolver):
         
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "pred_score", "lab_score"])
+            writer.writerow(["YT_id", "segment_idx", "augment_type", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
-                mels_img, lab_scores = self.fetch_data(data)
-                # mels_img shape: (batch_size=1, channel=1, n_mels=64, time_steps=431)
-                pred_score = self.model(mels_img).cpu().detach().item()
+                specs, _ = self.fetch_data(data)
+                pred_score = self.model(specs).cpu().detach().item()
                 self.pred_scores.append(pred_score)
-                writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
+                writer.writerow([self.test_df.YT_id.values[idx],
+                                self.test_df.segment_idx.values[idx],
+                                self.test_df.augment_type.values[idx],
+                                self.pred_scores[idx],
+                                 self.test_set.labels[idx]])
 
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
+        self.verbose("using max value in the segment as the prediction score")
+        prediction_df = prediction_df.groupby(["YT_id"]).max()
 
+        correlation = stats.spearmanr(prediction_df.pred_score.values, prediction_df.lab_score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(prediction_df.lab_score.values).unsqueeze(0))
         with open(self.corr_output_path, 'w') as f:
-            f.write("using weight: {}\n".format(self.paras.load))
-            f.write(str(correlation)+"\n")
-            f.write("regression loss: {}\n".format(str(reg_loss)))
+            f.write(str(correlation) + "\n")
+            f.write("MSE loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         self.interpret_model()
@@ -105,7 +111,8 @@ class Solver(BaseSolver):
         cnt = 0
         for idx in sorted_score_idx[:N]:
             self.verbose("generating lime explanation {}/{}".format(cnt+1, N))
-            mels_img, _ = self.fetch_data(self.test_set[idx])
+            # mels_img, _ = self.fetch_data(self.test_set[idx])
+            mels_img = self.test_set.specs[idx]
             # mels_img shape: (channel=1, n_mels=64, time_steps=431)
             self.save_explanatory_video(mels_img, idx)
             cnt += 1
@@ -117,9 +124,9 @@ class Solver(BaseSolver):
         
         n_fft = 1024
         hop_length = 512
-        sr = 44100
+        sr = self.config["hparas"]["sample_rate"]
         mels_ticks = [0, 20, 40, 60]
-        seconds = 5
+        seconds = 1
         # frame_ticks = [0, 50, 100, 150, 200, 250, 300, 350, 400]
         time_steps = int(seconds * sr * (n_fft/hop_length) / n_fft) + 1
         frame_ticks = [i*time_steps/5 for i in range(5)]
@@ -160,7 +167,9 @@ class Solver(BaseSolver):
         ax2.set_ylabel('Frequency [Hz]')
         
         # plot audio waveform
-        audio_path = os.path.join(self.test_set.audio_root, self.test_set.audio_dirs[0], self.test_set.track_names[idx])
+        # audio_path = os.path.join(self.test_set.audio_root, self.test_set.audio_dirs[0], self.test_set.track_names[idx])
+        audio_file_name = self.test_set.df.YT_id[idx] + '_' + self.test_set.df.augment_type[idx] + '_' + str(self.test_set.df.segment_idx[idx]) + ".wav"
+        audio_path = os.path.join(self.test_set.audio_root, audio_file_name)
         audio, sr = librosa.load(audio_path, sr=sr)
         line,v = ax3.plot(0, audio.min(), 5*sr, audio.max(), linewidth=2, color='black')
         ax3.plot(audio, linewidth=2)
@@ -191,7 +200,7 @@ class Solver(BaseSolver):
 
         animation.audio = new_audioclip
 
-        interp_path = os.path.join(self.interp_dir, "lime_"+self.test_set.track_names[idx].replace(".wav", ".mp4"))
+        interp_path = os.path.join(self.interp_dir, "lime_"+audio_file_name.replace(".wav", ".mp4"))
         animation.write_videofile(interp_path, fps=frames/5, audio_codec='aac')
         self.verbose("lime video saved at {}".format(interp_path))
 
