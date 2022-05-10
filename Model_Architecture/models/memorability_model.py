@@ -87,8 +87,8 @@ class H_LSTM(nn.Module):
         # input shape: (batch_size, seq, input_size)
         self.Linear = nn.Linear(self.hidden_size*(1+int(self.bidirectional))+model_config["non_sequential_input_size"], 1)
 
-        # self.Sigmoid = nn.Sigmoid()
-        self.ReLU = nn.ReLU()
+        self.Sigmoid = nn.Sigmoid()
+        # self.ReLU = nn.ReLU()
 
     def attention_layer(self, h):
         '''
@@ -126,7 +126,7 @@ class H_LSTM(nn.Module):
         out = self.Batch_Norm(out)
         out = self.Linear(out)
 
-        predictions = self.ReLU(out)
+        predictions = self.Sigmoid(out)
         return predictions
 
 class E_CRNN(nn.Module):

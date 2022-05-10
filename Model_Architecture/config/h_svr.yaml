@@ -13,7 +13,7 @@ experiment:
 model:
     kernel: "rbf" # "rbf", "linear"
 
-    use_lds: True
+    use_lds: False
     use_fds: True
     lds_ks: 5
     lds_sigma: 2
@@ -40,7 +40,9 @@ hparas:
     differential_loss: False
     emphasize_linear_low: False
 
-    
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
 
 path:
     features_dir: "data/features"

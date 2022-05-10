@@ -33,6 +33,10 @@ if __name__ == "__main__":
                     help='index of 10 fold', required=False)
     parser.add_argument('--seed', default=1234, type=int,
                     help='random seed', required=False)
+    parser.add_argument('--use_pitch_shift', action='store_true',
+                    help='use pitch shifting as data augmentation or not')
+    parser.add_argument('--use_lds', default=None,
+                    help='use label distribution smoothing or not', required=False)
     
 
 
@@ -47,6 +51,9 @@ if __name__ == "__main__":
         config["hparas"]["optimizer"]["lr"] = paras.lr_rate
     if paras.svr_kernel != None:
         config["model"]["kernel"] = paras.svr_kernel
+
+    if paras.use_lds != None:
+        config["model"]["use_lds"] = paras.use_lds == "True"
 
     if paras.features == "all":
         pass

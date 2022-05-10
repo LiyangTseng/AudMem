@@ -95,7 +95,7 @@ class Solver(BaseSolver):
             f.write("MSE loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
-        self.interpret_model()
+        # self.interpret_model()
 
     def interpret_model(self, N=5):
         ''' Use Captum to interprete feature importance on top N memorability score '''

@@ -23,7 +23,7 @@ model:
     dropout_rate: 0.5
     use_ranking_loss: False
 
-    use_lds: True
+    use_lds: False
     use_fds: True
     lds_ks: 5
     lds_sigma: 2

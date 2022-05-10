@@ -53,6 +53,10 @@ class Solver(BaseSolver):
     def load_data(self):
         ''' Load data for training/validation '''
         self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        if not self.paras.use_pitch_shift:
+            # only use original audio
+            self.verbose("Only use original audio")
+            self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
 
         YT_ids = self.data_df['YT_id'].unique()
         fold_size = int(len(YT_ids) / self.paras.kfold_splits)
@@ -97,8 +101,8 @@ class Solver(BaseSolver):
         self.valid_loader = DataLoader(dataset=self.valid_set, batch_size=self.config["experiment"]["batch_size"],
                             num_workers=self.config["experiment"]["num_workers"], shuffle=False)
         
-        data_msg = ('I/O spec. | sequential feature dim = {}\t| non sequential feature dim = {}\t'
-                .format(self.train_set[0][0][0].shape, self.train_set[0][1].shape))
+        data_msg = ('I/O spec. | sequential feature dim = {}\t| non sequential feature dim = {}\t| use LDS: {}\t| use pitch_shift_augmentation: {}\t'
+                .format(self.train_set[0][0][0].shape, self.train_set[0][1].shape, self.use_lds, self.paras.use_pitch_shift))
 
         self.verbose(data_msg)
 

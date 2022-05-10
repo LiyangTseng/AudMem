@@ -47,7 +47,10 @@ class Solver(BaseSolver):
     def load_data(self):
         ''' Load data for training/validation '''
         self.data_df = pd.read_csv(self.config["path"]["data_file"])
-        # self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        if not self.paras.use_pitch_shift:
+            # only use original audio
+            self.verbose("Only use original audio")
+            self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         YT_ids = self.data_df['YT_id'].unique()
         fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]

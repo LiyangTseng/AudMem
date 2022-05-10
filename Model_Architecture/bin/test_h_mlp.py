@@ -85,8 +85,8 @@ class Solver(BaseSolver):
                 writer.writerow([self.test_df.YT_id.values[idx],
                                 self.test_df.segment_idx.values[idx],
                                 self.test_df.augment_type.values[idx],
-                                self.pred_scores[idx],
-                                 self.test_set.labels[idx]])
+                                self.pred_scores[idx] + self.test_set.label_mean,
+                                 self.test_set.labels[idx]+ self.test_set.label_mean])
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)

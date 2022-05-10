@@ -15,12 +15,15 @@ from src.transforms import *
 from src.util import _prepare_weights
 import sys
 
-from utils.extract_segments_features import YT_ids
 
 class Tabular_Features_Dataset(Dataset):
     """ All features are pooling across time (including mean and std) """
-    def __init__(self, df, config, use_lds=False):
+    def __init__(self, df, config, use_lds=False, label_minus_mean=True):
         self.labels = df.iloc[:, -1].values
+        if label_minus_mean:
+            print("Label minus mean")
+            self.label_mean = np.mean(self.labels)
+            self.labels = self.labels - self.labels.mean()
         self.features = df.iloc[:, 3:-1].values
         # noramlize features
         features_mean = np.mean(self.features, axis=0)
@@ -49,8 +52,13 @@ class Tabular_Features_Dataset(Dataset):
 
 class Tabular_and_Sequential_Dataset(Dataset):
     """ harmony and timbre and sequential, emotion and tempo(bpm) are not """
-    def __init__(self, df, config, use_lds=False):
+    def __init__(self, df, config, use_lds=False, label_minus_mean=True):
         self.labels = df.iloc[:, -1].values
+        if label_minus_mean:
+            print("Label minus mean")
+            self.label_mean = np.mean(self.labels)
+            self.labels = self.labels - self.labels.mean()
+
         # extract non sequential features from csv file
         self.non_sequential_features = df[["bpm", "static_valence", "static_arousal"]].values
         non_sequential_features_mean = np.mean(self.non_sequential_features, axis=0)
@@ -1082,11 +1090,14 @@ class ReconstructionDataset(Dataset):
 # CNN
 
 class SoundDataset(Dataset):
-    def __init__(self, df, config, split, use_lds=False):
+    def __init__(self, df, config, split, use_lds=False, label_minus_mean=True):
         use_lds = False
         self.df = df
         self.labels = df.iloc[:, -1].values
-
+        if label_minus_mean:
+            print("Label minus mean")
+            self.label_mean = np.mean(self.labels)
+            self.labels = self.labels - self.labels.mean()
         self.specs = []
         self.weights = []
         self.audio_root = config["path"]["audio_root"]

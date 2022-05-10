@@ -49,14 +49,15 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for testing '''
-        # self.test_set = EndToEndImgDataset(config=self.config, mode="test")
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
-        
+        test_yt_ids = [YT_ids[idx] for idx in testing_range]
+        self.test_df = self.data_df[self.data_df['YT_id'].isin(test_yt_ids)].reset_index(drop=True)
+
         self.test_loader = DataLoader(
             AST_AudioDataset(self.data_eval, audio_conf=self.test_audio_conf, config=self.config),
             batch_size=1, shuffle=False, num_workers=self.config["experiment"]["num_workers"], pin_memory=False)
@@ -87,24 +88,29 @@ class Solver(BaseSolver):
         
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "pred_score", "lab_score"])
+            writer.writerow(["YT_id", "segment_idx", "augment_type", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 fbanks, lab_scores = self.fetch_data(data)
                 pred_score = self.model(fbanks, task="ft_avgtok").cpu().detach().item()
                 self.pred_scores.append(pred_score)
-                writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
+                writer.writerow([self.test_df.YT_id.values[idx],
+                                self.test_df.segment_idx.values[idx],
+                                self.test_df.augment_type.values[idx],
+                                self.pred_scores[idx],
+                                self.test_df.label.values[idx]])
 
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df.pred_score.values, self.test_labels_df.score.values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(self.test_labels_df.score.values).unsqueeze(0))
+        self.verbose("using max value in the segment as the prediction score")
+        prediction_df = prediction_df.groupby(["YT_id"]).max()
 
+        correlation = stats.spearmanr(prediction_df.pred_score.values, prediction_df.lab_score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(prediction_df.lab_score.values).unsqueeze(0))
         with open(self.corr_output_path, 'w') as f:
-            f.write("using weight: {}\n".format(self.paras.load))
-            f.write(str(correlation)+"\n")
-            f.write("regression loss: {}\n".format(str(reg_loss)))
+            f.write(str(correlation) + "\n")
+            f.write("MSE loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         # self.interpret_model()

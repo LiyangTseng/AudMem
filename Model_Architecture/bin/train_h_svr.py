@@ -8,6 +8,7 @@ from src.solver import BaseSolver
 from sklearn.svm import SVR
 from src.dataset import PairHandCraftedDataset, HandCraftedDataset
 from utils.calculate_handcrafted_features_stats import get_features_stats
+from src.util import _prepare_weights
 
 CKPT_STEP = 10000
 
@@ -23,8 +24,10 @@ class Solver(BaseSolver):
         ''' Load data for training/validation '''
         
         self.data_df = pd.read_csv(self.config["path"]["data_file"])
-        # NOTE: for now do not use augmentation, need to wait for spleeter completed
-        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        if not self.paras.use_pitch_shift:
+            # only use original audio
+            self.verbose("Only use original audio")
+            self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         
         YT_ids = self.data_df['YT_id'].unique()
         fold_size = int(len(YT_ids) / self.paras.kfold_splits)
@@ -40,11 +43,24 @@ class Solver(BaseSolver):
         train_features_mean = np.mean(self.train_features, axis=0)
         train_features_std = np.std(self.train_features, axis=0)
         self.train_features = (self.train_features - train_features_mean) / train_features_std
-        
+        self.use_lds = self.config["model"]["use_lds"]
 
         self.verbose("Loaded data for training/validation")
 
-        
+        if self.use_lds:
+            self.weights_distri = _prepare_weights(labels=self.train_labels, 
+                                                    reweight="inverse", 
+                                                    max_target=1, 
+                                                    lds=True,
+                                                    lds_ks=self.config["hparas"]["lds_ks"], 
+                                                    lds_sigma=self.config["hparas"]["lds_sigma"],
+                                                    bin_size=self.config["hparas"]["bin_size"])
+        data_msg = ('I/O spec.  | use LDS: {}\t| use pitch_shift_augmentation: {}\t'
+                .format(self.use_lds, self.paras.use_pitch_shift))
+
+        self.verbose(data_msg)
+
+    
     def set_model(self):
         ''' Setup h_mlp model and optimizer '''
         # Model
@@ -57,8 +73,10 @@ class Solver(BaseSolver):
         self.verbose("Saved checkpoint to {}".format(ckpt_path))
 
     def exec(self):
-        # normalization already done in dataset
-        self.model.fit(self.train_features, self.train_labels)
+        if self.use_lds:
+            self.model.fit(self.train_features, self.train_labels, sample_weight=self.weights_distri)
+        else:
+            self.model.fit(self.train_features, self.train_labels)
         self.save_checkpoint()
 
         

@@ -57,8 +57,11 @@ class Solver(BaseSolver):
         ''' Load data for training/validation '''
         
         self.data_df = pd.read_csv(self.config["path"]["data_file"])
-        # NOTE: for now do not use augmentation, need to wait for spleeter completed
-        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        if not self.paras.use_pitch_shift:
+            # only use original audio
+            self.verbose("Only use original audio")
+            self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+
         
         YT_ids = self.data_df['YT_id'].unique()
         fold_size = int(len(YT_ids) / self.paras.kfold_splits)
@@ -110,8 +113,8 @@ class Solver(BaseSolver):
                                         shuffle=False
                                         )
         
-        data_msg = ('I/O spec.  | feature shape = {}\t| use LDS: {}\t'
-                .format(self.train_set[0][0].shape, self.use_lds))
+        data_msg = ('I/O spec.  | feature shape = {}\t| use LDS: {}\t| use pitch_shift_augmentation: {}\t'
+                .format(self.train_set[0][0].shape, self.use_lds, self.paras.use_pitch_shift))
 
         self.verbose(data_msg)
 

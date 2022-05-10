@@ -72,19 +72,16 @@ class Solver(BaseSolver):
         assert split in ['train', 'valid', 'test']
         
         audio_root = os.path.abspath(self.config["path"]["audio_root"])
-        if split != "test":
-            audio_subdir = os.listdir(audio_root)
-        else:
-            audio_subdir = ["original"]
-        data_arr = df.to_numpy()
         
         data = {}
         data["data"] = []
         
-        for row in data_arr:
-            wav, label = row
-            for subdir in audio_subdir:
-                data["data"].append({"wav": os.path.join(audio_root, subdir, wav), "labels": label})
+        for i in tqdm(range(len(df))):
+            audio_file_name = df.YT_id[i] + '_' + df.augment_type[i] + '_' + str(df.segment_idx[i]) + ".wav"
+            data["data"].append({
+                "wav": os.path.join(audio_root, audio_file_name),
+                "labels": df.label[i]
+            })
         
         json_input_dir = self.config["path"]["ssast_input_dir"]
         os.makedirs(json_input_dir, exist_ok=True)        
@@ -98,26 +95,30 @@ class Solver(BaseSolver):
 
     def load_data(self):
         ''' Load data for training/validation '''
-        self.labels_df = pd.read_csv(self.config["path"]["label_file"])
-        # indexing except testing indices
-        fold_size = int(len(self.labels_df) / self.paras.kfold_splits)
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
         testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
-        for_test = self.labels_df.index.isin(testing_range)
-        self.test_labels_df = self.labels_df[for_test].reset_index(drop=True)
         
-        self.labels_df = self.labels_df[~for_test] # extract non-testing indices
-        # shuffling to make validation set
-        self.labels_df = self.labels_df.sample(frac=1, random_state=self.paras.seed).reset_index(drop=True)
-        self.valid_labels_df = self.labels_df[:fold_size].reset_index(drop=True)
-        self.train_labels_df = self.labels_df[fold_size:].reset_index(drop=True)
-        self.write_log('train_distri/lab', self.train_labels_df.score.values)
-        self.write_log('valid_distri/lab', self.valid_labels_df.score.values)
+        train_yt_ids = [YT_ids[idx] for idx in range(len(YT_ids)) if idx not in testing_range]
+        test_yt_ids = [YT_ids[idx] for idx in testing_range]
+        
+        self.non_test_df = self.data_df[self.data_df['YT_id'].isin(train_yt_ids)].reset_index(drop=True)
+        segment_nums = 9
+        
+        self.valid_df = self.non_test_df[:fold_size*segment_nums].reset_index(drop=True)
+        self.train_df = self.non_test_df[fold_size*segment_nums:].reset_index(drop=True)
+        self.test_df = self.data_df[self.data_df['YT_id'].isin(test_yt_ids)].reset_index(drop=True)
+
+        self.write_log('train_distri/lab', self.train_df["label"].unique())
+        self.write_log('valid_distri/lab', self.valid_df["label"].unique())
         
         
         # generate json data for this fold
-        self.generate_json_format(self.train_labels_df, "train")
-        self.generate_json_format(self.valid_labels_df, "valid")
-        self.generate_json_format(self.test_labels_df, "test")
+        self.generate_json_format(self.train_df, "train")
+        self.generate_json_format(self.valid_df, "valid")
+        self.generate_json_format(self.test_df, "test")
 
         # if use balanced sampling, note - self-supervised pretraining should not use balance sampling as it implicitly leverages the label information.
         if self.bal == 'bal':
