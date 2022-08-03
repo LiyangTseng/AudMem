@@ -6,11 +6,9 @@ function join_by {
   fi
 }
 
-# folds=(0 1 2 3 4 5 6 7 8 9)
-folds=(1)
-# seeds=(1111 1000 2345 1234)
-seeds=(1111)
-model="h_mlp"
+folds=(0 1 2 3 4 5 6 7 8 9)
+seeds=(1111 1000 2345 1234)
+model="ssast"
 mkdir -p "results/$model"
 correlation_results_file="results/${model}/correlation_results.csv"
 loss_results_file="results/${model}/loss_results.csv"
@@ -33,8 +31,8 @@ for seed in ${seeds[@]}; do
     loss_results=($seed)
     for fold in "${folds[@]}"; do
         exp_name="seed_${seed}_fold_${fold}_norm_label_vanilla"
-        # echo "trainig ${exp_name} with ${model}..."
-        # python train.py --model $model --name $exp_name --kfold_splits 10 --fold_index $fold --seed $seed --use_lds False
+        echo "trainig ${exp_name} with ${model}..."
+        python train.py --model $model --name $exp_name --kfold_splits 10 --fold_index $fold --seed $seed --use_lds False
         echo "testing ${exp_name} with ${model}..."
         python test.py --model $model --fold_index $fold --load "weights/${model}/${exp_name}/${model}_best.pth" --outdir "results/${model}/${exp_name}"
         # read ouptut file store fold results to array
@@ -64,41 +62,41 @@ done
 
 # with augmentation (no LDS)
 
-# echo "norm_label_w/aug" >> $correlation_results_file
-# echo "norm_label_w/aug" >> $loss_results_file
-# for seed in ${seeds[@]}; do
-#     correlation_results=($seed)
-#     loss_results=($seed)
-#     for fold in "${folds[@]}"; do
-#         exp_name="seed_${seed}_fold_${fold}_norm_label_w/aug"
-#         echo "trainig ${exp_name} with ${model}..."
-#         python train.py --model $model --name $exp_name --kfold_splits 10 --fold_index $fold --seed $seed --use_pitch_shift --use_lds False
-#         echo "testing ${exp_name} with ${model}..."
-#         python test.py --model $model --fold_index $fold --load "weights/${model}/${exp_name}/${model}_best.pth" --outdir "results/${model}/${exp_name}"
-#         # read ouptut file store fold results to array
-#         exec < "results/${model}/${exp_name}/details.txt"
-#         while read line; do
-#             if [[ $line == *"correlation"* ]]; then
-#                 # extact the content inside the parathese
-#                 str=$(echo $line | cut -d '(' -f 2 | cut -d ')' -f 1)
-#                 # seperate two strings by comma, and extract numeric value after =
-#                 correlation=$(echo $str | cut -d , -f 1 | cut -d = -f 2)
-#                 correlation_results+=("$correlation")
-#             fi
-#             if [[ $line == *"loss"* ]]; then
-#                 # extact the content inside the parathese
-#                 str=$(echo $line | cut -d '(' -f 2 | cut -d ')' -f 1)
-#                 # seperate two strings by comma, and extract numeric value after =
-#                 loss=$(echo $str | cut -d , -f 1 )
-#                 loss_results+=("$loss")
-#             fi
+echo "norm_label_w/aug" >> $correlation_results_file
+echo "norm_label_w/aug" >> $loss_results_file
+for seed in ${seeds[@]}; do
+    correlation_results=($seed)
+    loss_results=($seed)
+    for fold in "${folds[@]}"; do
+        exp_name="seed_${seed}_fold_${fold}_norm_label_w/aug"
+        echo "trainig ${exp_name} with ${model}..."
+        python train.py --model $model --name $exp_name --kfold_splits 10 --fold_index $fold --seed $seed --use_pitch_shift --use_lds False
+        echo "testing ${exp_name} with ${model}..."
+        python test.py --model $model --fold_index $fold --load "weights/${model}/${exp_name}/${model}_best.pth" --outdir "results/${model}/${exp_name}"
+        # read ouptut file store fold results to array
+        exec < "results/${model}/${exp_name}/details.txt"
+        while read line; do
+            if [[ $line == *"correlation"* ]]; then
+                # extact the content inside the parathese
+                str=$(echo $line | cut -d '(' -f 2 | cut -d ')' -f 1)
+                # seperate two strings by comma, and extract numeric value after =
+                correlation=$(echo $str | cut -d , -f 1 | cut -d = -f 2)
+                correlation_results+=("$correlation")
+            fi
+            if [[ $line == *"loss"* ]]; then
+                # extact the content inside the parathese
+                str=$(echo $line | cut -d '(' -f 2 | cut -d ')' -f 1)
+                # seperate two strings by comma, and extract numeric value after =
+                loss=$(echo $str | cut -d , -f 1 )
+                loss_results+=("$loss")
+            fi
 
-#         done
-#     done
-#     # save all fold results to file
-#     echo $(join_by , "${correlation_results[@]}") >> $correlation_results_file
-#     echo $(join_by , "${loss_results[@]}") >> $loss_results_file
-# done
+        done
+    done
+    # save all fold results to file
+    echo $(join_by , "${correlation_results[@]}") >> $correlation_results_file
+    echo $(join_by , "${loss_results[@]}") >> $loss_results_file
+done
 
 # with LDS (no augmentation) 
 

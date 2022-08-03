@@ -96,8 +96,8 @@ hparas:                                   # Experiment hyper-parameters
 
 path:
     pretrained_mdl_path: "ssast/SSAST-Base-Patch-400.pth"
-    # audio_root: "data/raw_audios"
-    audio_root: "data/1_second_clips"
+    audio_root: "data/raw_audios"
+    # audio_root: "data/1_second_clips"
     data_file: "data/data.csv"
     ssast_input_dir: "data/ssast_input"    
     data_train: "data/ssast_input/train.json"

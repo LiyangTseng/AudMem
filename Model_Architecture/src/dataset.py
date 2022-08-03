@@ -20,10 +20,7 @@ class Tabular_Features_Dataset(Dataset):
     """ All features are pooling across time (including mean and std) """
     def __init__(self, df, config, use_lds=False, label_minus_mean=True):
         self.labels = df.iloc[:, -1].values
-        if label_minus_mean:
-            print("Label minus mean")
-            self.label_mean = np.mean(self.labels)
-            self.labels = self.labels - self.labels.mean()
+        
         self.features = df.iloc[:, 3:-1].values
         # noramlize features
         features_mean = np.mean(self.features, axis=0)
@@ -43,6 +40,11 @@ class Tabular_Features_Dataset(Dataset):
                                                 bin_size=config["hparas"]["bin_size"])
         else:
             self.weights_distri = np.ones(len(self.labels)).astype(np.float32)
+
+        if label_minus_mean:
+            print("Label minus mean")
+            self.label_mean = np.mean(self.labels)
+            self.labels = self.labels - self.labels.mean()
 
     def __len__(self):
         return len(self.features)
@@ -809,6 +811,7 @@ class AudioDataset(Dataset):
         mels = self.imgs[index]
         score = self.scores[index]
         return mels, score
+
 
 def make_index_dict(label_csv):
     index_lookup = {}
