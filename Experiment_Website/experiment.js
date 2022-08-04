@@ -1,4 +1,4 @@
-let vigilance_threshold = 0.65; 
+let vigilance_threshold = 0.60; 
 let now_playing = document.querySelector(".now-playing");
 let track_name = document.querySelector(".track-name");
 
