@@ -1,7 +1,7 @@
 # according to pase argparse
 experiment:
-    batch_size: 50
-    num_workers: 2
+    batch_size: 32
+    num_workers: 10
     log_freq: 50
     ckpt_continue: False
     tensorboard: True
@@ -44,7 +44,7 @@ hparas:    # Experiment hyper-parameters
     lr_scheduler:
         type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
 path:
-    data_root: ["data/audioset/wavs"]
+    data_root: ["/media/lab812/53D8AD2D1917B29C/audioset"]
     data_cfg: ["data/audioset/audioset_data.cfg"]
     stats: "data/audioset/audioset_stats_pase.pkl"
     net_cfg: "config/workers.cfg"

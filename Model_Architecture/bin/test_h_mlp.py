@@ -6,7 +6,8 @@ from tqdm import tqdm
 from scipy import stats
 from src.solver import BaseSolver
 from models.memorability_model import H_MLP
-from src.dataset import HandCraftedDataset
+from src.dataset import HandCraftedDataset, Tabular_Features_Dataset
+from utils.calculate_handcrafted_features_stats import get_features_stats
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -17,36 +18,50 @@ class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        output_dir = os.path.join(self.outdir, paras.model)
-        os.makedirs(output_dir, exist_ok=True)
-        self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(output_dir, "details.txt")
-        self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")
+        
+        self.memo_output_path = os.path.join(self.outdir, "predicted_memorability_scores.csv")
+        self.corr_output_path = os.path.join(self.outdir, "details.txt")
+        
+        self.interp_dir = os.path.join(self.outdir, "interpretability")        
+        os.makedirs(self.interp_dir, exist_ok=True)
         
 
     def fetch_data(self, data):
         ''' Move data to device '''
-        seq_feat, non_seq_feat = data
-        feat = torch.cat((seq_feat, non_seq_feat), 1)
-        feat = feat.to(self.device)
+        feats, lab_scores, weights = data
+        # (seq_feat, non_seq_feat), lab_scores, weight = data
+        # feat = torch.cat((seq_feat, non_seq_feat), 1)
+        feats = feats.to(self.device).float()
 
-        return feat
+        return feats
 
 
     def load_data(self):
         ''' Load data for testing '''
-        self.test_set = HandCraftedDataset(config=self.config, pooling=True, mode="test")
+
+        self.data_df = pd.read_csv(self.config["path"]["data_file"])
+        self.data_df = self.data_df[self.data_df["augment_type"] == "original"]
         
-        self.test_loader = DataLoader(dataset=self.test_set, batch_size=1,
-                            num_workers=self.config["experiment"]["num_workers"], shuffle=False)
+        YT_ids = self.data_df['YT_id'].unique()
+        fold_size = int(len(YT_ids) / self.paras.kfold_splits)
+        testing_range = [ i for i in range(self.paras.fold_index*fold_size, (self.paras.fold_index+1)*fold_size)]
+        test_yt_ids = [YT_ids[idx] for idx in testing_range]
+        self.test_df = self.data_df[self.data_df['YT_id'].isin(test_yt_ids)].reset_index(drop=True)
+
+        self.test_set = Tabular_Features_Dataset(df=self.test_df, config=self.config)
+
+        self.test_loader = DataLoader(dataset=self.test_set, 
+                                        batch_size=1,
+                                        num_workers=self.config["experiment"]["num_workers"], 
+                                        shuffle=False)
         
-        data_msg = ('I/O spec.  | audio feature = {}\t| sequential feature dim = {}\t| nonsequential feature dim = {}\t'
-                .format(self.test_set.features_dict, self.test_set.sequential_features[0].shape, self.test_set.non_sequential_features[0].shape))
+        data_msg = ('I/O spec.  | feature shape = {}\t'
+                .format(self.test_set[0][0].shape))
 
         self.verbose(data_msg)
 
     def set_model(self):
-        ''' Setup ASR model '''
+        ''' Setup h_mlp model '''
         # Model
         self.model = H_MLP(model_config=self.config["model"]).to(self.device)
         self.verbose(self.model.create_msg())
@@ -62,22 +77,27 @@ class Solver(BaseSolver):
 
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["track", "score"])
+            writer.writerow(["YT_id", "segment_idx", "augment_type", "pred_score", "lab_score"])
             for idx, data in enumerate(tqdm(self.test_loader)):
                 feat = self.fetch_data(data)
                 pred_score = self.model(feat).cpu().detach().item()
                 self.pred_scores.append(pred_score)
-                writer.writerow([self.test_set.idx_to_filename[idx], pred_score])
-        
+                writer.writerow([self.test_df.YT_id.values[idx],
+                                self.test_df.segment_idx.values[idx],
+                                self.test_df.augment_type.values[idx],
+                                self.pred_scores[idx] + self.test_set.label_mean,
+                                 self.test_set.labels[idx]+ self.test_set.label_mean])
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
         prediction_df = pd.read_csv(self.memo_output_path)
-        correlation = stats.spearmanr(prediction_df["score"].values, self.test_set.filename_memorability_df["score"].values)
-        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df["score"].values).unsqueeze(0), torch.tensor(self.test_set.filename_memorability_df["score"].values).unsqueeze(0))
+        self.verbose("using max value in the segment as the prediction score")
+        prediction_df = prediction_df.groupby(["YT_id"]).max()
 
+        correlation = stats.spearmanr(prediction_df.pred_score.values, prediction_df.lab_score.values)
+        reg_loss = torch.nn.MSELoss()(torch.tensor(prediction_df.pred_score.values).unsqueeze(0), torch.tensor(prediction_df.lab_score.values).unsqueeze(0))
         with open(self.corr_output_path, 'w') as f:
-            f.write(str(correlation))
-            f.write("regression loss: {}".format(str(correlation)))
+            f.write(str(correlation) + "\n")
+            f.write("MSE loss: {}\n".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, regression loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         

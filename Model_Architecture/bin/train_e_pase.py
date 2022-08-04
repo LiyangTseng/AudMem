@@ -243,7 +243,7 @@ class Solver(BaseSolver):
 
 
         torch.save(full_dict, ckpt_path)
-        self.verbose("Saved checkpoint (step = {}, {} = {:.2f}) and status @ {}".
+        self.verbose("Saved checkpoint (epochs = {}, {} = {:.2f}) and status @ {}".
                      format(human_format(self.epoch), "total loss", pretext_losses["total"], ckpt_path))
 
     def train_logger(self, preds, labels, losses, epoch, bidx, lrs, pbar):

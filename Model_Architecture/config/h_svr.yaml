@@ -1,0 +1,51 @@
+# non end-to-end configuration
+features:
+    chords: ["chroma", "tonnetz"]
+    rhythms: ["tempogram"]
+    timbre: ["mfcc", "mfcc_delta", "mfcc_delta2"]
+    emotions: ["static_arousal", "static_valence"]
+    
+experiment:
+    batch_size: 16
+    num_workers: 15
+    log_freq: 50
+
+model:
+    kernel: "rbf" # "rbf", "linear"
+
+    use_lds: False
+    use_fds: True
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
+    bucket_num: 20
+
+hparas:                           
+    # not use
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 10000
+    max_step: 150001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.0001
+    lr_scheduler:
+        type: 'reduce_lr_on_plateau'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+        # type:                    # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+    freq_loss_type: 'l1'                         # 'l1'/'mse'
+    differential_loss: False
+    emphasize_linear_low: False
+
+    lds_ks: 5
+    lds_sigma: 2
+    bin_size: 0.05
+
+path:
+    features_dir: "data/features"
+
+    label_file: "data/labels/track_memorability_scores_beta.csv"
+    data_file: "data/data.csv"

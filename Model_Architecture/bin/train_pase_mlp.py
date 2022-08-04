@@ -24,10 +24,6 @@ class Solver(BaseSolver):
         super().__init__(config, paras, mode)
         self.ranking_weight = config["model"]["ranking_weight"]
 
-        # Seeds initialization
-        np.random.seed(self.paras.seed)
-        torch.manual_seed(self.paras.seed)
-
         with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
             self.fe_cfg = json.load(fe_cfg_f)
 
@@ -137,6 +133,12 @@ class Solver(BaseSolver):
                                                                 lr=self.config["hparas"]["optimizer"]["lr"])
         else:
             raise Exception("Not Implement Error")
+        # # set scheduler
+        # self.scheduler = getattr(torch.optim.lr_scheduler, self.config["hparas"]["scheduler"]["type"])(
+        #                                                         self.optimizer, 
+        #                                                         self.config["hparas"]["scheduler"]["lr_decay"],
+        #                                                         last_epoch=-1)      
+
 
     def backward(self, loss):
         '''
@@ -216,8 +218,8 @@ class Solver(BaseSolver):
                 self.optimizer.zero_grad()
 
                 wavs_1, wavs_2, lab_scores_1, lab_scores_2 = self.fetch_data(data)
-                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
                 self.timer.cnt('rd')
+                lab_scores = torch.cat((lab_scores_1, lab_scores_2))
 
                 # inference
                 features_1 = self.encoder(wavs_1, self.device)
@@ -244,8 +246,9 @@ class Solver(BaseSolver):
 
                 total_loss = reg_loss + self.ranking_weight*rank_loss
                 train_total_loss.append(total_loss.cpu().detach().numpy())
-                
                 self.timer.cnt('fw')
+                
+                # Backprop
                 grad_norm = self.backward(total_loss)
                 self.step += 1
 

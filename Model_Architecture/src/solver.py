@@ -3,12 +3,13 @@ import os
 import sys
 import abc
 import math
-import yaml
 import time
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from src.option import default_hparas
 from src.util import human_format, Timer
+import random
 
 class BaseSolver():
     ''' 
@@ -53,7 +54,17 @@ class BaseSolver():
                 from utils.early_stopping_pytorch.pytorchtools import EarlyStopping
                 self.early_stopping = EarlyStopping(patience=self.paras.patience, verbose=True)
 
-            
+            # Seeds initialization
+            random.seed(self.paras.seed)
+            np.random.seed(self.paras.seed)
+            torch.manual_seed(self.paras.seed)
+            # for cuda, ref: https://github.com/pytorch/pytorch/issues/7068
+            torch.cuda.manual_seed_all(self.paras.seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.enabled = False
+            self.verbose("Random seed set to {}".format(self.paras.seed))
+
             self.verbose('Exp. name : {}'.format(self.exp_name))
             self.verbose('Loading data... large corpus may took a while.')
             
@@ -100,7 +111,7 @@ class BaseSolver():
                         if type(v) is float:
                             metric, score = k,v
                     self.model.eval()
-                    self.verbose('Evaluation target = {} (recorded {} = {:.2f} %)'.format(self.paras.load,metric,score))
+                    self.verbose('Evaluation target = {} (recorded {} = {:.2f})'.format(self.paras.load,metric,score))
                 else:
                     self.model.eval()
 

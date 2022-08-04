@@ -21,12 +21,8 @@ class Highway(nn.Module):
 
 class Probing_Model(nn.Module):
     """ use to reconstruct audio """
-    def __init__(self, model_config, mode="train"):
+    def __init__(self, model_config):
         super().__init__()
-        if mode in ["train", "test"]:
-            self.mode = mode
-        else:
-            raise Exception("Invalid model mode")
         self.downsampling_factor = model_config["downsampling_factor"]
         self.output_size = model_config["output_size"]
 
@@ -43,26 +39,16 @@ class Probing_Model(nn.Module):
         self.Relu_2 = nn.ReLU()
         self.Loss_Function = nn.L1Loss()
 
-    def forward(self, *args):
-        if self.mode == "train":
-            (features, labels) = args
-            # features = self.Batch_Norm(features)
-            out = self.Projection(features)
-            out = self.Highway_Network(out)
-            # out = self.Relu_1(out)
-            out = self.Linear(out)
-            # reshape (upsampling)
-            predictions = out.reshape(-1, out.size(-1) // self.downsampling_factor, self.downsampling_factor)
-            # predictions = self.Relu_2(out)
-            loss = self.Loss_Function(predictions, labels)
-            return predictions, loss
-        else:
-            (features, ) = args
-            out = self.Projection(features)
-            out = self.Highway_Network(out)
-            # out = self.Relu_1(out)
-            out = self.Linear(out)
-            # reshape (upsampling)
-            predictions = out.reshape(-1, out.size(-1) // self.downsampling_factor, self.downsampling_factor)# reshape (upsampling)
-            return predictions
-
+    def forward(self, features, labels):
+        # features = self.Batch_Norm(features)
+        out = self.Projection(features)
+        out = self.Highway_Network(out)
+        # out = self.Relu_1(out)
+        out = self.Linear(out)
+        # reshape (upsampling)
+        predictions = out.reshape(-1, out.size(-1) // self.downsampling_factor, self.downsampling_factor)
+        # predictions = self.Relu_2(out)
+        loss = self.Loss_Function(predictions, labels)
+        
+        return predictions, loss
+        

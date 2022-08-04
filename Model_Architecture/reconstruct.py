@@ -39,14 +39,14 @@ def get_hidden_states(args, recon_config):
 
     if args.memorability_model == "Regression_MLP":
         # ==== same as train.py ====
-        all_engineered_set = HandCraftedDataset(config=memo_config, pooling=True, mode="all") 
+        all_engineered_set = HandCraftedDataset(config=memo_config, pooling=True, split="all") 
         sequential_input_size, non_sequential_input_size = memo_model_config["sequential_input_size"], memo_model_config["non_sequential_input_size"] 
         model = Regression_MLP(model_config=memo_model_config, device=device).to(device).double()
         model.load_state_dict(torch.load("weights/train_memorability/Regression_MLP/Regression_MLP.pt"))
         # TODO: finish the remaining part
         
     elif args.memorability_model == "Regression_LSTM":
-        all_engineered_set = HandCraftedDataset(config=memo_config, pooling=False, mode="all") 
+        all_engineered_set = HandCraftedDataset(config=memo_config, pooling=False, split="all") 
         sequential_input_size, non_sequential_input_size = memo_model_config["sequential_input_size"], memo_model_config["non_sequential_input_size"] 
         model = Regression_LSTM(model_config=memo_model_config, device=device).to(device).double()
         model.load_state_dict(torch.load("weights/train_memorability/Regression_LSTM/Regression_LSTM.pt"))

@@ -1,0 +1,76 @@
+experiment:
+    batch_size: 16
+    num_workers: 15
+    log_freq: 50
+
+augmentation:
+    vol:
+        gain_range: [0.5, 1.5]
+        prob: 0.3
+
+    banddrop:
+        ir_files: []
+        data_root: "data/filters"
+        prob: 0.4
+
+    reverb:
+        ir_fmt: "wav"
+        data_root: "data/simulated_rirs_16k/largeroom/Room001"
+        prob: 0.4
+
+    add_noise:
+        snr_options: [5, 10, 20, 40, 60, 80, 100]
+        path: "data/"
+        prob: 0.4
+
+    fade:
+        fade_shape: "linear"
+        fade_in_sec: 1
+        fade_out_sec: 1
+        prob: 0.4
+
+    time_stretch:
+        speed_range: [0.9, 1,1]
+        prob: 0.3
+
+model:
+    image_size: [128, 157]
+    seq_len: 157
+    transformer_encoder:
+        d_model: 128 
+        nhead: 8
+        dim_feedforward: 2048
+        dropout: 0.1
+        num_layers: 6
+    fc_1:
+        input_size: 20096 # d_moel * seq_len
+        output_size: 1000
+    fc_2:
+        input_size: 1000
+        output_size: 50
+    output:
+        input_size: 50
+        output_size: 1 
+    use_ranking_loss: False
+    ranking_weight: 0.4
+
+hparas:          
+    sample_rate: 16000                         # Experiment hyper-parameters
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 100
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.00001
+    lr_scheduler:
+        type: 'decay'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+
+path:
+    audio_root: "data/raw_audios"
+    img_dir: "data/mels_img"
+    label_file: "data/labels/track_memorability_scores_beta.csv"

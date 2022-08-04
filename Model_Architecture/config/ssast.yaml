@@ -1,0 +1,108 @@
+experiment:
+    batch_size: 12
+    num_workers: 15
+    log_freq: 50
+
+    dataset: "audioset"
+    set: "balanced"
+    dataset_mean: -4.2677393
+    dataset_std: 4.5689974
+    save_model: False
+    
+augmentation:
+    vol:
+        gain_range: [0.5, 1.5]
+        prob: 0.3
+
+    banddrop:
+        ir_files: []
+        data_root: "data/filters"
+        prob: 0.4
+
+    reverb:
+        ir_fmt: "wav"
+        data_root: "data/simulated_rirs_16k/largeroom/Room001"
+        prob: 0.4
+
+    add_noise:
+        snr_options: [5, 10, 20, 40, 60, 80, 100]
+        path: "data/"
+        prob: 0.4
+
+    fade:
+        fade_shape: "linear"
+        fade_in_sec: 1
+        fade_out_sec: 1
+        prob: 0.4
+
+    time_stretch:
+        speed_range: [0.9, 1,1]
+        prob: 0.3
+
+
+model:
+    n_class: 1
+    fshape: 16
+    tshape: 16
+    # In the fine-tuning and inference steps, we split the patch
+    # with an overlap of 6 in the same fashion as the original AST, source: https://arxiv.org/pdf/2110.09784v2.pdf
+    fstride: 10
+    tstride: 10
+    input_fdim: 128
+    model_size: "base"
+    hidden_layer_dim: 256
+
+    target_length: 500 # 5 second clips
+    noise: False
+    task: "ft_avgtok"
+    
+    use_ranking_loss: False
+    
+
+
+    ranking_weight: 0.4
+
+hparas:                                   # Experiment hyper-parameters
+    sample_rate: 16000
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 1000
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.000005
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+
+    head_lr: 1
+    warmup: False
+    bal: "none"
+    lr: 5e-5
+    freqm: 48
+    timem: 192
+    mixup: 0.0 # mixup rate seems to only be for classification, see https://arxiv.org/pdf/1711.10282.pdf
+    adaptschedule: False
+    num_mel_bins: 128
+    lrscheduler_start: 10
+    lrscheduler_step: 5
+    lrscheduler_decay: 0.5
+    wa: True
+    wa_start: 6
+    wa_end: 25
+
+path:
+    pretrained_mdl_path: "ssast/SSAST-Base-Patch-400.pth"
+    audio_root: "data/raw_audios"
+    # audio_root: "data/1_second_clips"
+    data_file: "data/data.csv"
+    ssast_input_dir: "data/ssast_input"    
+    data_train: "data/ssast_input/train.json"
+    data_val: "data/ssast_input/valid.json"
+    data_eval: "data/ssast_input/test.json"
+
+    img_dir: "data/mels_img"
+    label_file: "data/labels/track_memorability_scores_beta.csv"

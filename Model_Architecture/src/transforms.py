@@ -1,8 +1,6 @@
 import torch
 import torch.nn.functional as F
-import gammatone
 import tempfile
-from gammatone.gtgram import gtgram
 import numpy as np
 import subprocess
 import shlex
@@ -26,6 +24,9 @@ from torchvision.transforms import Compose
 from ahoproc_tools.interpolate import interpolation
 from ahoproc_tools.io import *
 from joblib import Parallel, delayed
+import math
+from typing import Optional
+import torchaudio
 
 try:
     import kaldi_io as kio
@@ -839,7 +840,7 @@ class Reverb(object):
     def __init__(self, ir_files, report=False, ir_fmt='mat',
                  max_reverb_len=24000,
                  cache=False,
-                 data_root='.'):
+                 data_root='.', prob=0.5):
         if len(ir_files) == 0:
             # list the directory
             ir_files = [os.path.basename(f) for f in glob.glob(os.path.join(data_root,
@@ -904,16 +905,15 @@ class Reverb(object):
             return self.ir_files[idx]
 
     ##@profile
-    def __call__(self, pkg):
-        pkg = format_package(pkg)
-        wav = pkg['chunk']
+    def __call__(self, wav):
+        if isinstance(wav, torch.Tensor):
+            wav = wav.numpy().squeeze()
+            wav = wav.astype(np.float32).reshape(-1)
         # sample an ir_file
         ir_file = self.sample_IR()
         IR, p_max = self.load_IR(ir_file, self.ir_fmt)
         IR = IR.astype(np.float32)
-        wav = wav.data.numpy().reshape(-1)
         Ex = np.dot(wav, wav)
-        wav = wav.astype(np.float32).reshape(-1)
         # wav = wav / np.max(np.abs(wav))
         # rev = signal.fftconvolve(wav, IR, mode='full')
         rev = signal.convolve(wav, IR, mode='full').reshape(-1)
@@ -930,13 +930,7 @@ class Reverb(object):
         # Trim rev signal to match clean length
         rev = rev[:wav.shape[0]]
         rev = Eratio * rev
-        rev = torch.FloatTensor(rev)
-        if self.report:
-            if 'report' not in pkg:
-                pkg['report'] = {}
-            pkg['report']['ir_file'] = ir_file
-        pkg['chunk'] = rev
-        return pkg
+        return rev
 
     def __repr__(self):
         if len(self.ir_files) > 3:
@@ -1043,7 +1037,7 @@ class Downsample(object):
 class BandDrop(object):
 
     def __init__(self, filt_files, report=False, filt_fmt='npy',
-                 data_root='.'):
+                 data_root='.', prob=0.5):
         if len(filt_files) == 0:
             # list the directory
             filt_files = [os.path.basename(f) for f in glob.glob(os.path.join(data_root,
@@ -1051,6 +1045,7 @@ class BandDrop(object):
             print('Found {} *.{} filt_files in {}'.format(len(filt_files),
                                                           filt_fmt,
                                                           data_root))
+        self.prob = prob
         self.filt_files = filt_files
         assert isinstance(filt_files, list), type(filt_files)
         assert len(filt_files) > 0, len(filt_files)
@@ -1096,41 +1091,41 @@ class BandDrop(object):
             return self.filt_files[idx]
 
     ##@profile
-    def __call__(self, pkg):
-        pkg = format_package(pkg)
-        wav = pkg['chunk']
-        # sample a filter
-        filt_file = self.sample_filt()
-        filt_coeff = self.load_filter(filt_file, self.filt_fmt)
-        filt_coeff = filt_coeff.astype(np.float32)
-        wav = wav.data.numpy().reshape(-1)
-        Ex = np.dot(wav, wav)
-        wav = wav.astype(np.float32).reshape(-1)
+    def __call__(self, wav):
+        if random.random() < self.prob:
+            # sample a filter
+            if isinstance(wav, torch.Tensor):
+                wav = wav.data.numpy().reshape(-1)
+            wav = wav.astype(np.float32).reshape(-1)
 
-        sig_filt = signal.convolve(wav, filt_coeff, mode='full').reshape(-1)
 
-        sig_filt = self.shift(sig_filt, -round(filt_coeff.shape[0] / 2))
+            filt_file = self.sample_filt()
+            filt_coeff = self.load_filter(filt_file, self.filt_fmt)
+            filt_coeff = filt_coeff.astype(np.float32)
+            
+            Ex = np.dot(wav, wav)
 
-        sig_filt = sig_filt[:wav.shape[0]]
+            sig_filt = signal.convolve(wav, filt_coeff, mode='full').reshape(-1)
 
-        # sig_filt=sig_filt/np.max(np.abs(sig_filt))
+            sig_filt = self.shift(sig_filt, -round(filt_coeff.shape[0] / 2))
 
-        Efilt = np.dot(sig_filt, sig_filt)
-        # Ex = np.dot(wav, wav)
-        if Efilt > 0:
-            Eratio = np.sqrt(Ex / Efilt)
+            sig_filt = sig_filt[:wav.shape[0]]
+
+            # sig_filt=sig_filt/np.max(np.abs(sig_filt))
+
+            Efilt = np.dot(sig_filt, sig_filt)
+            # Ex = np.dot(wav, wav)
+            if Efilt > 0:
+                Eratio = np.sqrt(Ex / Efilt)
+            else:
+                Eratio = 1.0
+                sig_filt = wav
+
+            sig_filt = Eratio * sig_filt
+            sig_filt = torch.FloatTensor(sig_filt)
+            return sig_filt
         else:
-            Eratio = 1.0
-            sig_filt = wav
-
-        sig_filt = Eratio * sig_filt
-        sig_filt = torch.FloatTensor(sig_filt)
-        if self.report:
-            if 'report' not in pkg:
-                pkg['report'] = {}
-            pkg['report']['filt_file'] = filt_file
-        pkg['chunk'] = sig_filt
-        return pkg
+            return wav
 
     def __repr__(self):
         if len(self.filt_files) > 3:
@@ -1411,11 +1406,12 @@ class Resample(object):
 
 class SimpleAdditive(object):
 
-    def __init__(self, noises_dir, snr_levels=[0, 5, 10],
+    def __init__(self, noises_dir, snr_levels=[0, 5, 10], prob=0.5, 
                  cache=False,
                  report=False):
         self.noises_dir = noises_dir
         self.snr_levels = snr_levels
+        self.prob = prob
         self.report = report
         # read noises in dir
         if isinstance(noises_dir, list):
@@ -1466,49 +1462,45 @@ class SimpleAdditive(object):
         return np.sqrt(ienergy / (oenergy + eps)) * osignal
 
     #@profile
-    def __call__(self, pkg):
+    def __call__(self, wav):
         """ Add noise to clean wav """
-        pkg = format_package(pkg)
-        wav = pkg['chunk']
-        wav = wav.data.numpy().reshape(-1)
-        if 'chunk_beg_i' in pkg:
-            beg_i = pkg['chunk_beg_i']
-            end_i = pkg['chunk_end_i']
-        else:
+        # check if wav is tensor
+        if isinstance(wav, torch.Tensor):
+            wav = wav.data.numpy().reshape(-1)
+
+        # random decide whether to add noise
+        if np.random.rand() < self.prob:
+            
             beg_i = 0
             end_i = wav.shape[0]
-        sel_noise = self.load_noise(self.sample_noise())
-        if len(sel_noise) < len(wav):
-            # pad noise
-            P = len(wav) - len(sel_noise)
-            sel_noise = F.pad(torch.tensor(sel_noise).view(1, 1, -1),
-                              (0, P),
-                              ).view(-1).data.numpy()
-                              #mode='reflect').view(-1).data.numpy()
-        T = end_i - beg_i
-        # TODO: not pre-loading noises from files?
-        if len(sel_noise) > T:
-            n_beg_i = np.random.randint(0, len(sel_noise) - T)
-        else:
-            n_beg_i = 0
-        noise = sel_noise[n_beg_i:n_beg_i + T].astype(np.float32)
-        # randomly sample the SNR level
-        snr = random.choice(self.snr_levels)
-        K, Ex, En = self.compute_SNR_K(wav, noise, snr)
-        scaled_noise = K * noise
-        if En > 0:
-            noisy = wav + scaled_noise
-            noisy = self.norm_energy(noisy, Ex)
-        else:
-            noisy = wav
+            sel_noise = self.load_noise(self.sample_noise())
+            if len(sel_noise) < len(wav):
+                # pad noise
+                P = len(wav) - len(sel_noise)
+                sel_noise = F.pad(torch.tensor(sel_noise).view(1, 1, -1),
+                                    (0, P),
+                                    ).view(-1).data.numpy()
+                                    #mode='reflect').view(-1).data.numpy()
+            T = end_i - beg_i
+            # TODO: not pre-loading noises from files?
+            if len(sel_noise) > T:
+                n_beg_i = np.random.randint(0, len(sel_noise) - T)
+            else:
+                n_beg_i = 0
+            noise = sel_noise[n_beg_i:n_beg_i + T].astype(np.float32)
+            # randomly sample the SNR level
+            snr = random.choice(self.snr_levels)
+            K, Ex, En = self.compute_SNR_K(wav, noise, snr)
+            scaled_noise = K * noise
+            if En > 0:
+                noisy = wav + scaled_noise
+                noisy = self.norm_energy(noisy, Ex)
+            else:
+                noisy = wav
 
-        x_ = torch.FloatTensor(noisy)
-        if self.report:
-            if 'report' not in pkg:
-                pkg['report'] = {}
-            pkg['report']['snr'] = snr
-        pkg['chunk'] = x_
-        return pkg
+            return noisy
+        else:
+            return wav
 
     def __repr__(self):
         attrs = '(noises_dir={})'.format(
@@ -2167,9 +2159,7 @@ class SpeedChange(object):
         self.report = report
 
     # @profile
-    def __call__(self, pkg):
-        pkg = format_package(pkg)
-        wav = pkg['chunk']
+    def __call__(self, wav):
         wav = wav.data.numpy().reshape(-1).astype(np.float32)
         warp_factor = random.random() * (self.factor_range[1] - \
                                          self.factor_range[0]) + \
@@ -2192,18 +2182,197 @@ class SpeedChange(object):
                                        wav,
                                        np.zeros(P + 1, )),
                                       axis=0)
-        if self.report:
-            if 'report' not in pkg:
-                pkg['report'] = {}
-            pkg['report']['warp_factor'] = warp_factor
-        pkg['chunk'] = torch.FloatTensor(rwav)
-        return pkg
+        
+        return rwav
 
     def __repr__(self):
         attrs = '(factor_range={})'.format(
             self.factor_range
         )
         return self.__class__.__name__ + attrs
+
+# ideas from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8489166
+# https://github.com/willfrey/audio/blob/master/torchaudio/transforms.py
+class Transform(object):
+    """Abstract base class for a transform.
+    All other transforms should subclass it. All subclassses should
+    override __call__ and __call__ should expect one argument, the
+    data to transform, and return the transformed data.
+    Any state variables should be stored internally in the __dict__
+    class attribute and accessed through self, e.g., self.some_attr.
+    """
+
+    def __call__(self, data):
+        raise NotImplementedError
+
+class ToTensor(Transform):
+    """Converts a numpy.ndarray to a torch.*Tensor."""
+
+    def __call__(self, nparray):
+        # pylint: disable=E1101
+        return torch.from_numpy(nparray)
+        # pylint: enable=E1101
+
+# pitch shift
+class PitchShift(torch.nn.Module):
+    r"""Stretch stft in time without modifying pitch for a given rate.
+    Args:
+        hop_length (int or None, optional): Length of hop between STFT windows. (Default: ``win_length // 2``)
+        n_freq (int, optional): number of filter banks from stft. (Default: ``201``)
+        fixed_rate (float or None, optional): rate to speed up or slow down by.
+            If None is provided, rate must be passed to the forward method. (Default: ``None``)
+    """
+    __constants__ = ['fixed_rate']
+
+    def __init__(self,
+                 hop_length: Optional[int] = None,
+                 n_freq: int = 201,
+                 fixed_rate: Optional[float] = None) -> None:
+        super(PitchShift, self).__init__()
+
+        self.fixed_rate = fixed_rate
+
+        n_fft = (n_freq - 1) * 2
+        hop_length = hop_length if hop_length is not None else n_fft // 2
+        self.register_buffer('phase_advance', torch.linspace(0, math.pi * hop_length, n_freq)[..., None])
+
+    def forward(self, complex_specgrams: torch.Tensor, overriding_rate: Optional[float] = None) -> torch.Tensor:
+        r"""
+        Args:
+            complex_specgrams (Tensor): complex spectrogram (..., freq, time, complex=2).
+            overriding_rate (float or None, optional): speed up to apply to this batch.
+                If no rate is passed, use ``self.fixed_rate``. (Default: ``None``)
+        Returns:
+            Tensor: Stretched complex spectrogram of dimension (..., freq, ceil(time/rate), complex=2).
+        """
+        assert complex_specgrams.size(-1) == 2, "complex_specgrams should be a complex tensor, shape (..., complex=2)"
+
+        if overriding_rate is None:
+            rate = self.fixed_rate
+            if rate is None:
+                raise ValueError("If no fixed_rate is specified"
+                                 ", must pass a valid rate to the forward method.")
+        else:
+            rate = overriding_rate
+
+        if rate == 1.0:
+            return complex_specgrams
+
+        return F.phase_vocoder(complex_specgrams, rate, self.phase_advance)
+
+
+# loudness
+class VolChange(Transform):
+    """ chanage volumn of the audio """
+    def __init__(self, gain_range=[0.5, 1.5], prob=0.4):
+        self.low_gain, self.high_gain = gain_range
+        self.prob = prob
+
+    def __call__(self, wav):
+        if random.random() < self.prob:
+            if not isinstance(wav, torch.Tensor):
+                wav = torch.from_numpy(wav)
+            gain = np.random.uniform(self.low_gain, self.high_gain)
+            wav = torchaudio.transforms.Vol(gain, gain_type="amplitude")(wav)
+            return wav.numpy().squeeze()
+        else:
+            return wav
+
+
+# time stretching
+class TimeStretch(Transform):
+    """Time-stretch an audio series by a fixed rate with some probability.
+    The rate is selected randomly from between two values.
+    It's just a jump to the left...
+    """
+
+    def __init__(self, rates=(1.0, 1.0), probability=0.0):
+        self.rates = tuple(rates)
+        self.probability = probability
+
+    def __call__(self, y):
+        # pylint: disable=E1101
+        success = np.random.binomial(1, self.probability)
+        if success:
+            rate = np.random.uniform(*self.rates)
+            # check if rate is numpy ndarray
+            if isinstance(rate, np.ndarray):
+                rate = rate[0]
+            return librosa.effects.time_stretch(y, rate)
+        return y
+
+class Fade(Transform):
+    """ Fade in and out of an audio with some probabiloity """
+    def __init__(self, sample_rate, prob, fade_in_second, fade_out_second, fade_shape='linear'):
+        self.prob = prob
+        self.sample_rate = sample_rate
+        self.fade_in_second = fade_in_second
+        self.fade_out_second = fade_out_second
+        self.fade_shape = fade_shape
+        self.transform = torchaudio.transforms.Fade(fade_in_len=self.fade_in_second*self.sample_rate,\
+                                                    fade_out_len=self.fade_out_second*self.sample_rate, \
+                                                        fade_shape=self.fade_shape)
+
+    def __call__(self, wav):
+        
+        if np.random.rand() < self.prob:
+            if not isinstance(wav, torch.Tensor):
+                wav = torch.tensor(wav)
+            faded = self.transform(wav)
+            # convert back to numpy array
+            return faded.numpy().squeeze()
+        else:
+            return wav
+        
+class FrequencyMasking(Transform):
+    """ apply freqency masking """
+    def __init__(self, freq_mask_param, prob, mean_masking=False):
+        self.freq_mask_param = freq_mask_param
+        self.prob = prob
+        self.transform = torchaudio.transforms.FrequencyMasking(freq_mask_param)
+        self.mean_masking = mean_masking
+
+    def __call__(self, spec):
+        if np.random.rand() < self.prob:
+            if not isinstance(spec, torch.Tensor):
+                spec = torch.from_numpy(spec)
+            if self.mean_masking:
+                masked = self.transform(spec, spec.mean())
+            else:
+                masked = self.transform(spec)
+            return masked.numpy().squeeze()
+        else:
+            return spec
+
+class TimeMasking(Transform):
+    """ apply time masking """
+    def __init__(self, time_mask_param, prob, mean_masking=False):
+        self.time_mask_param = time_mask_param
+        self.prob = prob
+        self.transform = torchaudio.transforms.TimeMasking(time_mask_param)
+        self.mean_masking = mean_masking
+
+    def __call__(self, spec):
+        if np.random.rand() < self.prob:
+            if not isinstance(spec, torch.Tensor):
+                spec = torch.from_numpy(spec)
+            if self.mean_masking:
+                masked = self.transform(spec, spec.mean())
+            else:
+                masked = self.transform(spec)
+            return masked.numpy().squeeze()
+        else:
+            return spec
+
+class Melspectrogram(Transform):
+    ''' generate melspectrogram from audio '''
+    def __init__(self, sample_rate, **kwargs):
+        self.sample_rate = sample_rate
+        self.kwargs = kwargs
+
+    def __call__(self, data):
+        return librosa.feature.melspectrogram(data, self.sample_rate, **self.kwargs)
+
 
 if __name__ == '__main__':
     """

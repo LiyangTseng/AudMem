@@ -1,20 +1,40 @@
-features:
-    chords: ["chroma"]
-    rhythms: ["tempogram"]
-    timbre: ["mfcc"]
-    emotions: ["static_arousal", "static_valence"]
 experiment:
     batch_size: 128
+    num_workers: 10
     epochs: 100
     learning_rate: 0.0005
+    log_freq: 50
+    memo_model: "pase_lstm" # pase_mlp/pase_lstm
+    store_hidden_states: False
+    hidden_layer_num: 4
 model:
-    seq_len: 157 # under 16kHz sampling rate
-    # need to sync with memorability model config
-    input_size: 200
+    seq_len: 100 
+    input_size: 500 # sync with pase_lstm's hidden_size
     layer_num: 4 
     output_size: 128 #librosa n_mels
     downsampling_factor: 4
+
+hparas:                                   # Experiment hyper-parameters
+    valid_step: 1000
+    curriculum: 0
+    max_epoch: 100
+    max_step: 15001
+    tf_start: 1.0
+    tf_end: 1.0
+    tf_step: 500000
+    grad_clip: 'inf'
+    optimizer:
+        type: 'Adam'
+        lr: 0.0005
+    lr_scheduler:
+        type: 'warmup'                   # 'fixed'/'warmup'/'decay'/'reduce_lr_on_plateau'
+    freq_loss_type: 'l1'                         # 'l1'/'mse'
+    differential_loss: False
+    emphasize_linear_low: False
+
+
 path:
-    features_dir: "data/features"
+    model_ckpt_file: weights/pase_lstm/fold_0/pase_lstm_best.pth
+    mels_dir: "data/mels_npy"
     hidden_states_dir: "data/hidden_states"
-    labels_dir: "data/labels"
+    label_file: "data/labels/track_memorability_scores_beta.csv"

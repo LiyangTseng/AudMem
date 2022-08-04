@@ -1,11 +1,16 @@
 import os
 import csv
 import argparse
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from scipy import stats
 
-VIGILANCE_THRESHOLD = 0.65
+VIGILANCE_THRESHOLD = 0.6
+SHORT_TERM_BOUNDARY = (10, 49)
+MEDIUM_TERM_BOUNDARY = (61, 131)
+LONG_TERM_BOUNDARY = (155, 258)
 
 TRACK_LIST = ['normalize_5s_intro_thc1MtNagC8.wav', 'normalize_5s_intro_Wo2qUD1g7xM.wav', 'normalize_5s_intro_3ObVN3QQiZ8.wav', 'normalize_5s_intro_S-zQJFRX5Fg.wav', 'normalize_5s_intro_SyZOAgXiPMw.wav', 'normalize_5s_intro_GQT8ejgV2_A.wav', 'normalize_5s_intro_PQAIxeSIQU4.wav', 'normalize_5s_intro_E-8pyVBvCPQ.wav', 'normalize_5s_intro_Qr8eZSVaw10.wav', 'normalize_5s_intro_p7j-tz1Cn4o.wav', 'normalize_5s_intro_nISI4qF55F4.wav', 'normalize_5s_intro_RoeRU5zxkak.wav', 'normalize_5s_intro_EygNk739nnY.wav', 'normalize_5s_intro_w1G3rqVil1s.wav', 'normalize_5s_intro_KKc_RMln5UY.wav', 'normalize_5s_intro_Ng2JdroNfC0.wav', 'normalize_5s_intro_xc0sWhVhmkw.wav', 'normalize_5s_intro_VVRszjvg3_U.wav', 'normalize_5s_intro_C7u6rtswjCU.wav', 'normalize_5s_intro_HiPkwl5p1GY.wav', 'normalize_5s_intro_mYa_9d2Daas.wav', 'normalize_5s_intro_6MSYrN4YfKY.wav', 'normalize_5s_intro_O2q_9lBDM7I.wav', 'normalize_5s_intro_7E_a_VKjcl8.wav', 'normalize_5s_intro_a8cJLohQ_Jg.wav', 'normalize_5s_intro_7zz-nEVKZdc.wav', 'normalize_5s_intro_JeGhUESd_1o.wav', 'normalize_5s_intro_IN1f9k8qVDk.wav', 'normalize_5s_intro_RhBb77hG0iw.wav', 'normalize_5s_intro_qAiwzv8N7rM.wav', 'normalize_5s_intro_AoB8koE95C0.wav', 'normalize_5s_intro_j3DigipQ_hQ.wav', 'normalize_5s_intro_1X0SdKtnwo8.wav', 'normalize_5s_intro_RCJx5VW-fQI.wav', 'normalize_5s_intro_S_-qkv0NZ1g.wav', 'normalize_5s_intro_C90sY_Ht6Ig.wav', 'normalize_5s_intro_Z5gvqq3ChII.wav', 'normalize_5s_intro_zumMQrI_tMg.wav', 'normalize_5s_intro_gwsaElRJI2M.wav', 'normalize_5s_intro_ftjEcrrf7r0.wav', 'normalize_5s_intro_ZBBS4imv1qo.wav', 'normalize_5s_intro_DyQ_9p6y89c.wav', 'normalize_5s_intro_vgZv7Uu4YrA.wav', 'normalize_5s_intro_wcLXjQLwSBE.wav', 'normalize_5s_intro_7LuQQP-DAoc.wav', 'normalize_5s_intro_BEo0rqOZIng.wav', 'normalize_5s_intro_n4HTXYR-2AI.wav', 'normalize_5s_intro_72T4j04MS8o.wav', 'normalize_5s_intro_6TT_UgrRHq8.wav', 'normalize_5s_intro_uo8qDCDZhK0.wav', 'normalize_5s_intro_Et-YdmSo_3A.wav', 'normalize_5s_intro_oxKbrl4kyg8.wav', 'normalize_5s_intro_XgwqnGG-pbI.wav', 'normalize_5s_intro_1wpJkzCWHcI.wav', 'normalize_5s_intro_bwQ49N0jVvE.wav', 'normalize_5s_intro_OMR2W-7AyYU.wav', 'normalize_5s_intro_sjlkxcwhpwA.wav', 'normalize_5s_intro_4F1wvsJXXVY.wav', 'normalize_5s_intro_YEq-cvq_cK4.wav', 'normalize_5s_intro_42O51bcJyq0.wav', 'normalize_5s_intro_5FYAICvv-d0.wav', 'normalize_5s_intro_yBzk2xXE9yg.wav', 'normalize_5s_intro_zEWSSod0zTY.wav', 'normalize_5s_intro_dvf--10EYXw.wav', 'normalize_5s_intro_xQOXxmznGPg.wav', 'normalize_5s_intro_hMWoOunsMFM.wav', 'normalize_5s_intro_TnsOVDCq_b0.wav', 'normalize_5s_intro_Yh78Ll6-ODQ.wav', 'normalize_5s_intro_IYnu4-69fTA.wav', 'normalize_5s_intro_SubIr_Fyp4M.wav', 'normalize_5s_intro_WrRAZVJGImw.wav', 'normalize_5s_intro_gFnNr5vr5bQ.wav', 'normalize_5s_intro_j9KKh215HTs.wav', 'normalize_5s_intro_XBTT9tSVsh0.wav', 'normalize_5s_intro_u8BxVzRG9bE.wav', 'normalize_5s_intro_SQBuVfTX1ME.wav', 'normalize_5s_intro_-MqZKMbOYEA.wav', 'normalize_5s_intro_IpniN1Wq68Y.wav', 'normalize_5s_intro_1lunUbvf35M.wav', 'normalize_5s_intro_zk04E79riMQ.wav', 'normalize_5s_intro_uUfPwlxFFJM.wav', 'normalize_5s_intro_Ws-QlpSltr8.wav', 'normalize_5s_intro_xT1eOeXlTXg.wav', 'normalize_5s_intro_1Ngn3fZIK2E.wav', 'normalize_5s_intro_2JL_KcEzkqg.wav', 'normalize_5s_intro_4jvQFLlRQlo.wav', 'normalize_5s_intro_AjGkbFqi67c.wav', 'normalize_5s_intro_ahpmuikko3U.wav', 'normalize_5s_intro_sY5wXfgspQI.wav', 'normalize_5s_intro_HMvXE4Zs6ZA.wav', 'normalize_5s_intro_gv7BRXvZJbI.wav', 'normalize_5s_intro_4wgo8K28RNM.wav', 'normalize_5s_intro_2ySLmwsfP4Q.wav', 'normalize_5s_intro_MY4YJxn-9Og.wav', 'normalize_5s_intro_3gjfHYZ873o.wav', 'normalize_5s_intro_csHiDQXIggE.wav', 'normalize_5s_intro_C5VCGM2J5ls.wav', 'normalize_5s_intro_ey4Fc9DP5Rw.wav', 'normalize_5s_intro_bI7xde9-3BI.wav', 'normalize_5s_intro_EfZ-dVDySzc.wav', 'normalize_5s_intro_Zh3uBgwow8A.wav', 'normalize_5s_intro_JQTlG7NxJek.wav', 'normalize_5s_intro_1CrxzClzLvs.wav', 'normalize_5s_intro_0aC-jOKuBFE.wav', 'normalize_5s_intro_xePw8n4xu8o.wav', 'normalize_5s_intro_lEHM9HZf0IA.wav', 'normalize_5s_intro_xhmtXrtLkgo.wav', 'normalize_5s_intro_hHItMz0gfaU.wav', 'normalize_5s_intro_99f0oH45TVc.wav', 'normalize_5s_intro_co6WMzDOh1o.wav', 'normalize_5s_intro_xqzOxMdhmzU.wav', 'normalize_5s_intro_h-nnAeByB1A.wav', 'normalize_5s_intro_TFv9Kcym9dg.wav', 'normalize_5s_intro_tEW2eRQ-4DY.wav', 'normalize_5s_intro_VAc0xuVa7jI.wav', 'normalize_5s_intro_PALMMqZLAQk.wav', 'normalize_5s_intro_STpRa2JPFA0.wav', 'normalize_5s_intro_SgJMnEdtTXA.wav', 'normalize_5s_intro_NL2ZHPji3Z0.wav', 'normalize_5s_intro_EVSuxb6Ywcg.wav', 'normalize_5s_intro_wAJMhJpSCIc.wav', 'normalize_5s_intro_GphIn74Weu0.wav', 'normalize_5s_intro_gue_crpFdSE.wav', 'normalize_5s_intro_oQ0O2cd1T04.wav', 'normalize_5s_intro_vMcFA2x23FE.wav', 'normalize_5s_intro_FhvXg70ycrM.wav', 'normalize_5s_intro_lE_747E_Sdg.wav', 'normalize_5s_intro_i0MrGb1hT2U.wav', 'normalize_5s_intro_bI8-2blisUM.wav', 'normalize_5s_intro_aQ06TfyA1Ks.wav', 'normalize_5s_intro_ZvrysfBDzSs.wav', 'normalize_5s_intro_v2seHL0pwbg.wav', 'normalize_5s_intro_BrrWNfjgHGs.wav', 'normalize_5s_intro_j1c70vRHdhQ.wav', 'normalize_5s_intro_3DCHLwOqtJs.wav', 'normalize_5s_intro_g20t_K9dlhU.wav', 'normalize_5s_intro_EH1OEWJ9C5w.wav', 'normalize_5s_intro_SCBxmcwmX7U.wav', 'normalize_5s_intro_tXvpe2GbUec.wav', 'normalize_5s_intro_7ZgPGMfUVek.wav', 'normalize_5s_intro_aIJuCcGFJkc.wav', 'normalize_5s_intro_RLMl1umHgp0.wav', 'normalize_5s_intro_KT-m6qTJyN0.wav', 'normalize_5s_intro_WJs-_T8I74Y.wav', 'normalize_5s_intro_aIyqRdrHodE.wav', 'normalize_5s_intro_XJT-fM4nBJU.wav', 'normalize_5s_intro_7QQzDQceGgU.wav', 'normalize_5s_intro_fE2h3lGlOsk.wav', 'normalize_5s_intro_Oq1n8fUxQZc.wav', 'normalize_5s_intro_pssWSj42t8M.wav', 'normalize_5s_intro_GsPq9mzFNGY.wav', 'normalize_5s_intro_Jg9NbDizoPM.wav', 'normalize_5s_intro_Ib7m3Qh-4O4.wav', 'normalize_5s_intro_hn3wJ1_1Zsg.wav', 'normalize_5s_intro_hjZqVw3qI9E.wav', 'normalize_5s_intro_cUKD9tEeBp0.wav', 'normalize_5s_intro_q_4no3KCrY4.wav', 'normalize_5s_intro_VlWs8ey2nyg.wav', 'normalize_5s_intro_Srp0opA8V8o.wav', 'normalize_5s_intro_PYM9NUU9Roc.wav', 'normalize_5s_intro_v0UvOsCi8mc.wav', 'normalize_5s_intro_zaCbuB3w0kg.wav', 'normalize_5s_intro_PCp2iXA1uLE.wav', 'normalize_5s_intro_S2RnxiNJg0M.wav', 'normalize_5s_intro_Jtv4satRsP0.wav', 'normalize_5s_intro_ytq5pGcM77w.wav', 'normalize_5s_intro_9nWpMZFrbvI.wav', 'normalize_5s_intro_1kN-34GFMYM.wav', 'normalize_5s_intro_Yyvo9O8fN-A.wav', 'normalize_5s_intro_ulj-L3K_Gzs.wav', 'normalize_5s_intro_V-ar6MLjy5o.wav', 'normalize_5s_intro_dtOv6WvJ44w.wav', 'normalize_5s_intro_XkC8Uzl9pCY.wav', 'normalize_5s_intro_jII5qoCrzYE.wav', 'normalize_5s_intro_7pcZIsJNlAs.wav', 'normalize_5s_intro_0QN9KLFWn7I.wav', 'normalize_5s_intro_d6BzCEkGd3I.wav', 'normalize_5s_intro_lYxcW8jtFw0.wav', 'normalize_5s_intro_R1T_SrdQGH8.wav', 'normalize_5s_intro_YOKq1VmEbtc.wav', 'normalize_5s_intro_19Q9l85Feqw.wav', 'normalize_5s_intro_CXm7hPs_als.wav', 'normalize_5s_intro_nFOLhtsyvMA.wav', 'normalize_5s_intro_-8cFfkyk7vA.wav', 'normalize_5s_intro_ZIiQ1jMqhVM.wav', 'normalize_5s_intro_hejXc_FSYb8.wav', 'normalize_5s_intro_eXvBjCO19QY.wav', 'normalize_5s_intro_haCay85cpvo.wav', 'normalize_5s_intro_RpJz01guPMY.wav', 'normalize_5s_intro_sPlXrbVLdO8.wav', 'normalize_5s_intro_Mme9REVuidw.wav', 'normalize_5s_intro_UGTYqTKUl8w.wav', 'normalize_5s_intro_9DP0yMwvyWE.wav', 'normalize_5s_intro_WrDJMxSKlCA.wav', 'normalize_5s_intro_2F8Kr91wQ0U.wav', 'normalize_5s_intro_gyegm85BPPA.wav', 'normalize_5s_intro_Xhh3_-JRnDc.wav', 'normalize_5s_intro_WRSeV_27z6k.wav', 'normalize_5s_intro_HwcCBnfhsR4.wav', 'normalize_5s_intro_bd5m12UEHWI.wav', 'normalize_5s_intro_1juIFmPyG-Y.wav', 'normalize_5s_intro_DGsoqhIUgDQ.wav', 'normalize_5s_intro_2UL-1MOlSPw.wav', 'normalize_5s_intro_2AWE9tqnDPw.wav', 'normalize_5s_intro_68b_HImZAig.wav', 'normalize_5s_intro_GIulOhzXufc.wav', 'normalize_5s_intro_Stet_4bnclk.wav', 'normalize_5s_intro_RHGfkuJv0j0.wav', 'normalize_5s_intro_0uLI6BnVh6w.wav', 'normalize_5s_intro_uo6VU4euIbY.wav', 'normalize_5s_intro_6pARjpdqxYQ.wav', 'normalize_5s_intro_hjIhCG_nIPA.wav', 'normalize_5s_intro_hV-FwW1LgxU.wav', 'normalize_5s_intro_mWfWyhzC22U.wav', 'normalize_5s_intro_IISA6t-9zzc.wav', 'normalize_5s_intro_gDevCxVY_wA.wav', 'normalize_5s_intro_IrtcCSE2bVY.wav', 'normalize_5s_intro_feVUoKhP1mE.wav', 'normalize_5s_intro_Tfypj4UwvvA.wav', 'normalize_5s_intro_TeH7sCVCMJk.wav', 'normalize_5s_intro_0EVVKs6DQLo.wav', 'normalize_5s_intro_d7to9URtLZ4.wav', 'normalize_5s_intro_TzhhbYS9EO4.wav', 'normalize_5s_intro_nn5nypm7GG8.wav', 'normalize_5s_intro_hed6HkYNA7g.wav', 'normalize_5s_intro_rWznOAwxM1g.wav', 'normalize_5s_intro_zyQkFh-E4Ak.wav', 'normalize_5s_intro_agKkcRXN2iE.wav', 'normalize_5s_intro_SZaZU_qi6Xc.wav', 'normalize_5s_intro_ZpDQJnI4OhU.wav', 'normalize_5s_intro_D4nWzd63jV4.wav', 'normalize_5s_intro_9odM1BRqop4.wav', 'normalize_5s_intro_F64yFFnZfkI.wav', 'normalize_5s_intro_Js2JQH_kt0I.wav', 'normalize_5s_intro_Skt_NKI4d6U.wav']
 TRACK_NUM = len(TRACK_LIST)
@@ -61,27 +66,27 @@ for index in range(len(target_idx_arr)):
 # sort both list according last appearance index
 target_last_appearnce_idx, target_first_appearnce_idx = zip(*sorted(zip(
                                                     target_last_appearnce_idx, target_first_appearnce_idx)))
-
+# collect the stats of target response given slot location (by last apperaance index)
+target_responses = [[] for i in range(len(target_last_appearnce_idx))]
 
 def filter_data(data_df):
     ''' prune repeated participations and incomplete fields '''
     
+    # prune 
+    data_df = data_df[data_df['userResponse'].notna()]
+    # only keep the very first userEmail
+    data_df = data_df.drop_duplicates(subset='userEmail', keep='first')
     # drop rows without completing experiment
-    # TODO: should consider unfinished but qualified data
-    data_df = data_df.drop(data_df[data_df['experimentFinished']==0].index)
-
+    
     # TODO: should able to prune by vigilance on new data format
     # calculate vigilance score for all users, then filter unqualified
     for idx, row in data_df.iterrows():
-        _, vigilance_score, _, _, _ = calculate_datum_stats(row, id_to_track)
+        _, _, vigilance_score, _, _, _ = calculate_datum_stats(row, id_to_track)
         data_df.loc[idx,"vigilanceScore"] = vigilance_score
+    
     data_df = data_df.drop(data_df[data_df['vigilanceScore']<VIGILANCE_THRESHOLD].index)
     
-    # drop rows with NaN column
-    data_df = data_df.dropna()
-    # only keep the very first userEmail
-    data_df = data_df.drop_duplicates(subset='userEmail', keep='first')
-
+    
     return data_df
 
 def calculate_datum_stats(singleUserData, id_to_track):
@@ -112,7 +117,7 @@ def calculate_datum_stats(singleUserData, id_to_track):
                 vigilance_performance.append(0) # vigilance not memorized
             vigilance_progress_cnt += 1
 
-        if response_idx == target_last_appearnce_idx[target_progress_cnt]:
+        elif response_idx == target_last_appearnce_idx[target_progress_cnt]:
             # encounter one target pair
             first_occ = target_first_appearnce_idx[target_progress_cnt]
             last_occ = target_last_appearnce_idx[target_progress_cnt]
@@ -121,10 +126,14 @@ def calculate_datum_stats(singleUserData, id_to_track):
             if userResponses[first_occ] == 0 and userResponses[last_occ] == 1:
                 target_performance.append(1) # target memorized
                 track_to_memo[track_name].append({last_occ-first_occ: 1})
+                target_responses[target_progress_cnt].append(1)
             elif userResponses[first_occ] == 0 and userResponses[last_occ] == 0:
                 target_performance.append(0) # target not memorized
                 track_to_memo[track_name].append({last_occ-first_occ: 0})
+                target_responses[target_progress_cnt].append(0)
             target_progress_cnt += 1
+
+    vigilance_progress = vigilance_progress_cnt/len(vigilance_last_appearnce_idx)
 
     vigilance_score = 0 if len(vigilance_performance)==0 \
                         else float(vigilance_performance.count(1))/len(vigilance_performance)
@@ -134,7 +143,7 @@ def calculate_datum_stats(singleUserData, id_to_track):
                         else float(target_performance.count(1))/len(target_performance)
     target_detail = "{}/{}".format(target_performance.count(1), len(target_performance))
     
-    return track_to_memo, vigilance_score, vigilance_detail, target_score, target_detail
+    return vigilance_progress, track_to_memo, vigilance_score, vigilance_detail, target_score, target_detail
 
 def get_experiment_stats(qualified_data_df):
     ''' returns:
@@ -151,7 +160,7 @@ def get_experiment_stats(qualified_data_df):
     user_stats["target_score"] = 0
     user_stats["target_stats"] = 0
     for index, singleUserData in qualified_data_df.iterrows():
-        track_to_memo, vigilance_score, vigilance_stats, target_score, target_stats = calculate_datum_stats(singleUserData, id_to_track)
+        vigilance_progress, track_to_memo, vigilance_score, vigilance_stats, target_score, target_stats = calculate_datum_stats(singleUserData, id_to_track)
         if vigilance_score < VIGILANCE_THRESHOLD:
             continue
         for track, memorability in track_to_memo.items():
@@ -162,6 +171,7 @@ def get_experiment_stats(qualified_data_df):
         user_stats.loc[index, "target_score"] = target_score
         user_stats.loc[index, "vigilance_stats"] = vigilance_stats
         user_stats.loc[index, "target_stats"] = target_stats
+        user_stats.loc[index, "vigilance_progress"] = vigilance_progress
     return user_stats, track_stats
 
 def save_stats(args, user_stats, track_stats, track_order):
@@ -239,19 +249,104 @@ def record_macro_stats(args, track_stats):
             writer.writerow([interval_list[idx], memorability_score_list[idx], memorability_stat_list[idx]])
     print('total statistics csv saved at {}'.format(stats_csv_file))
 
+    # slice to three interval levels
+    short_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= SHORT_TERM_BOUNDARY[0] and interval_list[i] <= SHORT_TERM_BOUNDARY[1]]
+    medium_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= MEDIUM_TERM_BOUNDARY[0] and interval_list[i] <= MEDIUM_TERM_BOUNDARY[1]]
+    long_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= LONG_TERM_BOUNDARY[0] and interval_list[i] <= LONG_TERM_BOUNDARY[1]]
+    
+    # plot memorability vs interval
     plt.figure()
     plt.title("memorability-interval plot")
     plt.xlabel("repeat interval")
     plt.ylabel("memorability score")
-    plt.scatter(interval_list, memorability_score_list)
-    stats_plot_file = os.path.join(args.stats_dir, 'macro_stats.png')
-    plt.savefig(stats_plot_file)
-    print('total statistics plot saved at {}'.format(stats_plot_file))
+    # scatter plot of three levels of repeat interval
+    plt.scatter(np.array(interval_list)[short_term_slice], np.array(memorability_score_list)[short_term_slice], label="short term", c='b')
+    plt.scatter(np.array(interval_list)[medium_term_slice], np.array(memorability_score_list)[medium_term_slice], label="medium term", c='g')
+    plt.scatter(np.array(interval_list)[long_term_slice], np.array(memorability_score_list)[long_term_slice], label="long term", c='r')
+    plt.legend(loc='lower left')
+    # annotate some special case
+    plt.text(129, memorability_score_list[interval_list.index(129)], "1st repeat after 1st break", fontsize=10)
+    plt.text(125, memorability_score_list[interval_list.index(125)], "3rd repeat after 1st break", fontsize=10)
+
+    plt.savefig(os.path.join(args.stats_dir, 'macro_stats.png'))
+    print('total statistics plot saved at {}'.format(os.path.join(args.stats_dir, 'macro_log_stats.png')))
+
+    # plot memorability vs log interval
+    plt.figure()
+    plt.title("memorability-log interval plot")
+    plt.xlabel("log repeat interval")
+    plt.ylabel("memorability score")
+    plt.scatter(np.log10(np.array(interval_list)[short_term_slice]), np.array(memorability_score_list)[short_term_slice], label="short term", c='b', marker='o')
+    plt.scatter(np.log10(np.array(interval_list)[medium_term_slice]), np.array(memorability_score_list)[medium_term_slice], label="medium term", c='g', marker='^')
+    plt.scatter(np.log10(np.array(interval_list)[long_term_slice]), np.array(memorability_score_list)[long_term_slice], label="long term", c='r', marker='s')
+    plt.legend(loc='lower left')
+
+    # annotate some special case
+    plt.text(np.log10(129), memorability_score_list[interval_list.index(129)], "1st repeat after 1st break", fontsize=10)
+    plt.text(np.log10(125), memorability_score_list[interval_list.index(125)], "3rd repeat after 1st break", fontsize=10)
+
+    plt.savefig(os.path.join(args.stats_dir, 'macro_log_stats.png'))
+    print('total log statistics plot saved at {}'.format(os.path.join(args.stats_dir, 'macro_log_stats.png')))
+
+    # plot 3d plot: memorability - interval - resting_time
+    slots_per_stage = 135
+    memorability_score_list = [sum(response)/len(response) for response in target_responses]
+    fatigue_list = []
+    interval_list = []
+    target_num = len(target_responses)
+    for target_idx in range(target_num):
+        if target_last_appearnce_idx[target_idx] < slots_per_stage:
+            # repeat in first stage
+            fatigue = target_last_appearnce_idx[target_idx]
+        elif target_last_appearnce_idx[target_idx] < slots_per_stage*2:
+            # repeat in second stage
+            fatigue = target_last_appearnce_idx[target_idx] - 135
+        else:
+            # repeat in third stage
+            fatigue = target_last_appearnce_idx[target_idx] - 270
+        fatigue_list.append(fatigue)
+        interval_list.append(target_last_appearnce_idx[target_idx] - target_first_appearnce_idx[target_idx])
+    
+    # slice to three interval levels
+    short_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= SHORT_TERM_BOUNDARY[0] and interval_list[i] <= SHORT_TERM_BOUNDARY[1]]
+    medium_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= MEDIUM_TERM_BOUNDARY[0] and interval_list[i] <= MEDIUM_TERM_BOUNDARY[1]]
+    long_term_slice = [i for i in range(len(interval_list)) if interval_list[i] >= LONG_TERM_BOUNDARY[0] and interval_list[i] <= LONG_TERM_BOUNDARY[1]]
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xlabel('repeat interval')
+    ax.set_ylabel('resting time')
+    ax.set_zlabel('memorability score')
+    ax.scatter(np.array(interval_list)[short_term_slice], np.array(fatigue_list)[short_term_slice], np.array(memorability_score_list)[short_term_slice], label="short term", c='b')
+    ax.scatter(np.array(interval_list)[medium_term_slice], np.array(fatigue_list)[medium_term_slice], np.array(memorability_score_list)[medium_term_slice], label="medium term", c='g')
+    ax.scatter(np.array(interval_list)[long_term_slice], np.array(fatigue_list)[long_term_slice], np.array(memorability_score_list)[long_term_slice], label="long term", c='r')
+
+    plt.legend(loc='lower left')
+
+    plt.savefig(os.path.join(args.stats_dir, 'macro_3d_stats.png'))
+    print('total log statistics plot saved at {}'.format(os.path.join(args.stats_dir, 'macro_3d_stats.png')))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    # _r tacked on the end to reverse colormap
+    ax.scatter(np.log10(np.array(interval_list)[short_term_slice]), np.array(memorability_score_list)[short_term_slice], c=np.array(fatigue_list)[short_term_slice], cmap="plasma_r", label="short term", marker='o')
+    ax.scatter(np.log10(np.array(interval_list)[medium_term_slice]), np.array(memorability_score_list)[medium_term_slice], c=np.array(fatigue_list)[medium_term_slice], cmap="plasma_r", label="medium term", marker='^')
+    ax.scatter(np.log10(np.array(interval_list)[long_term_slice]), np.array(memorability_score_list)[long_term_slice], c=np.array(fatigue_list)[long_term_slice],  cmap="plasma_r", label="long term", marker='s')
+    plt.legend(loc='lower left')
+    cbar = fig.colorbar(ax.collections[0], ticks=[20, 125])
+    cbar.ax.set_ylabel('fatigue level')
+    cbar.ax.set_yticklabels(["low", "high"])
+
+    plt.title("memorability-log interval with fatigue level")
+    plt.xlabel('log repeat interval')
+    plt.ylabel('memorability score')
+    plt.savefig(os.path.join(args.stats_dir, 'macro_log_with_fatigue_plot.png'))
+    print('total log statistics plot saved at {}'.format(os.path.join(args.stats_dir, 'macro_log_with_fatigue_plot.png')))
+
 
 def calculate_consistency(args, qualified_data_df, track_order):
     ''' calculate memorability consistency by averaging a number of correlation '''
     
-
     correlations = [] # store correlations of different split
     out_fname = "correlations.csv"
     out_path = os.path.join(args.stats_dir, out_fname)

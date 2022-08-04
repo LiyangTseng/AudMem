@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import init
 import numpy as np
+from src.util import FDS
+
 
 ''' train features to approximate memorability score (regression) '''
 
@@ -12,35 +15,42 @@ class H_MLP(nn.Module):
     def __init__(self, model_config):
 
         super(H_MLP, self).__init__()
-        self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
+        # self.input_size = model_config["sequential_input_size"] + model_config["non_sequential_input_size"]
+        self.input_size = model_config["feature_size"]
         self.Linear_1 = nn.Linear(self.input_size, model_config["hidden_size"])
+        self.Linear_2 = nn.Linear(model_config["hidden_size"],32)
         self.Relu = nn.ReLU()
         self.BatchNorm = nn.BatchNorm1d(model_config["hidden_size"])
-        self.Linear_2 = nn.Linear(model_config["hidden_size"], 1)
+        self.Linear_3 = nn.Linear(32, 1)
         self.Sigmoid = nn.Sigmoid()
         self.Relu_2 = nn.ReLU()
+        self.Dropout = nn.Dropout(p=model_config["dropout_rate"])
+
+        # if model_config["use_fds"]:
+        #     self.FDS = FDS(feature_dim=model_config["hidden_size"],
+        #                     bucket_num=model_config["bucket_num"],
+        #                     )
 
     def create_msg(self):
         # Messages for user
         msg = []
         msg.append('Model spec.| H_MLP: average pooling on time axis of sequential features, concate all features to MLP')
-        # TODO: add one regarding attention
-        # if self.encoder.vgg:
-        #     msg.append('           | VCC Extractor w/ time downsampling rate = 4 in encoder enabled.')
-        # if self.enable_ctc:
-        #     msg.append('           | CTC training on encoder enabled ( lambda = {}).'.format(self.ctc_weight))
-        # if self.enable_att:
-        #     msg.append('           | {} attention decoder enabled ( lambda = {}).'.format(self.attention.mode,1-self.ctc_weight))
         return msg
 
     def forward(self, features):
         
         x = self.Linear_1(features)
+        x = self.BatchNorm(x)
+        x = self.Relu(x)
+        x = self.Dropout(x)
+        x = self.Linear_2(x)
+        # x = self.Dropout(x)
         x = self.Relu(x)
         # x = self.BatchNorm(x)
-        x = self.Linear_2(x)
-        predictions = self.Relu_2(x)
-        # predictions = self.Sigmoid(x)
+        x = self.Linear_3(x)
+        # x = self.Dropout(x)
+        # predictions = self.Relu_2(x)
+        predictions = self.Sigmoid(x)
         return predictions
     
 class H_LSTM(nn.Module):
@@ -55,20 +65,30 @@ class H_LSTM(nn.Module):
         self.num_layers = model_config["layer_num"]
         self.bidirectional = model_config["bidirectional"]
         
-        self.Batch_Norm_1 = nn.BatchNorm1d(model_config["seq_len"])
-        self.LSTM = nn.ModuleList()
-        
-        for i in range(self.num_layers):
-            input_size = model_config["sequential_input_size"] if i == 0 else intermediate_hidden_size*(1+int(self.bidirectional))
-            intermediate_hidden_size = self.hidden_size
-            self.LSTM.append(nn.LSTM(input_size=input_size, hidden_size=intermediate_hidden_size, batch_first=True, bidirectional=True))
+        self.Layer_Norm = nn.LayerNorm(2*model_config["hidden_size"])
+        self.Dropout = nn.Dropout(p=model_config["dropout_rate"])
 
-        self.Batch_Norm_2 = nn.BatchNorm1d(2*model_config["hidden_size"]+model_config["non_sequential_input_size"])
+        self.LSTM = nn.ModuleList()
+        for i in range(self.num_layers):
+            input_size = model_config["sequential_input_size"] if i == 0 else self.hidden_size*(1+int(self.bidirectional))
+            self.LSTM.append(nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, bidirectional=True))
+        
+        # module_list = []
+        # for i in range(self.num_layers):
+        #     input_size = model_config["sequential_input_size"] if i == 0 else self.hidden_size*(1+int(self.bidirectional))
+        #     module_list.append(nn.Sequential(
+        #         nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, bidirectional=True),
+        #         nn.LayerNorm(2*model_config["hidden_size"]),
+        #         nn.Dropout(p=model_config["dropout_rate"])
+        #     ))
+        # self.LSTM = nn.ModuleList(module_list)
+
+        self.Batch_Norm = nn.BatchNorm1d(2*model_config["hidden_size"]+model_config["non_sequential_input_size"])
         # input shape: (batch_size, seq, input_size)
         self.Linear = nn.Linear(self.hidden_size*(1+int(self.bidirectional))+model_config["non_sequential_input_size"], 1)
 
-        # self.Sigmoid = nn.Sigmoid()
-        self.ReLU = nn.ReLU()
+        self.Sigmoid = nn.Sigmoid()
+        # self.ReLU = nn.ReLU()
 
     def attention_layer(self, h):
         '''
@@ -88,13 +108,6 @@ class H_LSTM(nn.Module):
         # Messages for user
         msg = []
         msg.append('Model spec.| H_LSTM: apply LSTM to sequential features, involve non sequential features in output layer ')
-        # TODO: add one regarding attention
-        # if self.encoder.vgg:
-        #     msg.append('           | VCC Extractor w/ time downsampling rate = 4 in encoder enabled.')
-        # if self.enable_ctc:
-        #     msg.append('           | CTC training on encoder enabled ( lambda = {}).'.format(self.ctc_weight))
-        # if self.enable_att:
-        #     msg.append('           | {} attention decoder enabled ( lambda = {}).'.format(self.attention.mode,1-self.ctc_weight))
         return msg
 
     def forward(self, sequential_features, non_sequential_features):
@@ -104,14 +117,16 @@ class H_LSTM(nn.Module):
             # in shape: (batch_size, seq_len, input_size)
             hidden_states, _ = layer(inputs)
             # out shape: (batch_size, seq_length, hidden_size*bidirectional)
+            hidden_states = self.Layer_Norm(hidden_states)
+            hidden_states = self.Dropout(hidden_states)
     
         # only use the last timestep for linear input
         out = hidden_states[:, -1, :]
         out = torch.cat((out, non_sequential_features), 1)
-        out = self.Batch_Norm_2(out)
+        out = self.Batch_Norm(out)
         out = self.Linear(out)
 
-        predictions = self.ReLU(out)
+        predictions = self.Sigmoid(out)
         return predictions
 
 class E_CRNN(nn.Module):
@@ -148,7 +163,7 @@ class E_CRNN(nn.Module):
                                batch_first=True,
                                bidirectional=model_config["gru"]["bidirectional"])
 
-        self.GruLayerF = nn.Sequential(nn.BatchNorm1d(model_config["gru"]["input_size"]),
+        self.GruLayerF = nn.Sequential(nn.BatchNorm1d(model_config["fc_1"]["input_size"]),
                                        nn.Dropout(0.6))
 
         self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
@@ -175,26 +190,147 @@ class E_CRNN(nn.Module):
         return msg
 
     def forward(self, inp):
-        # _input (batch_size, time, freq)
-
+        # (N, C, H, W) = (16, 1, 64, 64)
         out = self.convBlock1(inp)
+        # (N, C, H, W) = (16, 4, 32, 32)
         out = self.convBlock2(out)
-        # 16, 32, 16, 16
-        out = self.convBlock3(out)
-        # 16, 64, 8, 8
-        # [N, 256, 8, 8]
+        # (N, C, H, W) = (16, 4, 16, 16)
+        # out = self.convBlock3(out)
+        # (N, C, H, W) = (16, 16, 8, 8)
+        
         out = out.contiguous().view(out.size()[0], out.size()[2], -1)
-        # [N, 8, 2048]
+        # [N, 16, 64]
         out, _ = self.GruLayer(out)
-        # [N, 8, 256]
+        # [N, 16, 32]
         out = out.contiguous().view(out.size()[0],  -1)
-        # [N, 2048]
+        # [N, 512]
 
         out = self.GruLayerF(out)
         out = self.fcBlock1(out)
         out = self.fcBlock2(out)
         out = self.output(out)
         return out
+
+class E_Transformer(nn.Module):
+    '''
+        use Transformer encoder (visual transformer) for melspectrogram inputs, ref:
+        https://arxiv.org/pdf/1706.03762.pdf
+    '''
+    def __init__(self, model_config):
+        super(E_Transformer, self).__init__()
+        self.d_model = model_config["transformer_encoder"]["d_model"]
+        self.nhead = model_config["transformer_encoder"]["nhead"]
+        self.dim_feedforward = model_config["transformer_encoder"]["dim_feedforward"]
+        self.dropout = model_config["transformer_encoder"]["dropout"]
+        self.seq_len = model_config["seq_len"]
+        encoder_layers = nn.TransformerEncoderLayer(d_model=self.d_model,
+                                                    nhead=self.nhead,
+                                                    dim_feedforward=self.dim_feedforward,
+                                                    dropout=self.dropout)
+
+        self.transforer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=model_config["transformer_encoder"]["num_layers"])
+        self.transforer_encoder_f = nn.Sequential(nn.BatchNorm1d(self.seq_len), # after transpose
+                                                  nn.Dropout(0.6))
+
+        self.fcBlock1 = nn.Sequential(nn.Linear(in_features=model_config["fc_1"]["input_size"], out_features=model_config["fc_1"]["output_size"]),
+                                      nn.ReLU(),
+                                      nn.Dropout(0.5))
+
+        self.fcBlock2 = nn.Sequential(nn.Linear(in_features=model_config["fc_2"]["input_size"], out_features=model_config["fc_2"]["output_size"]),
+                                      nn.ReLU(),
+                                      nn.Dropout(0.5))
+
+        self.output = nn.Sequential(nn.Linear(in_features=model_config["output"]["input_size"], out_features=model_config["output"]["output_size"]),
+                                    nn.Sigmoid())
+    def create_msg(self):
+        # Messages for user
+        msg = []
+        msg.append('Model spec.| E_Transformer: use Transformer encoder for melspectrogram inputs(img)')
+        return msg
+
+    def forward(self, inp):
+
+        # pad zero to seq_len (need to be divisible by n_head)
+        # inp = F.pad(input=inp, pad=(0,  self.d_model - inp.size(-1), 0, 0), mode='constant', value=0)
+
+        # (batch_size, 1(gray scale), embed_dim(n_mels), seq_len)
+        out = inp.squeeze(1)
+        # (batch_size, embed_dim(n_mels), seq_len)
+        out = torch.transpose(out, 1, 2) # swap seq_len and embed_dim
+        # (batch_size, seq_len, embed_dim(n_mels))
+        out = self.transforer_encoder(out)
+
+        out = self.transforer_encoder_f(out)
+        out = out.contiguous().view(out.size()[0], -1)
+        out = self.fcBlock1(out)
+        out = self.fcBlock2(out)
+        out = self.output(out)
+        return out
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        conv_layers = []
+
+        # First Convolution Block with Relu and Batch Norm. Use Kaiming Initialization
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=(5, 5), stride=(2, 2), padding=(2, 2))
+        self.relu1 = nn.ReLU()
+        self.bn1 = nn.BatchNorm2d(8)
+        init.kaiming_normal_(self.conv1.weight, a=0.1)
+        self.conv1.bias.data.zero_()
+        conv_layers += [self.conv1, self.relu1, self.bn1]
+
+        # Second Convolution Block
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu2 = nn.ReLU()
+        self.bn2 = nn.BatchNorm2d(16)
+        init.kaiming_normal_(self.conv2.weight, a=0.1)
+        self.conv2.bias.data.zero_()
+        conv_layers += [self.conv2, self.relu2, self.bn2]
+
+        # Second Convolution Block
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu3 = nn.ReLU()
+        self.bn3 = nn.BatchNorm2d(32)
+        init.kaiming_normal_(self.conv3.weight, a=0.1)
+        self.conv3.bias.data.zero_()
+        conv_layers += [self.conv3, self.relu3, self.bn3]
+
+        # Second Convolution Block
+        self.conv4 = nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        self.relu4 = nn.ReLU()
+        self.bn4 = nn.BatchNorm2d(64)
+        init.kaiming_normal_(self.conv4.weight, a=0.1)
+        self.conv4.bias.data.zero_()
+        conv_layers += [self.conv4, self.relu4, self.bn4]
+
+        # Linear Classifier
+        self.ap = nn.AdaptiveAvgPool2d(output_size=1)
+        self.lin = nn.Linear(in_features=64, out_features=1)
+
+        # Wrap the Convolutional Blocks
+        self.conv = nn.Sequential(*conv_layers)
+        # TODO: add this to config
+        fds = False
+        if fds:
+            self.FDS = FDS(
+
+            )
+
+    def forward(self, x):
+        # Run the convolutional blocks
+        x = self.conv(x)
+
+        # Adaptive pool and flatten for input to linear layer
+        x = self.ap(x)
+        x = x.view(x.shape[0], -1)
+
+        # Linear layer
+        x = self.lin(x)
+
+        # Final output
+        return x
+
 
 ''' modified from https://github.com/santi-pdp/pase/blob/master/emorec/neural_networks.py '''  
 class MLP(nn.Module):
@@ -289,6 +425,53 @@ class MLP(nn.Module):
             
           
         return x
+
+class LSTM(nn.Module):
+    
+    def __init__(self, options,inp_dim):
+        super(LSTM, self).__init__()
+        
+        self.input_dim=inp_dim
+        self.hidden_size=int(options['hidden_size'])
+        self.num_layers=int(options['num_layers'])
+        self.bias=bool(strtobool(options['bias']))
+        self.batch_first=bool(strtobool(options['batch_first']))
+        self.dropout=float(options['dropout'])
+        self.bidirectional=bool(strtobool(options['bidirectional']))
+        self.out_dim=self.hidden_size+self.bidirectional*self.hidden_size
+        
+        self.lstm = nn.ModuleList()
+        
+        for i in range(self.num_layers):
+            input_size = self.input_dim if i == 0 else self.out_dim
+            self.lstm.append(nn.LSTM(input_size=input_size, hidden_size=self.hidden_size, batch_first=True, 
+                                        bias=self.bias,dropout=self.dropout,bidirectional=self.bidirectional))
+        
+         
+        self.linear = nn.Linear(self.out_dim, 1)
+
+        self.relu = nn.ReLU()
+               
+        
+    def forward(self, x):
+
+        hidden_states_list = []                 
+        for idx, layer in enumerate(self.lstm):
+            inputs = x if idx == 0 else hidden_states
+
+            # in shape: (batch_size, seq_len, input_size)
+            hidden_states, _ = layer(inputs)
+            # out shape: (batch_size, seq_length, hidden_size*bidirectional)
+            
+            hidden_states_list.append(hidden_states)
+
+        # use last time step
+        out = hidden_states[:, -1, :]
+        out = self.linear(out)
+
+        predictions = self.relu(out)
+                
+        return predictions, hidden_states_list
 
 class LayerNorm(nn.Module):
 

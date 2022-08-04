@@ -21,19 +21,19 @@ class Solver(BaseSolver):
     ''' Solver for training'''
     def __init__(self,config,paras,mode):
         super().__init__(config,paras,mode)
-        if self.paras.do_kfold:
-            output_dir = os.path.join(self.outdir, paras.model, "fold_{}".format(self.paras.fold_index))
-        os.makedirs(output_dir, exist_ok=True)
-        self.memo_output_path = os.path.join(output_dir, "predicted_memorability_scores.csv")
-        self.corr_output_path = os.path.join(output_dir, "details.txt")
-        self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")
+        
+        self.memo_output_path = os.path.join(self.outdir, "predicted_memorability_scores.csv")
+        self.corr_output_path = os.path.join(self.outdir, "details.txt")
+        
+        self.interp_dir = os.path.join(self.outdir, paras.model, "interpretability")        
+        os.makedirs(self.interp_dir, exist_ok=True)
         
         with open(self.config["path"]["fe_cfg"], 'r') as fe_cfg_f:
             self.fe_cfg = json.load(fe_cfg_f)
 
         self.CUDA = True if self.paras.gpu else False
         self.model_ckpt = torch.load(self.paras.load, map_location=self.device)
-        self.verbose("Loaded model checkpoint @ {}".format(self.config["path"]["finetuned_model_ckpt"]))
+        self.verbose("Loaded model checkpoint @ {}".format(self.paras.load))
 
     def load_data(self):
         ''' Load data for testing '''
@@ -77,10 +77,13 @@ class Solver(BaseSolver):
 
         # Downstream Model
         options = self.config["model"]
-        print(options)        
         inp_dim = options["input_dim"]
 
+        # set dropout to 0.0 for testing
+        options.update({"dnn_drop": '0.0,0.0'})
+
         self.downstream_model = MLP(options,inp_dim).to(self.device)
+        
         self.downstream_model.load_state_dict(self.model_ckpt["model"])
 
         self.reg_loss_func = nn.MSELoss()
@@ -94,14 +97,15 @@ class Solver(BaseSolver):
         with open(self.memo_output_path, 'w') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["track", "pred_score", "lab_score"])
-            for idx, data in enumerate(tqdm(self.test_loader)):
-                wavs, lab_scores = self.fetch_data(data)
-                features = self.encoder(wavs, self.device)
-                features = torch.mean(features, dim=1) # temporal pooling (B, T, D) -> (B, D)
-                pred_scores = self.downstream_model(features).cpu().detach().item()
+            with torch.no_grad():
+                for idx, data in enumerate(tqdm(self.test_loader)):
+                    wavs, lab_scores = self.fetch_data(data)
+                    features = self.encoder(wavs, self.device)
+                    features = torch.mean(features, dim=1) # temporal pooling (B, T, D) -> (B, D)
+                    pred_score = self.downstream_model(features).cpu().detach().item()
 
-                self.pred_scores.append(pred_scores)
-                writer.writerow([self.test_labels_df.track.values[idx], pred_scores, self.test_labels_df.score.values[idx]])
+                    self.pred_scores.append(pred_score)
+                    writer.writerow([self.test_labels_df.track.values[idx], pred_score, self.test_labels_df.score.values[idx]])
         
             self.verbose("predicted memorability score saved at {}".format(self.memo_output_path))
         
@@ -111,7 +115,7 @@ class Solver(BaseSolver):
 
         with open(self.corr_output_path, 'w') as f:
             f.write(str(correlation))
-            f.write("regression loss: {}".format(str(correlation)))
+            f.write("regression loss: {}".format(str(reg_loss)))
 
         self.verbose("correlation result: {}, MSE loss: {}, saved at {}".format(correlation, reg_loss, self.corr_output_path))
         
