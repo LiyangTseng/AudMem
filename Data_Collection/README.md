@@ -1,5 +1,14 @@
 # Data Collection
+## Goal
+- To collect appropriate music samples as materials in *[The Music Memory Game](../Experiment_Website/)*
+## How it is done
+- To avoid bias, Use [Youtube API](https://developers.google.com/youtube/v3/docs/search/list) to collect videos in the category of "music"
+- Manuel filter videos that not realy have content of music (e.g., interviews, unboxing musical gadgets)
+- Apply pilot study to make sure the collected audios are not that popular (therefore can be used as materials in memory game)
+- Apply appropriate truncation and stretching to the audios
+
 ## File Usage
+> Note that codes in this directory migth be a little bit messy
 - [collect_yt_data.py](collect_yt_data.py): get random music-related videos via Youtube API, then store the results to [yt_info.csv](yt_info.csv).
 - [brows_all.py](brows_all.py): a program to open all youtube links one by one automatically, and is meant to be used in the process of filtering unwanted music.
 - [plot_statistics.py](plot_statistics.py): plot histograms of both viewCounts and valid_viewCounts. 

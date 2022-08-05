@@ -1,5 +1,8 @@
 # Feature Extraction
 ## File Tree
+
+**Note Feature Extraction has been integrated to [Model_Architecture](../Model_Architecture/utils/)**
+
 ```
 .
 ├── extract_features.py
