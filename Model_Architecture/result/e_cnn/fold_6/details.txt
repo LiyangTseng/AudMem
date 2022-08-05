@@ -1,3 +1,0 @@
-using weight: weights/e_cnn/fold_6/e_cnn_best.pth
-SpearmanrResult(correlation=0.24802371541501977, pvalue=0.2538330249039902)
-regression loss: tensor(0.0264, dtype=torch.float64)

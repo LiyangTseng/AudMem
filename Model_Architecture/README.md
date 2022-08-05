@@ -1,4 +1,28 @@
-# Model
+# Model Architecture
+> This project is written using [this template](https://github.com/Alexander-H-Liu/End-to-end-ASR-Pytorch)
+## Goal 
+Use the labeled [music memorabilty dataset](https://drive.google.com/file/d/16A_3x1FhWq76HpW2Sq5t7-BQzLdnkfAI/view?usp=sharing) from the interactive [Music Memory Game](../Experiment_Website/) to train music memorability prediction
+## Implementation (Proposed Models)
+1. Explainable handcraft features + SVR
+2. Explainable handcraft features + MLP
+3. Mel-spectrogram + [Self-Supervised Audio Spectrogram Transformer (SSAST)](https://drive.google.com/file/d/16A_3x1FhWq76HpW2Sq5t7-BQzLdnkfAI/view?usp=sharing)
+
+## File Usage
+### General Function
+- Can reference [original template](https://github.com/Alexander-H-Liu/End-to-end-ASR-Pytorch) for overview
+- Hyperparameter configurations saved at [config](config).
+- All data (features, labels, raw_audios) saved at [data](data).
+- Model weights saved at [weights](weights).
+- [train.py](train.py)/[test.py](test.py) for model training/inferencing wrappers.
+- Baseline representations are stored in [baseline_representation.zip](/baseline_representation.zip)
+### Feature Engineering Model
+- Data augmentation by shifting [original audios](data/raw_audios/original) semitones using [augment_data.py](utils/augment_data.py). The augmentated audios will also be stored at the folder [data/raw_audios](data/raw_audios).
+- Note that the *explainable handcraft features (EHC features)* are extracted in [extract_segments_features](extract_segments_features) (after split five-second clips to 9 one-second clips), and the features are stored in [data.csv](data/data.csv).
+- Train models using [run_mlp_k_fold.sh](/run_mlp_k_fold.sh) and [run_svr_k_fold.sh](/run_svr_k_fold.sh)
+### End-to-End Feature Learning Model
+#### SSAST
+- Fine-tuned SSAST on our music memorability prediction task
+- Train model using [run_ssast_k_fold.sh](/run_ssast_k_fold.sh)
 ## Dependency
 To run the codes, the following packages are needed. It is suggested to create a new virtual environment and run <code>pip install -r [requirements.txt](requirements.txt)</code> to install all packages.
 ```
@@ -26,18 +50,3 @@ Run the following code in [root folder](.) to enable sibling package imports. Th
 ```
 pip install -e .
 ```
-## File Usage
-## General Function
-- Hyperparameter configurations saved at [config](config).
-- All data (features, labels, raw_audios) saved at [data](data).
-- Model weights saved at [weights](weights).
-- [train.py](train.py)/[test.py](test.py) for model training/inferencing wrappers.
-### Handcrafted Features Model
-- Data augmentation by shifting [original audios](data/raw_audios/original) semitones using [augment_data.py](utils/augment_data.py). The augmentated audios will also be stored at the folder [data/raw_audios](data/raw_audios).
-- Extract features from raw audios using [extract_features.py](utils/extract_features.py).
-
-### End-to-End Model
-#### Pase/Pase+ Encoder
-- Set up audioset for pre-training pase using [prepare_audioset.py](utils/prepare_audioset.py).
-- Format data configuration to pase-compatible form using [generate_data_cfg.py](utils/generate_data_cfg.py), this is modified from [PASE](https://github.com/santi-pdp/pase/blob/master/unsupervised_data_cfg_librispeech.py).
-- Use [make_trainset_statistics.py](utils/make_trainset_statistics.py) to compute data normalization statistics for pretext workers.
