@@ -1,8 +1,0 @@
-raw, corr Music and memorabilty score : 0.07947619419339105
-raw, corr Musical instrument and memorabilty score : 0.153066291960605
-
-truncation, corr Music and memorabilty score : -0.03854857935189092
-truncation, corr Musical instrument and memorabilty score : 0.12305165425055145
-
-truncation&PS, corr Music and memorabilty score : -0.02670036627166933
-truncation&PS, corr Musical instrument and memorabilty score : 0.12595638556274194
