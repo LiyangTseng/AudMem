@@ -1,0 +1,11 @@
+raw, corr zcr_num and memorabilty score : 0.15977892077269815
+raw, corr zcr_avg and memorabilty score : 0.16027710591562633
+raw, corr zcr_median and memorabilty score : 0.16841144568769792
+
+truncation, corr zcr_num and memorabilty score : 0.1823828894097966
+truncation, corr zcr_avg and memorabilty score : 0.18236734843183652
+truncation, corr zcr_median and memorabilty score : 0.19152266461395703
+
+truncation&PS, corr zcr_num and memorabilty score : 0.16800313567250244
+truncation&PS, corr zcr_avg and memorabilty score : 0.1679892177988872
+truncation&PS, corr zcr_median and memorabilty score : 0.1769466877834053
